@@ -4,7 +4,6 @@ uses
   Forms,
   UServerForm in 'UServerForm.pas' {ServerForm},
   UCliForm in 'UCliForm.pas' {CliForm},
-  zLogGlobal in '..\zLog\zLogGlobal.pas',
   UAbout in 'UAbout.pas' {AboutBox},
   UBasicMultiForm in 'UBasicMultiForm.pas' {BasicMultiForm},
   UBasicStats in 'UBasicStats.pas' {BasicStats},
@@ -22,12 +21,15 @@ uses
   UWWZone in 'UWWZone.pas' {WWZone},
   UCheckWin in 'UCheckWin.pas' {CheckWin},
   UFreqList in 'UFreqList.pas' {FreqList},
-  UGraph in 'UGraph.pas' {Graph};
+  UzlogConst in 'UzlogConst.pas',
+  UzLogQSO in 'UzLogQSO.pas',
+  UzLogGlobal in 'UzLogGlobal.pas' {dmZLogGlobal: TDataModule};
 
 {$R *.RES}
 
 begin
   Application.Title := 'Z-Server';
+  Application.CreateForm(TdmZLogGlobal, dmZLogGlobal);
   Application.CreateForm(TServerForm, ServerForm);
   Application.CreateForm(TAboutBox, AboutBox);
   Application.CreateForm(TBasicMultiForm, BasicMultiForm);
@@ -46,6 +48,5 @@ begin
   Application.CreateForm(TWWMultiForm, WWMultiForm);
   Application.CreateForm(TCheckWin, CheckWin);
   Application.CreateForm(TFreqList, FreqList);
-  Application.CreateForm(TGraph, Graph);
   Application.Run;
 end.

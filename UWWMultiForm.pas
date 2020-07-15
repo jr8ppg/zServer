@@ -4,7 +4,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  UBasicMultiForm, StdCtrls, Grids, Cologrid, ExtCtrls, JLLabel,zLogGlobal;
+  UBasicMultiForm, StdCtrls, Grids, Cologrid, ExtCtrls, JLLabel,
+  UzLogGlobal, UzLogConst, UzLogQSO;
 
 const testCQWW = $03;
       MAXCQZONE = 40;
@@ -13,10 +14,10 @@ const testCQWW = $03;
 
 type
   TCountry = class
-    Country : string[40]; {JA, KH6 etc}
-    CountryName : string[40]; {Japan, Hawaii, etc}
+    Country : string; {JA, KH6 etc}
+    CountryName : string; {Japan, Hawaii, etc}
     Zone : integer;
-    Continent : string[3];
+    Continent : string;
     Worked : array[b19..HiBand] of boolean;
     GridIndex : integer;  // where it is listed in the Grid (row)
     constructor Create;
@@ -32,11 +33,11 @@ type
   end;
 
   TPrefix = class
-    Prefix : string[12];
+    Prefix : string;
     Index : integer;
     Length : integer;
     OvrZone : integer;         // override zone
-    OvrContinent : string[3];  // override continent
+    OvrContinent : string;     // override continent
     constructor Create;
   end;
 
@@ -96,663 +97,651 @@ var
 
 implementation
 
-uses UWWZone, UServerForm;
+uses
+  UWWZone, UServerForm;
 
 {$R *.DFM}
 
-
-procedure LoadCTY_DAT(TEST : byte; var L : TCountryList; var PL : TPrefixList);
-var f : textfile;
-    str, temp, temp2 : string;
-    C : TCountry;
-    P : TPrefix;
-    i, mii, j, k, m : integer;
+procedure LoadCTY_DAT(TEST: byte; var L: TCountryList; var PL: TPrefixList);
+var
+   f: textfile;
+   str, temp, temp2: string;
+   C: TCountry;
+   P: TPrefix;
+   i, mii, j, k, m: integer;
 begin
-  System.assign(f, 'CTY.DAT');
-  try
-    System.reset(f);
-  except
-    on EFOpenError do
-      begin
-        exit;
+   AssignFile(f, 'CTY.DAT');
+   try
+      Reset(f);
+   except
+      on EFOpenError do begin
+         exit;
       end;
-  end;
+   end;
 
-  //readln(f, str);
-  C := TCountry.Create;
-  C.CountryName := 'Unknown';
-  L.List.Add(C);
-  while not(eof(f)) do
-    begin
-      readln(f, str);
+   C := TCountry.Create;
+   C.CountryName := 'Unknown';
+   L.List.Add(C);
+   while not(eof(f)) do begin
+      ReadLn(f, str);
 
-      if (Pos('*', str) > 0) and (TEST <> testCQWW) then //Cty only for CQWW
-        begin
-          repeat
+      if (Pos('*', str) > 0) and (TEST <> testCQWW) then // Cty only for CQWW
+      begin
+         repeat
             readln(f, str);
-          until (eof(f)) or (pos(':',str) > 0);
-          if eof(f) then
+         until (eof(f)) or (Pos(':', str) > 0);
+         if eof(f) then
             exit;
-        end;
+      end;
 
       C := TCountry.Create;
 
-      i := Pos(':',str);
-      if i > 0 then
-        begin
-          C.CountryName := copy(str,1,i-1);
-          Delete(str, 1, i);
-          str := TrimLeft(str);
-        end;
+      i := Pos(':', str);
+      if i > 0 then begin
+         C.CountryName := copy(str, 1, i - 1);
+         Delete(str, 1, i);
+         str := TrimLeft(str);
+      end;
 
-      i := Pos(':',str);
-      if i > 0 then
-        begin
-          temp := copy(str,1,i-1);
-          try
-            j := StrToInt(temp);
-          except
-            on EConvertError do
-              j := 0;
-          end;
-          if (TEST in [testCQWW, testDXCCWWZone]) then
+      i := Pos(':', str);
+      if i > 0 then begin
+         temp := copy(str, 1, i - 1);
+         j := StrToIntDef(temp, 0);
+
+         if (TEST in [testCQWW, testDXCCWWZone]) then begin
             C.Zone := j;
-          Delete(str, 1, i);
-          str := TrimLeft(str);
-        end;
+         end;
 
-      i := Pos(':',str);
-      if i > 0 then
-        begin
-          temp := copy(str,1,i-1);
-          try
-            j := StrToInt(temp);
-          except
-            on EConvertError do
-              j := 0;
-          end;
-          if (TEST = testIARU) then
+         Delete(str, 1, i);
+         str := TrimLeft(str);
+      end;
+
+      i := Pos(':', str);
+      if i > 0 then begin
+         temp := copy(str, 1, i - 1);
+         j := StrToIntDef(temp, 0);
+
+         if (TEST = testIARU) then begin
             C.Zone := j;
-          Delete(str, 1, i);
-          str := TrimLeft(str);
-        end;
+         end;
 
-      i := Pos(':',str);
-      if i > 0 then
-        begin
-          temp := copy(str,1,i-1);
-          if Pos(temp+';', 'AS;AF;EU;NA;SA;OC;') > 0 then
+         Delete(str, 1, i);
+         str := TrimLeft(str);
+      end;
+
+      i := Pos(':', str);
+      if i > 0 then begin
+         temp := copy(str, 1, i - 1);
+         if Pos(temp + ';', 'AS;AF;EU;NA;SA;OC;') > 0 then
             C.Continent := temp;
-          Delete(str, 1, i);
-          str := TrimLeft(str);
-        end;
+         Delete(str, 1, i);
+         str := TrimLeft(str);
+      end;
 
-      i := Pos(':',str); // latitude
-      if i > 0 then
-        begin
-          Delete(str, 1, i);
-          str := TrimLeft(str);
-        end;
+      i := Pos(':', str); // latitude
+      if i > 0 then begin
+         Delete(str, 1, i);
+         str := TrimLeft(str);
+      end;
 
-      i := Pos(':',str); // longitude
-      if i > 0 then
-        begin
-          Delete(str, 1, i);
-          str := TrimLeft(str);
-        end;
+      i := Pos(':', str); // longitude
+      if i > 0 then begin
+         Delete(str, 1, i);
+         str := TrimLeft(str);
+      end;
 
-      i := Pos(':',str); // utc offset
-      if i > 0 then
-        begin
-          Delete(str, 1, i);
-          str := TrimLeft(str);
-        end;
+      i := Pos(':', str); // utc offset
+      if i > 0 then begin
+         Delete(str, 1, i);
+         str := TrimLeft(str);
+      end;
 
-      i := Pos(':',str);
-      if i > 0 then
-        begin
-          temp := copy(str, 1, i-1);
-          if temp[1] = '*' then
-            Delete(temp,1,1);
-          C.Country := temp;
-          //Delete(str, 1, i);
-          //str := TrimLeft(str);
-        end;
+      i := Pos(':', str);
+      if i > 0 then begin
+         temp := copy(str, 1, i - 1);
+         if temp[1] = '*' then
+            Delete(temp, 1, 1);
+         C.Country := temp;
+         // Delete(str, 1, i);
+         // str := TrimLeft(str);
+      end;
 
       L.List.Add(C);
-      i := L.List.Count -1;
+      i := L.List.Count - 1;
       C.GridIndex := i;
 
       repeat
-        mii:=1;
-        readln(f,str);
-        str := TrimLeft(str);
-          repeat
-            temp:='';
+         mii := 1;
+         readln(f, str);
+         str := TrimLeft(str);
+         repeat
+            temp := '';
             repeat
-	      temp:=temp+str[mii];
-	      inc(mii)
-	    until (str[mii]=',') or (str[mii]=';') or (mii>length(str));
+               temp := temp + str[mii];
+               inc(mii)
+            until (str[mii] = ',') or (str[mii] = ';') or (mii > Length(str));
 
             P := TPrefix.Create;
 
-            if (pos('(', temp) > 0) then
-              begin
-                j := pos('(',temp);
-                k := pos(')',temp);
-                if k > j+1 then
-                  begin
-                    temp2 := copy(temp, j+1, k-j-1);
-                    try
-                      m := StrToInt(temp2);
-                    except
-                      on EConvertError do
-                        m := 0;
-                    end;
-                    if (m > 0) and (TEST in [testCQWW, testDXCCWWZone]) then
-                      P.OvrZone := m;
-                  end;
-                Delete(temp,j,k-j+1);
-              end;
+            if (Pos('(', temp) > 0) then begin
+               j := Pos('(', temp);
+               k := Pos(')', temp);
+               if k > j + 1 then begin
+                  temp2 := copy(temp, j + 1, k - j - 1);
+                  m := StrToIntDef(temp2, 0);
 
-            if (pos('[', temp) > 0) then
-              begin
-                j := pos('[',temp);
-                k := pos(']',temp);
-                if k > j+1 then
-                  begin
-                    temp2 := copy(temp, j+1, k-j-1);
-                    try
-                      m := StrToInt(temp2);
-                    except
-                      on EConvertError do
-                        m := 0;
-                    end;
-                    if (m > 0) and (TEST=testIARU) then
-                      P.OvrZone := m;
+                  if (m > 0) and (TEST in [testCQWW, testDXCCWWZone]) then begin
+                     P.OvrZone := m;
                   end;
-                Delete(temp,j,k-j+1);
-              end;
+               end;
 
-            if (pos('{', temp) > 0) then
-              begin
-                j := pos('{',temp);
-                k := pos('}',temp);
-                if k > j+1 then
-                  begin
-                    temp2 := copy(temp, j+1, k-j-1);
-                    if Pos(temp2+';', 'AS;AF;EU;NA;SA;OC;') > 0 then
-                      P.OvrContinent := temp2;
+               Delete(temp, j, k - j + 1);
+            end;
+
+            if (Pos('[', temp) > 0) then begin
+               j := Pos('[', temp);
+               k := Pos(']', temp);
+               if k > j + 1 then begin
+                  temp2 := copy(temp, j + 1, k - j - 1);
+                  m := StrToIntDef(temp2, 0);
+
+                  if (m > 0) and (TEST = testIARU) then begin
+                     P.OvrZone := m;
                   end;
-                Delete(temp,j,k-j+1);
-              end;
+               end;
 
-            if (pos('<', temp) > 0) then // lat, long override. ignore
-              begin
-                j := pos('<',temp);
-                k := pos('>',temp);
-                Delete(temp,j,k-j+1);
-              end;
+               Delete(temp, j, k - j + 1);
+            end;
+
+            if (Pos('{', temp) > 0) then begin
+               j := Pos('{', temp);
+               k := Pos('}', temp);
+               if k > j + 1 then begin
+                  temp2 := copy(temp, j + 1, k - j - 1);
+                  if Pos(temp2 + ';', 'AS;AF;EU;NA;SA;OC;') > 0 then
+                     P.OvrContinent := temp2;
+               end;
+               Delete(temp, j, k - j + 1);
+            end;
+
+            if (Pos('<', temp) > 0) then // lat, long override. ignore
+            begin
+               j := Pos('<', temp);
+               k := Pos('>', temp);
+               Delete(temp, j, k - j + 1);
+            end;
 
             P.Prefix := temp;
             P.Index := i;
-            P.Length := length(temp);
+            P.Length := Length(temp);
             j := 0;
             if PL.List.Count > 0 then
-              for j := 0 to PL.List.Count-1 do
-                begin
+               for j := 0 to PL.List.Count - 1 do begin
                   if TPrefix(PL.List[j]).Length <= P.Length then
-                    break;
-                end;
+                     break;
+               end;
             PL.List.Insert(j, P);
-	    inc(mii);
-	  until (mii >= Length(str)+1);
-       until str[mii-1]=';';
-    end;
+            inc(mii);
+         until (mii >= Length(str) + 1);
+      until str[mii - 1] = ';';
+   end;
 end;
 
-procedure LoadCountryDataFromFile(filename : string; var L : TCountryList; var PL : TPrefixList);
-var f : textfile;
-    str, temp : string;
-    C : TCountry;
-    P : TPrefix;
-    i, mii, j : integer;
+procedure LoadCountryDataFromFile(filename: string; var L: TCountryList; var PL: TPrefixList);
+var
+   f: textfile;
+   str, temp: string;
+   C: TCountry;
+   P: TPrefix;
+   i, mii, j: integer;
 begin
-  System.assign(f, filename);
-  try
-    System.reset(f);
-  except
-    on EFOpenError do
-      begin
-        exit;
+   AssignFile(f, filename);
+   try
+      Reset(f);
+   except
+      on EFOpenError do begin
+         exit;
       end;
-  end;
-  readln(f, str);
-  C := TCountry.Create;
-  C.CountryName := 'Unknown';
-  L.List.Add(C);
-  while not(eof(f)) do
-    begin
+   end;
+
+   ReadLn(f, str);
+   C := TCountry.Create;
+   C.CountryName := 'Unknown';
+   L.List.Add(C);
+   while not(eof(f)) do begin
       readln(f, str);
-      if Pos('end of file', LowerCase(str))>0 then break;
+      if Pos('end of file', LowerCase(str)) > 0 then
+         break;
       C := TCountry.Create;
-      C.CountryName := TrimRight(copy(str,1,26));
-      temp := TrimLeft(TrimRight(copy(str,27,2)));
-      try
-        i := StrToInt(temp)
-      except
-        on EConvertError do
-          i := 0;
+      C.CountryName := TrimRight(copy(str, 1, 26));
+      temp := TrimLeft(TrimRight(copy(str, 27, 2)));
+      i := StrToIntDef(temp, 0);
+
+      if (i < 0) or (i > 90 { maxzone } ) then begin
+         i := 0;
       end;
-      if (i < 0) or (i > 90{maxzone}) then
-        i := 0;
+
       C.Zone := i;
-      C.Country := TrimRight(copy(str,32,7));
+      C.Country := TrimRight(copy(str, 32, 7));
       case C.Zone of
-           1..8       :  C.Continent := 'NA';
-           9..13      :  C.Continent := 'SA';
-           14..16,40  :  C.Continent := 'EU';
-           17..26     :  C.Continent := 'AS';
-           27..32     :  C.Continent := 'OC';
-           33..39     :  C.Continent := 'AF';
-         end;
-      if str[39] in ['A','O','E'] then
-        begin
-          temp:=str[39]+str[40];
-             if temp='AS' then C.Continent := 'AS';
-             if temp='AN' then C.Continent := 'AN';
-             if temp='AF' then C.Continent := 'AF';
-             if temp='EU' then C.Continent := 'EU';
-             if temp='OC' then C.Continent := 'OC';
-             if temp='NA' then C.Continent := 'NA';
-             if temp='SA' then C.Continent := 'SA';
-           end;
+         1 .. 8:
+            C.Continent := 'NA';
+         9 .. 13:
+            C.Continent := 'SA';
+         14 .. 16, 40:
+            C.Continent := 'EU';
+         17 .. 26:
+            C.Continent := 'AS';
+         27 .. 32:
+            C.Continent := 'OC';
+         33 .. 39:
+            C.Continent := 'AF';
+      end;
+
+      if CharInSet(str[39], ['A', 'O', 'E']) then begin
+         temp := str[39] + str[40];
+         if temp = 'AS' then
+            C.Continent := 'AS';
+         if temp = 'AN' then
+            C.Continent := 'AN';
+         if temp = 'AF' then
+            C.Continent := 'AF';
+         if temp = 'EU' then
+            C.Continent := 'EU';
+         if temp = 'OC' then
+            C.Continent := 'OC';
+         if temp = 'NA' then
+            C.Continent := 'NA';
+         if temp = 'SA' then
+            C.Continent := 'SA';
+      end;
+
       L.List.Add(C);
-      i := L.List.Count -1;
+      i := L.List.Count - 1;
       C.GridIndex := i;
 
       repeat
-        mii:=3;
-        readln(f,str);
-          repeat
-            temp:='';
+         mii := 3;
+         readln(f, str);
+         repeat
+            temp := '';
             repeat
-	      temp:=temp+str[mii];
-	      inc(mii)
-	    until (str[mii]=',') or (str[mii]=';');
+               temp := temp + str[mii];
+               inc(mii)
+            until (str[mii] = ',') or (str[mii] = ';');
             P := TPrefix.Create;
             P.Prefix := temp;
             P.Index := i;
-            P.Length := length(temp);
+            P.Length := Length(temp);
             j := 0;
             if PL.List.Count > 0 then
-              for j := 0 to PL.List.Count-1 do
-                begin
+               for j := 0 to PL.List.Count - 1 do begin
                   if TPrefix(PL.List[j]).Length <= P.Length then
-                    break;
-                end;
+                     break;
+               end;
             PL.List.Insert(j, P);
-	    inc(mii);
-	  until mii=Length(str)+1;
-       until str[mii-1]=';';
-    end;
+            inc(mii);
+         until mii = Length(str) + 1;
+      until str[mii - 1] = ';';
+   end;
 end;
 
 constructor TCountryList.Create;
 begin
-  List := TList.Create;
+   List := TList.Create;
 end;
 
 destructor TCountryList.Destroy;
-var i : integer;
+var
+   i: integer;
 begin
-  List.Pack;
-  for i := 0 to List.Count-1 do
-    TCountry(List[i]).Free;
-  List.Free;
+   List.Pack;
+   for i := 0 to List.Count - 1 do
+      TCountry(List[i]).Free;
+   List.Free;
 end;
 
-function TCountry.Summary : string;
-var temp : string;
-    B : TBand;
+function TCountry.Summary: string;
+var
+   temp: string;
+   B: TBand;
 begin
-  if CountryName = 'Unknown' then
-    begin
+   if CountryName = 'Unknown' then begin
       Result := 'Unknown';
       exit;
-    end;
-  temp := '';
-  temp := FillRight(Country,7)+FillRight(CountryName,28)+
-          FillRight(IntToStr(Zone),2)+' '+ //ver 0.23
-          Continent+ '  ';
-  for B := b19 to b28 do
-    if NotWARC(B) then
-      if Worked[B] then
-        temp := temp + '* '
-      else
-        temp := temp + '. ';
-  Result := temp;
+   end;
+   temp := '';
+   temp := FillRight(Country, 7) + FillRight(CountryName, 28) + FillRight(IntToStr(Zone), 2) + ' ' + // ver 0.23
+      Continent + '  ';
+   for B := b19 to b28 do
+      if NotWARC(B) then
+         if Worked[B] then
+            temp := temp + '* '
+         else
+            temp := temp + '. ';
+   Result := temp;
 end;
 
-function TCountry.Summary2 : string;
-var temp : string;
-    B : TBand;
-    i : integer;
+function TCountry.Summary2: string;
+var
+   temp: string;
+   B: TBand;
+   i: integer;
 begin
-  if CountryName = 'Unknown' then
-    begin
+   if CountryName = 'Unknown' then begin
       Result := 'Unknown';
       exit;
-    end;
-  temp := '';
-  temp := FillRight(Country,7)+FillRight(CountryName,28)+ Continent+ '  ';
-  temp := temp + 'worked on : ';
-  for B := b19 to b28 do
-    if NotWARC(B) then
-      if Worked[B] then
-        temp := temp + MHzString[B] + ' '
-      else
-        for i := 1 to length(MHzString[B]) do
-          temp := temp + ' ';
-  Result := temp;
+   end;
+   temp := '';
+   temp := FillRight(Country, 7) + FillRight(CountryName, 28) + Continent + '  ';
+   temp := temp + 'worked on : ';
+   for B := b19 to b28 do
+      if NotWARC(B) then
+         if Worked[B] then
+            temp := temp + MHzString[B] + ' '
+         else
+            for i := 1 to Length(MHzString[B]) do
+               temp := temp + ' ';
+   Result := temp;
 end;
 
-function TCountry.JustInfo : string;
-var temp : string;
+function TCountry.JustInfo: string;
+var
+   temp: string;
 begin
-  if CountryName = 'Unknown' then
-    begin
+   if CountryName = 'Unknown' then begin
       Result := 'Unknown';
       exit;
-    end;
-  temp := '';
-  temp := FillRight(Country,7)+FillRight(CountryName,28)+ Continent+ '  ';
-  Result := temp;
+   end;
+   temp := '';
+   temp := FillRight(Country, 7) + FillRight(CountryName, 28) + Continent + '  ';
+   Result := temp;
 end;
 
 constructor TCountry.Create;
-var B : TBand;
+var
+   B: TBand;
 begin
-  for B := b19 to HiBand do
-    Worked[B] := False;
-  Country := '';
-  CountryName := '';
-  Zone := 0;
-  Continent := '';
+   for B := b19 to HiBand do
+      Worked[B] := False;
+   Country := '';
+   CountryName := '';
+   Zone := 0;
+   Continent := '';
 end;
 
 constructor TPrefix.Create;
 begin
-  Prefix := '';
-  Index := 0;
-  Length := 0;
-  OvrZone := 0;
-  OvrContinent := '';
+   Prefix := '';
+   Index := 0;
+   Length := 0;
+   OvrZone := 0;
+   OvrContinent := '';
 end;
 
 constructor TPrefixList.Create;
 begin
-  List := TList.Create;
+   List := TList.Create;
 end;
 
 destructor TPrefixList.Destroy;
-var i : integer;
+var
+   i: integer;
 begin
-  List.Pack;
-  for i := 0 to List.Count-1 do
-    TPrefix(List[i]).Free;
-  List.Free;
+   List.Pack;
+   for i := 0 to List.Count - 1 do
+      TPrefix(List[i]).Free;
+   List.Free;
 end;
-
-
-
 
 procedure TWWMultiForm.FormCreate(Sender: TObject);
 begin
-  inherited;
-  CountryList := TCountryList.Create;
-  PrefixList := TPrefixList.Create;
+   inherited;
+   CountryList := TCountryList.Create;
+   PrefixList := TPrefixList.Create;
 
-  if FileExists('CTY.DAT') then
-    begin
+   if FileExists('CTY.DAT') then begin
       LoadCTY_DAT(testCQWW, CountryList, PrefixList);
-      //MainForm.StatusLine.SimpleText := 'Loaded CTY.DAT';
-    end
-  else
-    LoadCountryDataFromFile('CQWW.DAT', CountryList, PrefixList);
+      // MainForm.StatusLine.SimpleText := 'Loaded CTY.DAT';
+   end
+   else
+      LoadCountryDataFromFile('CQWW.DAT', CountryList, PrefixList);
 
-  Reset; // WWZone.Reset is also called from Reset
+   Reset; // WWZone.Reset is also called from Reset
 
 end;
 
-procedure TWWMultiForm.ResetBand(B : TBand);
-var i : integer;
+procedure TWWMultiForm.ResetBand(B: TBand);
+var
+   i: integer;
 begin
-  for i := 0 to CountryList.List.Count - 1 do
-    begin
+   for i := 0 to CountryList.List.Count - 1 do begin
       TCountry(CountryList.List[i]).Worked[B] := False;
-    end;
+   end;
 
-  for i := 1 to MAXCQZONE do
-    Zone[B, i] := False;
-  WWZone.ResetBand(B);
+   for i := 1 to MAXCQZONE do
+      Zone[B, i] := False;
+   WWZone.ResetBand(B);
 
-  case SortBy.ItemIndex of
-    0 : SortDefault;
-    1 : SortZone;
-  end;
+   case SortBy.ItemIndex of
+      0:
+         SortDefault;
+      1:
+         SortZone;
+   end;
 end;
 
 procedure TWWMultiForm.Reset;
-var B : TBand;
-    i : integer;
+var
+   B: TBand;
+   i: integer;
 begin
-  WWZone.Reset;
-  for B := b19 to HiBand do
-    for i := 1 to MAXCQZONE do
-      Zone[B, i] := false;
-  if CountryList.List.Count = 0 then exit;
-  for i := 0 to CountryList.List.Count-1 do
-    begin
+   WWZone.Reset;
+   for B := b19 to HiBand do
+      for i := 1 to MAXCQZONE do
+         Zone[B, i] := False;
+
+   if CountryList.List.Count = 0 then
+      exit;
+
+   for i := 0 to CountryList.List.Count - 1 do begin
       for B := b19 to HiBand do
-        TCountry(CountryList.List[i]).Worked[B] := false;
-    end;
-  case SortBy.ItemIndex of
-    0 : SortDefault;
-    1 : SortZone;
-  end;
+         TCountry(CountryList.List[i]).Worked[B] := False;
+   end;
+
+   case SortBy.ItemIndex of
+      0:
+         SortDefault;
+      1:
+         SortZone;
+   end;
 end;
 
 procedure TWWMultiForm.SortDefault;
-var i, j : integer;
+var
+   i, j: integer;
 begin
-  if CountryList.List.Count = 0 then exit;
-  j := Grid.TopRow;
-  Grid.RowCount := 0;
-  Grid.RowCount := CountryList.List.Count;
+   if CountryList.List.Count = 0 then
+      exit;
+   j := Grid.TopRow;
+   Grid.RowCount := 0;
+   Grid.RowCount := CountryList.List.Count;
 
-  for i := 0 to CountryList.List.Count-1 do
-    begin
-      Grid.Cells[0,i] := TCountry(CountryList.List[i]).Summary;
+   for i := 0 to CountryList.List.Count - 1 do begin
+      Grid.Cells[0, i] := TCountry(CountryList.List[i]).Summary;
       TCountry(CountryList.List[i]).GridIndex := i;
       GridReverse[i] := i;
-    end;
-  Grid.TopRow := j;
+   end;
+   Grid.TopRow := j;
 end;
 
 procedure TWWMultiForm.SortZone;
-var i, j, x, _top: integer;
+var
+   i, j, x, _top: integer;
 begin
-  if CountryList.List.Count = 0 then exit;
-  _top := Grid.TopRow;
+   if CountryList.List.Count = 0 then
+      exit;
+   _top := Grid.TopRow;
 
-  Grid.RowCount := 0;
-  Grid.RowCount := CountryList.List.Count;
+   Grid.RowCount := 0;
+   Grid.RowCount := CountryList.List.Count;
 
-  Grid.Cells[0,0] := TCountry(CountryList.List[0]).Summary; // unknown
+   Grid.Cells[0, 0] := TCountry(CountryList.List[0]).Summary; // unknown
 
-  x := 1;
-  for i := 1 to 40 do
-    begin
-      for j := 1 to CountryList.List.Count - 1 do
-        begin
-          if TCountry(CountryList.List[j]).Zone = i then
-            begin
-              Grid.Cells[0,x] := TCountry(CountryList.List[j]).Summary;
-              TCountry(CountryList.List[j]).GridIndex := x;
-              GridReverse[x] := j;
-              inc(x);
-          end;
-        end;
-    end;
-  Grid.TopRow := _top;
-end;
-
-procedure TWWMultiForm.Add(aQSO : TQSO);
-var i : integer;
-    C : TCountry;
-begin
-  if aQSO.QSO.Dupe then
-    exit;
-
-  if aQSO.QSO.NewMulti1 then
-    begin
-      try
-        i := StrToInt(aQSO.QSO.Multi1);
-      except
-        on EConvertError do
-          i := 0;
+   x := 1;
+   for i := 1 to 40 do begin
+      for j := 1 to CountryList.List.Count - 1 do begin
+         if TCountry(CountryList.List[j]).Zone = i then begin
+            Grid.Cells[0, x] := TCountry(CountryList.List[j]).Summary;
+            TCountry(CountryList.List[j]).GridIndex := x;
+            GridReverse[x] := j;
+            inc(x);
+         end;
       end;
-      if i in [1..40] then
-        WWZone.Mark(aQSO.QSO.Band, i);
-    end;
-
-  if aQSO.QSO.NewMulti2 then
-    begin
-      for i := 0 to CountryList.List.Count - 1 do
-        if TCountry(CountryList.List[i]).Country = aQSO.QSO.Multi2 then
-          begin
-            C := TCountry(CountryList.List[i]);
-            C.Worked[aQSO.QSO.Band] := True;
-            Grid.Cells[0,C.GridIndex] := C.Summary;
-            exit;
-          end;
-    end;
+   end;
+   Grid.TopRow := _top;
 end;
 
-{procedure TWWMultiForm.RecalcBand(B : TBand);
-var Log : TQSOList;
-    i : integer;
-    aQSO : TQSO;
+procedure TWWMultiForm.Add(aQSO: TQSO);
+var
+   i: integer;
+   C: TCountry;
 begin
+   if aQSO.Dupe then
+      exit;
+
+   if aQSO.NewMulti1 then begin
+      try
+         i := StrToInt(aQSO.Multi1);
+      except
+         on EConvertError do
+            i := 0;
+      end;
+      if i in [1 .. 40] then
+         WWZone.Mark(aQSO.Band, i);
+   end;
+
+   if aQSO.NewMulti2 then begin
+      for i := 0 to CountryList.List.Count - 1 do
+         if TCountry(CountryList.List[i]).Country = aQSO.Multi2 then begin
+            C := TCountry(CountryList.List[i]);
+            C.Worked[aQSO.Band] := True;
+            Grid.Cells[0, C.GridIndex] := C.Summary;
+            exit;
+         end;
+   end;
+end;
+
+{ procedure TWWMultiForm.RecalcBand(B : TBand);
+  var Log : TQSOList;
+  i : integer;
+  aQSO : TQSO;
+  begin
   if NotWARC(B) and (B in [b19..b28]) = False then
-    exit;
+  exit;
   Log := ServerForm.Stats.Logs[B];
   ResetBand(B);
   aQSO := TQSO.Create;
   for i := 1 to Log.TotalQSO do
-    begin
-      aQSO.QSO := TQSO(Log.List[i]).QSO;
-      Add(aQSO);
-      TQSO(Log.List[i]).QSO := aQSO.QSO;
-    end;
+  begin
+  aQSO.QSO := TQSO(Log.List[i]).QSO;
+  Add(aQSO);
+  TQSO(Log.List[i]).QSO := aQSO.QSO;
+  end;
   aQSO.Free;
-end;}
+  end; }
 
 procedure TWWMultiForm.RecalcAll;
-var i : integer;
-    aQSO : TQSO;
+var
+   i: integer;
+   aQSO: TQSO;
 begin
-  Reset;
-  for i := 1 to ServerForm.Stats.MasterLog.TotalQSO do
-    begin
-      aQSO := TQSO(ServerForm.Stats.MasterLog.List[i]);
+   Reset;
+   for i := 1 to ServerForm.Stats.MasterLog.TotalQSO do begin
+      aQSO := TQSO(ServerForm.Stats.MasterLog.QSOList[i]);
       Add(aQSO);
-    end;
-{  aQSO := TQSO.Create;
-  for B := b19 to HiBand do
-    begin
-      if NotWARC(B) then
-        begin
-          Log := ServerForm.Stats.Logs[B];
-          for i := 1 to Log.TotalQSO do
-            begin
-              aQSO.QSO := TQSO(Log.List[i]).QSO;
-              Add(aQSO);
-              TQSO(Log.List[i]).QSO := aQSO.QSO;
-            end;
-        end;
-    end;
-  aQSO.Free; }
+   end;
+   { aQSO := TQSO.Create;
+     for B := b19 to HiBand do
+     begin
+     if NotWARC(B) then
+     begin
+     Log := ServerForm.Stats.Logs[B];
+     for i := 1 to Log.TotalQSO do
+     begin
+     aQSO.QSO := TQSO(Log.List[i]).QSO;
+     Add(aQSO);
+     TQSO(Log.List[i]).QSO := aQSO.QSO;
+     end;
+     end;
+     end;
+     aQSO.Free; }
 end;
-
-
 
 procedure TWWMultiForm.SortByClick(Sender: TObject);
 begin
-  case SortBy.ItemIndex of
-    0 : SortDefault;
-    1 : SortZone;
-  end;
+   case SortBy.ItemIndex of
+      0:
+         SortDefault;
+      1:
+         SortZone;
+   end;
 end;
 
 procedure TWWMultiForm.FormShow(Sender: TObject);
 begin
-  inherited;
-  WWZone.Show;
-  WWMultiForm.SetFocus;
+   inherited;
+   WWZone.Show;
+   WWMultiForm.SetFocus;
 end;
 
 procedure TWWMultiForm.GoButtonClick(Sender: TObject);
-var temp : string;
-    i : integer;
+var
+   temp: string;
+   i: integer;
 begin
-  temp := Edit1.Text;
-  for i := 0 to CountryList.List.Count-1 do
-    begin
-      if pos(temp,TCountry(CountryList.List[i]).Country) = 1 then
-        begin
-          Grid.TopRow := TCountry(CountryList.List[i]).GridIndex;
-          break;
-        end;
-    end;
+   temp := Edit1.Text;
+   for i := 0 to CountryList.List.Count - 1 do begin
+      if Pos(temp, TCountry(CountryList.List[i]).Country) = 1 then begin
+         Grid.TopRow := TCountry(CountryList.List[i]).GridIndex;
+         break;
+      end;
+   end;
 end;
 
 procedure TWWMultiForm.Button1Click(Sender: TObject);
 begin
-  Close;
+   Close;
 end;
 
 procedure TWWMultiForm.cbStayOnTopClick(Sender: TObject);
 begin
-  inherited;
-  if cbStayOnTop.Checked then
-    FormStyle := fsStayOnTop
-  else
-    FormStyle := fsNormal;
+   inherited;
+   if cbStayOnTop.Checked then
+      FormStyle := fsStayOnTop
+   else
+      FormStyle := fsNormal;
 end;
 
-procedure TWWMultiForm.GridSetting(ARow, Acol: Integer;
-  var Fcolor: Integer; var Bold, Italic, underline: Boolean);
+procedure TWWMultiForm.GridSetting(ARow, Acol: integer; var Fcolor: integer; var Bold, Italic, underline: boolean);
 begin
-  inherited;
-  {
-  B := Main.CurrentQSO.QSO.Band;
-  if TCountry(CountryList.List[GridReverse[ARow]]).Worked[B] then
-    FColor := clRed
-  else
-    FColor := clBlack;}
-  FColor := clBlack;
+   inherited;
+   {
+     B := Main.CurrentQSO.QSO.Band;
+     if TCountry(CountryList.List[GridReverse[ARow]]).Worked[B] then
+     FColor := clRed
+     else
+     FColor := clBlack; }
+   Fcolor := clBlack;
 end;
 
 procedure TWWMultiForm.Edit1KeyPress(Sender: TObject; var Key: Char);
 begin
-  inherited;
-  if Key = Chr($0D) then
-    begin
+   inherited;
+   if Key = Chr($0D) then begin
       GoButtonClick(Self);
       Key := #0;
-    end;
+   end;
 end;
 
 end.

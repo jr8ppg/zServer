@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  zLogGlobal;
+  UzLogGlobal, UzLogConst, UzLogQSO;
 
 type
   TBasicMultiForm = class(TForm)
@@ -32,14 +32,13 @@ implementation
 
 procedure TBasicMultiForm.CreateParams(var Params: TCreateParams);
 begin
-  inherited CreateParams(Params);
-  Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
+   inherited CreateParams(Params);
+   Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
 end;
-
 
 procedure TBasicMultiForm.FormCreate(Sender: TObject);
 begin
-  Caption := 'Multipliers';
+   Caption := 'Multipliers';
 end;
 
 end.

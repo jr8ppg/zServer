@@ -41,9 +41,10 @@ interface
 
 uses
   WinTypes, WinProcs, Messages, SysUtils, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, IniFiles, WSocket, WinSock, UCliForm,
-  ExtCtrls, zLogGlobal, Menus, UBasicStats, UBasicMultiForm, UALLJAStats,
-  UALLJAMultiForm, FngSingleInst;
+  Dialogs, StdCtrls, IniFiles, Menus, WinSock, ExtCtrls, System.UITypes,
+  OverbyteIcsWndControl, OverbyteIcsWSocket,
+  UzLogGlobal, UBasicStats, UBasicMultiForm, UALLJAStats, UCliForm,
+  UALLJAMultiForm, UzLogConst, UzLogQSO;
 
 const
   IniFileName = 'ZServer.ini';
@@ -74,7 +75,6 @@ type
     Save1: TMenuItem;
     SaveAs1: TMenuItem;
     N2: TMenuItem;
-    FnugrySingleInstance1: TFnugrySingleInstance;
     Open1: TMenuItem;
     MergeFile1: TMenuItem;
     OpenDialog: TOpenDialog;
@@ -138,296 +138,271 @@ var
 
 implementation
 
-uses UAbout, UChooseContest, UConnections, UMergeBand, UFreqList, UGraph;
+uses
+  UAbout, UChooseContest, UConnections, UMergeBand, UFreqList;
 
 {$R *.DFM}
 
 
 {* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
-function TServerForm.GetQSObyID(id : integer) : TQSO;
-var i, j : integer;
-    aQSO : TQSO;
+function TServerForm.GetQSObyID(id: Integer): TQSO;
+var
+   i, j: Integer;
+   aQSO: TQSO;
 begin
-  Result := nil;
-  j := id div 100;
-  for i := 1 to Stats.MasterLog.TotalQSO do
-    begin
-      aQSO := TQSO(Stats.MasterLog.List[i]);
-      if j = ((aQSO.QSO.Reserve3) div 100) then
-        begin
-          Result := aQSO;
-          exit;
-        end;
-    end;
+   Result := nil;
+   j := id div 100;
+   for i := 1 to Stats.MasterLog.TotalQSO do begin
+      aQSO := TQSO(Stats.MasterLog.QSOList[i]);
+      if j = ((aQSO.Reserve3) div 100) then begin
+         Result := aQSO;
+         Exit;
+      end;
+   end;
 end;
 
-procedure TServerForm.AddConsole(S : string);
-var _VisRows : integer;
-    _TopRow : integer;
+procedure TServerForm.AddConsole(S: string);
+var
+   _VisRows: Integer;
+   _TopRow: Integer;
 begin
-  ClientListBox.Items.Add(S);
-  _VisRows := ClientListBox.ClientHeight div ClientListBox.ItemHeight;
-  _TopRow := ClientListBox.Items.Count - _VisRows + 1;
-  if _TopRow > 0 then
-    ClientListBox.TopIndex := _TopRow
-  else
-    ClientListBox.TopIndex := 0;
+   ClientListBox.Items.Add(S);
+   _VisRows := ClientListBox.ClientHeight div ClientListBox.ItemHeight;
+   _TopRow := ClientListBox.Items.Count - _VisRows + 1;
+   if _TopRow > 0 then
+      ClientListBox.TopIndex := _TopRow
+   else
+      ClientListBox.TopIndex := 0;
 end;
 
-procedure TServerForm.ProcessCommand(S : string);
-var temp, temp2, sendbuf : string;
-    from : integer;
-    aQSO : TQSO;
-    i, j : integer;
-    B : TBand;
+procedure TServerForm.ProcessCommand(S: string);
+var
+   temp, temp2, sendbuf: string;
+   from: Integer;
+   aQSO: TQSO;
+   i, j: Integer;
+   B: TBand;
 begin
-  try
-    from := StrToInt(TrimRight(copy(S, 1, 3)));
-  except
-    from := 0;
-  end;
+   from := StrToIntDef(TrimRight(copy(S, 1, 3)), 0);
 
-  Delete(S, 1, 4);
+   Delete(S, 1, 4);
 
-  Delete(S, 1, Length(ZLinkHeader)+1);
+   Delete(S, 1, Length(ZLinkHeader) + 1);
 
-  temp := S;
+   temp := S;
 
-  if pos('FREQ', temp) = 1 then
-    begin
+   if Pos('FREQ', temp) = 1 then begin
       temp2 := copy(temp, 6, 255);
       FreqList.ProcessFreqData(temp2);
-    end;
+   end;
 
-  if pos('GETCONSOLE', UpperCase(temp)) = 1 then
-    begin
-      for i := 0 to ClientListBox.Items.Count - 1 do
-        begin
-          sendbuf := ZLinkHeader + ' PUTMESSAGE ';
-          sendbuf := sendbuf + ClientListBox.Items[i];
-          SendOnly(sendbuf+LBCODE, from);
-        end;
-      exit;
-    end;
+   if Pos('GETCONSOLE', UpperCase(temp)) = 1 then begin
+      for i := 0 to ClientListBox.Items.Count - 1 do begin
+         sendbuf := ZLinkHeader + ' PUTMESSAGE ';
+         sendbuf := sendbuf + ClientListBox.Items[i];
+         SendOnly(sendbuf + LBCODE, from);
+      end;
+      Exit;
+   end;
 
-  if pos('SENDRENEW', temp) = 1 then
-    begin
+   if Pos('SENDRENEW', temp) = 1 then begin
       sendbuf := ZLinkHeader + ' RENEW';
-      SendOnly(sendbuf+LBCODE, from);
-      exit;
-    end;
-{
-  if pos('FILELOADED', UpperCase(temp)) = 1 then
-    begin
-      sendbuf := ZLinkHeader + ' PROMPTUPDATE';
-      SendAll(sendbuf+LBCODE);    end;
-}
-  if pos('WHO', UpperCase(temp)) = 1 then
-    begin
-      for B := b19 to HiBand do
-        for i := 1 to 99 do
-          begin
-            if CliList[i] = nil then
-              break;
-            if CliList[i].CurrentBand = B then
-              begin
-                sendbuf := ZLinkHeader + ' PUTMESSAGE ';
-                sendbuf := sendbuf + FillRight(BandString[CliList[i].CurrentBand], 9) +
-                           CliList[i].CurrentOperator;
-                SendOnly(sendbuf+LBCODE, from);
-              end;
-          end;
-      exit;
-    end;
+      SendOnly(sendbuf + LBCODE, from);
+      Exit;
+   end;
 
-  if pos('OPERATOR', temp) = 1 then
-    begin
+   {
+     if Pos('FILELOADED', UpperCase(temp)) = 1 then
+     begin
+     sendbuf := ZLinkHeader + ' PROMPTUPDATE';
+     SendAll(sendbuf+LBCODE);    end;
+   }
+
+   if Pos('WHO', UpperCase(temp)) = 1 then begin
+      for B := b19 to HiBand do
+         for i := 1 to 99 do begin
+            if CliList[i] = nil then
+               break;
+            if CliList[i].CurrentBand = B then begin
+               sendbuf := ZLinkHeader + ' PUTMESSAGE ';
+               sendbuf := sendbuf + FillRight(BandString[CliList[i].CurrentBand], 9) + CliList[i].CurrentOperator;
+               SendOnly(sendbuf + LBCODE, from);
+            end;
+         end;
+      Exit;
+   end;
+
+   if Pos('OPERATOR', temp) = 1 then begin
       Delete(temp, 1, 9);
       CliList[from].CurrentOperator := temp;
       CliList[from].SetCaption;
       Connections.UpdateDisplay;
-      exit;
-    end;
+      Exit;
+   end;
 
-  if pos('BAND ', temp) = 1 then
-    begin
+   if Pos('BAND ', temp) = 1 then begin
       Delete(temp, 1, 5);
-      try
-        i := StrToInt(temp);
-      except
-        on EConvertError do
-          i := -1;
+
+      i := StrToIntDef(temp, -1);
+      if not(i in [0 .. ord(HiBand)]) then begin
+         Exit;
       end;
-      if not(i in [0..ord(HiBand)]) then
-        exit;
 
       B := TBand(i);
 
       CliList[from].CurrentBand := B;
 
-      for i := 1 to 99 do
-        begin
-          if CliList[i] = nil then
+      for i := 1 to 99 do begin
+         if CliList[i] = nil then
             break
-          else
-            begin
-              if (i <> from) and (CliList[i].CurrentBand = B) then
-                begin
-                  sendbuf := ZLinkHeader + ' PUTMESSAGE '+ 'Band already in use!';
-                  SendOnly(sendbuf+LBCODE, from);
-                  //CliList[from].Close;
-                end;
+         else begin
+            if (i <> from) and (CliList[i].CurrentBand = B) then begin
+               sendbuf := ZLinkHeader + ' PUTMESSAGE ' + 'Band already in use!';
+               SendOnly(sendbuf + LBCODE, from);
+               // CliList[from].Close;
             end;
-        end;
+         end;
+      end;
 
       CliList[from].SetCaption;
       Connections.UpdateDisplay;
-      exit;
-    end;
+      Exit;
+   end;
 
-  if pos('RESET', temp) = 1 then
-    begin
-      exit;
+   if Pos('RESET', temp) = 1 then begin
+      Exit;
       {
-      temp := copy(temp, 7, 255);
-      try
+        temp := copy(temp, 7, 255);
+        try
         i := StrToInt(temp);
-      except
+        except
         on EConvertError do
-          i := -1;
-      end;
-      if not(i in [0..ord(HiBand)]) then
-        exit;
-      Stats.Logs[TBand(i)].Clear;
-      Stats.UpdateStats;
-      MultiForm.ResetBand(TBand(i)); }
-    end;
+        i := -1;
+        end;
+        if not(i in [0..ord(HiBand)]) then
+        Exit;
+        Stats.Logs[TBand(i)].Clear;
+        Stats.UpdateStats;
+        MultiForm.ResetBand(TBand(i)); }
+   end;
 
-  if pos('ENDLOG', temp) = 1 then // received when zLog finishes uploading
-    begin
-      exit;
-{
-      temp := copy(temp, 8, 255);
-      try
+   if Pos('ENDLOG', temp) = 1 then // received when zLog finishes uploading
+   begin
+      Exit;
+      {
+        temp := copy(temp, 8, 255);
+        try
         i := StrToInt(temp);
-      except
+        except
         on EConvertError do
-          i := -1;
-      end;
-      if not(i in [0..ord(HiBand)]) then
-        exit;
+        i := -1;
+        end;
+        if not(i in [0..ord(HiBand)]) then
+        Exit;
 
-      sendbuf := ZLinkHeader + ' RESETSUB ' +IntToStr(i);
-      SendAllButFrom(sendbuf+LBCODE, from);
+        sendbuf := ZLinkHeader + ' RESETSUB ' +IntToStr(i);
+        SendAllButFrom(sendbuf+LBCODE, from);
 
-      for j := 1 to Stats.Logs[TBand(i)].TotalQSO do
+        for j := 1 to Stats.Logs[TBand(i)].TotalQSO do
         begin
-          sendbuf := ZLinkHeader + ' PUTLOGSUB '+TQSO(Stats.Logs[TBand(i)].List[j]).QSOinText;
-          SendAllButFrom(sendbuf+LBCODE, from);
+        sendbuf := ZLinkHeader + ' PUTLOGSUB '+TQSO(Stats.Logs[TBand(i)].List[j]).QSOinText;
+        SendAllButFrom(sendbuf+LBCODE, from);
         end;
 
-      sendbuf := ZLinkHeader + ' RENEW ';
-      SendAllButFrom(sendbuf+LBCODE, from);
+        sendbuf := ZLinkHeader + ' RENEW ';
+        SendAllButFrom(sendbuf+LBCODE, from);
 
-      MultiForm.RecalcAll;
-      Stats.UpdateStats;   }
-    end;
+        MultiForm.RecalcAll;
+        Stats.UpdateStats; }
+   end;
 
-  if pos('PUTMESSAGE', temp) = 1 then
-    begin
+   if Pos('PUTMESSAGE', temp) = 1 then begin
       temp2 := temp;
       Delete(temp2, 1, 11);
       AddConsole(temp2);
       if TakeLog then
-        AddToChatLog(temp2);
-    end;
+         AddToChatLog(temp2);
+   end;
 
-  if pos('SPOT', temp) = 1 then
-    begin
-    end;
+   if Pos('SPOT', temp) = 1 then begin
+   end;
 
-  if pos('SENDLOG', temp) = 1 then // will send all qsos in server's log and renew command
-    begin
+   if Pos('SENDLOG', temp) = 1 then // will send all qsos in server's log and renew command
+   begin
       if Stats.MasterLog.TotalQSO = 0 then
-        exit;
+         Exit;
 
-      for i := 1 to Stats.MasterLog.TotalQSO do
-        begin
-          sendbuf := ZLinkHeader + ' PUTLOG '+TQSO(Stats.MasterLog.List[i]).QSOinText;
-          SendOnly(sendbuf+LBCODE, from);
-        end;
-      sendbuf := ZLinkHeader + ' RENEW';
-      SendOnly(sendbuf+LBCODE, from);
-      exit;
-    end;
-
-  if pos('GETQSOIDS', temp) = 1 then // will send all qso ids in server's log
-    begin
-      i := 1;
-      while i <= Stats.MasterLog.TotalQSO do
-        begin
-          sendbuf := ZLinkHeader + ' QSOIDS ';
-          repeat
-             sendbuf := sendbuf + IntToStr(TQSO(Stats.MasterLog.List[i]).QSO.Reserve3);
-             sendbuf := sendbuf + ' ';
-             inc(i);
-          until (i mod 10 = 0) or (i > Stats.MasterLog.TotalQSO);
-          SendOnly(sendbuf+LBCODE, from);
-        end;
-      sendbuf := ZLinkHeader + ' ENDQSOIDS';
-      SendOnly(sendbuf+LBCODE, from);
-      exit;
-    end;
-
-  if pos('GETLOGQSOID', temp) = 1 then // will send all qso ids in server's log
-    begin
-      Delete(temp, 1, 12);
-      i := pos(' ', temp);
-      while i > 1 do
-        begin
-          temp2 := copy(temp, 1, i-1);
-          Delete(temp, 1, i);
-          j := StrToInt(temp2);
-          aQSO := GetQSObyID(j);
-          if aQSO <> nil then
-            begin
-              sendbuf := ZLinkHeader+' PUTLOG '+aQSO.QSOinText;
-              SendOnly(sendbuf+LBCODE, from);
-            end;
-          i := pos(' ', temp);
-        end;
-      exit;
-    end;
-
-  if pos('SENDCURRENT', temp) = 1 then
-    begin
-      exit;
-     { Delete(temp, 1, 12);
-      try
-        i := StrToInt(temp);
-      except
-        on EConvertError do
-          i := -1;
+      for i := 1 to Stats.MasterLog.TotalQSO do begin
+         sendbuf := ZLinkHeader + ' PUTLOG ' + TQSO(Stats.MasterLog.QSOList[i]).QSOinText;
+         SendOnly(sendbuf + LBCODE, from);
       end;
-      if not(i in [0..ord(HiBand)]) then
-        exit;
+      sendbuf := ZLinkHeader + ' RENEW';
+      SendOnly(sendbuf + LBCODE, from);
+      Exit;
+   end;
 
-      B := TBand(i);
+   if Pos('GETQSOIDS', temp) = 1 then // will send all qso ids in server's log
+   begin
+      i := 1;
+      while i <= Stats.MasterLog.TotalQSO do begin
+         sendbuf := ZLinkHeader + ' QSOIDS ';
+         repeat
+            sendbuf := sendbuf + IntToStr(TQSO(Stats.MasterLog.QSOList[i]).Reserve3);
+            sendbuf := sendbuf + ' ';
+            inc(i);
+         until (i mod 10 = 0) or (i > Stats.MasterLog.TotalQSO);
+         SendOnly(sendbuf + LBCODE, from);
+      end;
+      sendbuf := ZLinkHeader + ' ENDQSOIDS';
+      SendOnly(sendbuf + LBCODE, from);
+      Exit;
+   end;
 
-      if Stats.Logs[B].TotalQSO = 0 then
-        exit;
+   if Pos('GETLOGQSOID', temp) = 1 then // will send all qso ids in server's log
+   begin
+      Delete(temp, 1, 12);
+      i := Pos(' ', temp);
+      while i > 1 do begin
+         temp2 := copy(temp, 1, i - 1);
+         Delete(temp, 1, i);
+         j := StrToInt(temp2);
+         aQSO := GetQSObyID(j);
+         if aQSO <> nil then begin
+            sendbuf := ZLinkHeader + ' PUTLOG ' + aQSO.QSOinText;
+            SendOnly(sendbuf + LBCODE, from);
+         end;
+         i := Pos(' ', temp);
+      end;
+      Exit;
+   end;
 
-      for i := 1 to Stats.Logs[B].TotalQSO do
-        begin
-          sendbuf := ZLinkHeader + ' PUTLOG '+TQSO(Stats.Logs[B].List[i]).QSOinText;
-          SendOnly(sendbuf+LBCODE, from);
+   if Pos('SENDCURRENT', temp) = 1 then begin
+      Exit;
+      { Delete(temp, 1, 12);
+        try
+        i := StrToInt(temp);
+        except
+        on EConvertError do
+        i := -1;
         end;
-      sendbuf := ZLinkHeader + ' RENEW ';
-      SendOnly(sendbuf+LBCODE, from);  }
-    end;
+        if not(i in [0..ord(HiBand)]) then
+        Exit;
 
-  if pos('PUTQSO', temp) = 1 then
-    begin
+        B := TBand(i);
+
+        if Stats.Logs[B].TotalQSO = 0 then
+        Exit;
+
+        for i := 1 to Stats.Logs[B].TotalQSO do
+        begin
+        sendbuf := ZLinkHeader + ' PUTLOG '+TQSO(Stats.Logs[B].List[i]).QSOinText;
+        SendOnly(sendbuf+LBCODE, from);
+        end;
+        sendbuf := ZLinkHeader + ' RENEW ';
+        SendOnly(sendbuf+LBCODE, from); }
+   end;
+
+   if Pos('PUTQSO', temp) = 1 then begin
       aQSO := TQSO.Create;
       temp2 := temp;
       Delete(temp2, 1, 7);
@@ -435,10 +410,9 @@ begin
       Stats.Add(aQSO);
       MultiForm.Add(aQSO);
       aQSO.Free;
-    end;
+   end;
 
-  if pos('PUTLOG ', temp) = 1 then
-    begin
+   if Pos('PUTLOG ', temp) = 1 then begin
       aQSO := TQSO.Create;
       temp2 := temp;
       Delete(temp2, 1, 7);
@@ -446,463 +420,440 @@ begin
       Stats.AddNoUpdate(aQSO);
       MultiForm.Add(aQSO);
       aQSO.Free;
-      //exit;
-    end;
+      // Exit;
+   end;
 
-  if pos('DELQSO', temp) = 1 then
-    begin
+   if Pos('DELQSO', temp) = 1 then begin
       aQSO := TQSO.Create;
       temp2 := temp;
       Delete(temp2, 1, 7);
       aQSO.TextToQSO(temp2);
       Stats.Delete(aQSO);
-      //MultiForm.RecalcBand(aQSO.QSO.Band);
+      // MultiForm.RecalcBand(aQSO.QSO.Band);
       MultiForm.RecalcAll;
-      Stats.UpdateStats;  // 0.24
+      Stats.UpdateStats; // 0.24
       aQSO.Free;
-    end;
+   end;
 
-  if pos('EDITQSOFROM', temp) = 1 then
-    begin
-      exit;
-    end;
+   if Pos('EDITQSOFROM', temp) = 1 then begin
+      Exit;
+   end;
 
-  if pos('EDITQSOTO ', temp) = 1 then
-    begin
+   if Pos('EDITQSOTO ', temp) = 1 then begin
       aQSO := TQSO.Create;
       temp2 := temp;
       Delete(temp2, 1, 10);
       aQSO.TextToQSO(temp2);
-      aQSO.QSO.Reserve := actEdit;
+      aQSO.Reserve := actEdit;
 
-      {Stats.Logs[aQSO.QSO.Band].AddQue(aQSO);
-      Stats.Logs[aQSO.QSO.Band].ProcessQue;}
+      { Stats.Logs[aQSO.QSO.Band].AddQue(aQSO);
+        Stats.Logs[aQSO.QSO.Band].ProcessQue; }
       Stats.MasterLog.AddQue(aQSO);
       Stats.MasterLog.ProcessQue;
 
       MultiForm.RecalcAll;
       Stats.UpdateStats;
       aQSO.Free;
-    end;
+   end;
 
-  if pos('INSQSOAT ', temp) = 1 then
-    begin
-      exit;
-    end;
+   if Pos('INSQSOAT ', temp) = 1 then begin
+      Exit;
+   end;
 
-  if pos('RENEW', temp) = 1 then
-    begin
+   if Pos('RENEW', temp) = 1 then begin
       Stats.UpdateStats;
-    end;
+   end;
 
-  if pos('INSQSO ', temp) = 1 then
-    begin
+   if Pos('INSQSO ', temp) = 1 then begin
       aQSO := TQSO.Create;
       temp2 := temp;
       Delete(temp2, 1, 7);
       aQSO.TextToQSO(temp2);
-      aQSO.QSO.Reserve := actInsert;
+      aQSO.Reserve := actInsert;
       Stats.MasterLog.AddQue(aQSO);
       Stats.MasterLog.ProcessQue;
       MultiForm.RecalcAll;
       Stats.UpdateStats;
       aQSO.Free;
-    end;
+   end;
 
-  sendbuf := ZLinkHeader + ' ' + temp;
-  SendAllButFrom(sendbuf+LBCODE, from);
+   sendbuf := ZLinkHeader + ' ' + temp;
+   SendAllButFrom(sendbuf + LBCODE, from);
 end;
 
 procedure TServerForm.Idle;
-var str : string;
+var
+   str: string;
 begin
- { if CommandQue.Count = 0 then
-    if Connections.Visible then
-      Connections.Update;  }
-  {
-  for i := 1 to 99 do
-    begin
-      if CliList[i] = nil then
-        break
-      else
-        CliList[i].ParseLineBuffer;
-    end;
-  }
-  while CommandQue.Count > 0 do
-    begin
+   { if CommandQue.Count = 0 then
+     if Connections.Visible then
+     Connections.Update; }
+   {
+     for i := 1 to 99 do
+     begin
+     if CliList[i] = nil then
+     break
+     else
+     CliList[i].ParseLineBuffer;
+     end;
+   }
+   while CommandQue.Count > 0 do begin
       str := CommandQue[0];
       if not(ChatOnly) then
-        AddConsole(str);
+         AddConsole(str);
       ProcessCommand(str);
       CommandQue.Delete(0);
-    end;
+   end;
 end;
 
 procedure TServerForm.IdleEvent(Sender: TObject; var Done: Boolean);
 begin
-  Idle;
-  while ClientListBox.Items.Count > 400 do
-    begin
+   Idle;
+   while ClientListBox.Items.Count > 400 do begin
       ClientListBox.Items.Delete(0);
-    end;
+   end;
 end;
-{procedure TServerForm.CreateParams(var Params: TCreateParams);
-begin
+{ procedure TServerForm.CreateParams(var Params: TCreateParams);
+  begin
   inherited CreateParams(Params);
   Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
-end;  }
+  end; }
 
 procedure TServerForm.FormShow(Sender: TObject);
 var
-    IniFile : TIniFile;
-//    Buffer  : String;
-    i : integer;
+   IniFile: TIniFile;
+   // Buffer  : String;
+   i: Integer;
 begin
-    if not Initialized then begin
-        ChatOnly := True;
-        Initialized     := TRUE;
-        IniFile         := TIniFile.Create(IniFileName);
-        Top             := IniFile.ReadInteger('Window', 'Top',    Top);
-        Left            := IniFile.ReadInteger('Window', 'Left',   Left);
-        Width           := IniFile.ReadInteger('Window', 'Width',  Width);
-        Height          := IniFile.ReadInteger('Window', 'Height', Height);
-        ChatOnly        := IniFile.ReadBool('Options', 'ChatOnly', True);
+   if not Initialized then begin
+      ChatOnly := True;
+      Initialized := True;
+      IniFile := TIniFile.Create(IniFileName);
+      Top := IniFile.ReadInteger('Window', 'Top', Top);
+      Left := IniFile.ReadInteger('Window', 'Left', Left);
+      Width := IniFile.ReadInteger('Window', 'Width', Width);
+      Height := IniFile.ReadInteger('Window', 'Height', Height);
+      ChatOnly := IniFile.ReadBool('Options', 'ChatOnly', True);
 
-        IniFile.Free;
-        //StartServer;
-        ClientNumber := 0;
-        // CommandQue := TStringList.Create; //moved to formcreate;
-        for i :=  1 to 99 do
-          CliList[i] := nil;
-        CheckBox2.Checked := ChatOnly;
-        ChooseContest.ShowModal;
-        StartServer;
-    end;
+      IniFile.Free;
+      // StartServer;
+      ClientNumber := 0;
+      // CommandQue := TStringList.Create; //moved to formcreate;
+      for i := 1 to 99 do
+         CliList[i] := nil;
+      CheckBox2.Checked := ChatOnly;
+      ChooseContest.ShowModal;
+      StartServer;
+   end;
 end;
 
-
-{* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 procedure TServerForm.FormClose(Sender: TObject; var Action: TCloseAction);
 var
-    IniFile : TIniFile;
+   IniFile: TIniFile;
 begin
-    IniFile := TIniFile.Create(IniFileName);
-    IniFile.WriteInteger('Window', 'Top',    Top);
-    IniFile.WriteInteger('Window', 'Left',   Left);
-    IniFile.WriteInteger('Window', 'Width',  Width);
-    IniFile.WriteInteger('Window', 'Height', Height);
-    IniFile.WriteBool('Options','ChatOnly',ChatOnly);
-    IniFile.Free;
+   IniFile := TIniFile.Create(IniFileName);
+   IniFile.WriteInteger('Window', 'Top', Top);
+   IniFile.WriteInteger('Window', 'Left', Left);
+   IniFile.WriteInteger('Window', 'Width', Width);
+   IniFile.WriteInteger('Window', 'Height', Height);
+   IniFile.WriteBool('Options', 'ChatOnly', ChatOnly);
+   IniFile.Free;
 end;
 
-
-{* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 procedure TServerForm.PortButtonClick(Sender: TObject);
 begin
-    //StartServer;
+   // StartServer;
 end;
 
-
-{* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 procedure TServerForm.StartServer;
 begin
-    SrvSocket.Close;
-    SrvSocket.Addr  := '0.0.0.0';
-    SrvSocket.Port  := 'telnet';
-    SrvSocket.Proto := 'tcp';
-    SrvSocket.Listen;
+   SrvSocket.Close;
+   SrvSocket.Addr := '0.0.0.0';
+   SrvSocket.Port := 'telnet';
+   SrvSocket.Proto := 'tcp';
+   SrvSocket.Listen;
 end;
 
-
-{* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 procedure TServerForm.SrvSocketSessionAvailable(Sender: TObject; Error: Word);
 var
-    Form    : TCliForm;
-    i : integer;
+   Form: TCliForm;
+   i: Integer;
 begin
-    //Inc(ClientNumber);
-    for i := 1 to 99 do
-      if CliList[i] = nil then
-        break;
-    ClientNumber := i;
-    Form := TCliForm.Create(self);
-    //ClientListBox.Items.Add(IntToStr(LongInt(Form)));
-    Form.CliSocket.HSocket := SrvSocket.Accept;
-    Form.Caption           := 'Client ' + IntToStr(ClientNumber);
-    Form.ClientNumber := ClientNumber;
-    Form.Show;
-    CliList[ClientNumber] := Form;
+   // Inc(ClientNumber);
+   for i := 1 to 99 do begin
+      if CliList[i] = nil then begin
+         break;
+      end;
+   end;
+
+   ClientNumber := i;
+
+   Form := TCliForm.Create(self);
+   Form.CliSocket.HSocket := SrvSocket.Accept;
+   Form.Caption := 'Client ' + IntToStr(ClientNumber);
+   Form.ClientNumber := ClientNumber;
+   Form.Show;
+   CliList[ClientNumber] := Form;
 end;
 
-
-{* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 procedure TServerForm.WMUser(var msg: TMessage);
 var
-    Form : TCliForm;
-    i, j    : Integer;
-label xxx;
+   Form: TCliForm;
+   i, j: Integer;
+label
+   xxx;
 begin
-    Form := TCliForm(Msg.lParam);
-    Form.Release;
+   Form := TCliForm(msg.lParam);
+   Form.Release;
 
-    for i := 1 to 99 do
-      begin
-        if CliList[i] <> nil then
-          begin
-            if LongInt(CliList[i]) = LongInt(Form) then
-              begin
-                CliList[i] := nil;
-                for j := i to 98 do
-                  begin
-                    CliList[j] := CliList[j+1];
-                    if CliList[j] = nil then
-                      goto xxx
-                    else
-                      CliList[j].ClientNumber := j;
-                  end;
-                CliList[99] := nil;
-              end;
-          end;
+   for i := 1 to 99 do begin
+      if CliList[i] <> nil then begin
+         if LongInt(CliList[i]) = LongInt(Form) then begin
+            CliList[i] := nil;
+            for j := i to 98 do begin
+               CliList[j] := CliList[j + 1];
+               if CliList[j] = nil then
+                  goto xxx
+               else
+                  CliList[j].ClientNumber := j;
+            end;
+            CliList[99] := nil;
+         end;
       end;
+   end;
 
 xxx:
-    Connections.UpdateDisplay;
-    {for I := 0 to ClientListBox.Items.Count - 1 do begin
-        if ClientListBox.Items[I] = IntToStr(LongInt(Form)) then begin
-            ClientListBox.Items.Delete(I);
-            break;
-        end;
-    end;}
+   Connections.UpdateDisplay;
+   { for I := 0 to ClientListBox.Items.Count - 1 do begin
+     if ClientListBox.Items[I] = IntToStr(LongInt(Form)) then begin
+     ClientListBox.Items.Delete(I);
+     break;
+     end;
+     end; }
 end;
 
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
-{* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
-
-procedure TServerForm.SendAll(str : string);
-var i : integer;
+procedure TServerForm.SendAll(str: string);
+var
+   i: Integer;
 begin
-  for i := 1 to 99 do
-    begin
+   for i := 1 to 99 do begin
       if CliList[i] = nil then
-        exit
+         Exit
       else
-        CliList[i].SendStr(str);
-    end;
+         CliList[i].SendStr(str);
+   end;
 end;
 
-procedure TServerForm.SendAllButFrom(str : string; NotThisCli : integer);
-var i : integer;
+procedure TServerForm.SendAllButFrom(str: string; NotThisCli: Integer);
+var
+   i: Integer;
 begin
-  for i := 1 to 99 do
-    begin
+   for i := 1 to 99 do begin
       if CliList[i] = nil then
-        exit
-      else
-        if i <> NotThisCli then
-          CliList[i].SendStr(str);
-    end;
+         Exit
+      else if i <> NotThisCli then
+         CliList[i].SendStr(str);
+   end;
 end;
 
-procedure TServerForm.SendOnly(str : string; CliNo : integer);
+procedure TServerForm.SendOnly(str: string; CliNo: Integer);
 begin
-  if CliList[CliNo] <> Nil then
-    CliList[CliNo].SendStr(str);
+   if CliList[CliNo] <> Nil then
+      CliList[CliNo].SendStr(str);
 end;
 
 procedure TServerForm.Button1Click(Sender: TObject);
 begin
-  connections.updateDisplay;
+   Connections.UpdateDisplay;
 end;
 
 procedure TServerForm.Exit1Click(Sender: TObject);
 begin
-  SrvSocket.Close;
-  Close;
+   SrvSocket.Close;
+   Close;
 end;
 
 procedure TServerForm.About1Click(Sender: TObject);
 begin
-  AboutBox.Show;
+   AboutBox.Show;
 end;
 
-procedure TServerForm.AddToChatLog(str : string);
-var f : textfile;
-//    t : string;
+procedure TServerForm.AddToChatLog(str: string);
+var
+   f: textfile;
+   // t : string;
 begin
-  if TakeLog = False then exit;
-  assignfile(f, 'log.txt');
-  if FileExists('log.txt') then
-    append(f)
-  else
-    rewrite(f);
-{
-  t := FormatDateTime(' (hh:nn)', SysUtils.Now);
-}
-  writeln(f,str{ + t});
+   if TakeLog = False then
+      Exit;
+   assignfile(f, 'log.txt');
+   if FileExists('log.txt') then
+      append(f)
+   else
+      rewrite(f);
+   {
+     t := FormatDateTime(' (hh:nn)', SysUtils.Now);
+   }
+   writeln(f, str { + t } );
 
-  closefile(f);
+   closefile(f);
 end;
 
 procedure TServerForm.SendButtonClick(Sender: TObject);
-var t, S : string;
+var
+   t, S: string;
 begin
-  t := FormatDateTime('hh:nn', SysUtils.Now);
-  S := t+' ZServer> '+ SendEdit.Text;
-  //SendALL(ZLinkHeader + ' PUTMESSAGE '+'ZServer> '+SendEdit.Text + LBCODE);
-  SendALL(ZLinkHeader + ' PUTMESSAGE '+ S + LBCODE);
-  AddConsole(S);
-  if TakeLog then
-    AddToChatLog(S);
-  SendEdit.Clear;
-  ActiveControl := SendEdit;
+   t := FormatDateTime('hh:nn', SysUtils.Now);
+   S := t + ' ZServer> ' + SendEdit.Text;
+   // SendALL(ZLinkHeader + ' PUTMESSAGE '+'ZServer> '+SendEdit.Text + LBCODE);
+   SendAll(ZLinkHeader + ' PUTMESSAGE ' + S + LBCODE);
+   AddConsole(S);
+   if TakeLog then
+      AddToChatLog(S);
+   SendEdit.Clear;
+   ActiveControl := SendEdit;
 end;
 
 procedure TServerForm.Button2Click(Sender: TObject);
 begin
-  ClientListBox.Clear;
+   ClientListBox.Clear;
 end;
 
 procedure TServerForm.Timer1Timer(Sender: TObject);
 begin
-  //Idle;
-  while ClientListBox.Items.Count > 400 do
-    begin
+   // Idle;
+   while ClientListBox.Items.Count > 400 do begin
       ClientListBox.Items.Delete(0);
-    end;
+   end;
 end;
 
 procedure TServerForm.ScoreandStatistics1Click(Sender: TObject);
 begin
-  Stats.Show;
+   Stats.Show;
 end;
 
 procedure TServerForm.Multipliers1Click(Sender: TObject);
 begin
-  MultiForm.Show;
+   MultiForm.Show;
 end;
 
 procedure TServerForm.CheckBox2Click(Sender: TObject);
 begin
-  ChatOnly := CheckBox2.Checked;
+   ChatOnly := CheckBox2.Checked;
 end;
-
 
 procedure TServerForm.SendEditKeyPress(Sender: TObject; var Key: Char);
 begin
-  case Key of
-    Chr($0D) :
-       begin
-         SendButtonClick(Self);
-         Key := #0;
-       end;
-  end;
+   case Key of
+      Chr($0D): begin
+            SendButtonClick(self);
+            Key := #0;
+         end;
+   end;
 end;
 
 procedure TServerForm.Save1Click(Sender: TObject);
 begin
-  if Stats.Saved = False then
-    begin
+   if Stats.Saved = False then begin
       if CurrentFileName = '' then
-        if SaveDialog.Execute then
-          CurrentFileName := SaveDialog.FileName
-        else
-          exit;
+         if SaveDialog.Execute then
+            CurrentFileName := SaveDialog.FileName
+         else
+            Exit;
       Stats.SaveLogs(CurrentFileName);
-    end;
+   end;
 end;
 
-procedure TServerForm.FormCloseQuery(Sender: TObject;
-  var CanClose: Boolean);
-var R : word;
+procedure TServerForm.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+var
+   R: Word;
 begin
-  if Stats.Saved = False then
-    begin
-      R := MessageDlg('Save changes to '+CurrentFileName+' ?', mtConfirmation,
-                  [mbYes, mbNo, mbCancel], 0); {HELP context 0}
+   if Stats.Saved = False then begin
+      R := MessageDlg('Save changes to ' + CurrentFileName + ' ?', mtConfirmation, [mbYes, mbNo, mbCancel], 0); { HELP context 0 }
       case R of
-        mrYes : Save1Click(Self);
-        mrCancel : CanClose := False;
+         mrYes:
+            Save1Click(self);
+         mrCancel:
+            CanClose := False;
       end;
-    end;
+   end;
 end;
 
 procedure TServerForm.SaveAs1Click(Sender: TObject);
 begin
-  If SaveDialog.Execute then
-    begin
+   If SaveDialog.Execute then begin
       CurrentFileName := SaveDialog.FileName;
       Stats.SaveLogs(CurrentFileName);
-    end;
+   end;
 end;
 
 procedure TServerForm.FormCreate(Sender: TObject);
 begin
-  CommandQue := TStringList.Create;
-  Application.OnIdle := IdleEvent;
-  TakeLog := False;
-  Caption := 'Z-Server ' + VersionString;
+   CommandQue := TStringList.Create;
+   Application.OnIdle := IdleEvent;
+   TakeLog := False;
+   Caption := 'Z-Server ' + VersionString;
 end;
 
 procedure TServerForm.Open1Click(Sender: TObject);
 begin
-  if OpenDialog.Execute then
-    begin
-      if MessageDlg('This will clear all data and reload from new file.',
-                    mtWarning,
-                    [mbOK, mbCancel],
-                    0) = mrOK then
-      CurrentFileName := OpenDialog.FileName;
+   if OpenDialog.Execute then begin
+      if MessageDlg('This will clear all data and reload from new file.', mtWarning, [mbOK, mbCancel], 0) = mrOK then
+         CurrentFileName := OpenDialog.FileName;
       Stats.LoadFile(OpenDialog.FileName);
-    end;
+   end;
 end;
 
 procedure TServerForm.Connections1Click(Sender: TObject);
 begin
-  Connections.Show;
+   Connections.Show;
 end;
 
 procedure TServerForm.MergeFile1Click(Sender: TObject);
 begin
-  if OpenDialog.Execute then
-    begin
-      {if MessageDlg('This will clear all data and reload from new file.',
-                    mtWarning,
-                    [mbOK, mbCancel],
-                    0) = mrOK then}
+   if OpenDialog.Execute then begin
+      { if MessageDlg('This will clear all data and reload from new file.',
+        mtWarning,
+        [mbOK, mbCancel],
+        0) = mrOK then }
       // CurrentFileName := OpenDialog.FileName;
       MergeBand.FileName := OpenDialog.FileName;
       MergeBand.ShowModal;
-      //Stats.LoadFile(OpenDialog.FileName);
-    end;
+      // Stats.LoadFile(OpenDialog.FileName);
+   end;
 end;
 
 procedure TServerForm.mLogClick(Sender: TObject);
 begin
-  TakeLog := not(TakeLog);
-  if TakeLog then
-    mLog.Caption := 'Stop &Log'
-  else
-    mLog.Caption := 'Start &Log';
+   TakeLog := not(TakeLog);
+   if TakeLog then
+      mLog.Caption := 'Stop &Log'
+   else
+      mLog.Caption := 'Start &Log';
 end;
 
 procedure TServerForm.CurrentFrequencies1Click(Sender: TObject);
 begin
-  FreqList.Show;
+   FreqList.Show;
 end;
 
 procedure TServerForm.Graph1Click(Sender: TObject);
 begin
-  Graph.Show;
+//   Graph.Show;
 end;
 
 procedure TServerForm.DeleteDupes1Click(Sender: TObject);
 
 begin
-  Stats.MasterLog.RemoveDupes;
-  MultiForm.RecalcAll;
-  Stats.UpdateStats;
+   Stats.MasterLog.RemoveDupes;
+   MultiForm.RecalcAll;
+   Stats.UpdateStats;
 end;
 
 end.
-
-

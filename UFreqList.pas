@@ -4,7 +4,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  UCheckWin, StdCtrls, ExtCtrls, zLogGlobal;
+  StdCtrls, ExtCtrls,
+  UCheckWin, UzLogGlobal, UzLogConst;
 
 type
   TFreqList = class(TCheckWin)
@@ -31,95 +32,100 @@ implementation
 {$R *.DFM}
 
 procedure TFreqList.UpdateX;
-var B : TBand;
-    s : string;
+var
+   B: TBand;
+   S: string;
 begin
-  ListBox.Items.Clear;
-  for B := b19 to HiBand do
-    if FreqArray[B] <> '' then
-      begin
-        s := FreqArray[B];
-        Delete(s, 1, 3);
-        ListBox.Items.Add(s);
+   ListBox.Items.Clear;
+   for B := b19 to HiBand do
+      if FreqArray[B] <> '' then begin
+         S := FreqArray[B];
+         Delete(S, 1, 3);
+         ListBox.Items.Add(S);
       end;
 end;
 
-{function TFreqList.GetTXNr(S : string) : integer;
-var ss : string;
-    i : integer;
-begin
+{ function TFreqList.GetTXNr(S : string) : integer;
+  var ss : string;
+  i : integer;
+  begin
   ss := copy(S, 7, 2);
   ss := TrimRight(ss);
   try
-    i := StrToInt(ss);
+  i := StrToInt(ss);
   except
-    on EConvertError do
-      i := 0;
+  on EConvertError do
+  i := 0;
   end;
   Result := i;
-end;}
+  end; }
 
-function TFreqList.GetPCName(S : string) : string;
-var ss : string;
-    i, j : integer;
+function TFreqList.GetPCName(S: string): string;
+var
+   ss: string;
+   i, j: integer;
 begin
-  ss := '';
-  i := pos('[',S);
-  j := pos(']',S);
-  if (i > 0) and (j > 0) and (j > i) then
-    begin
+   ss := '';
+   i := pos('[', S);
+   j := pos(']', S);
+   if (i > 0) and (j > 0) and (j > i) then begin
       ss := S;
       Delete(ss, 1, i);
       j := pos(']', ss);
-      ss := copy(ss, 1, j-1);
-    end;
-  Result := ss;
+      ss := copy(ss, 1, j - 1);
+   end;
+   Result := ss;
 end;
 
-procedure TFreqList.ProcessFreqData(S : string);
-var ss : string;
-    pcname : string;
-    B : TBand;
+procedure TFreqList.ProcessFreqData(S: string);
+var
+   ss: string;
+   pcname: string;
+   B: TBand;
 begin
-  if length(S) < 30 then
-    exit;
+   if length(S) < 30 then
+      exit;
 
-  //tx := GetTXNr(S);
-  pcname := GetPCName(S);
+   // tx := GetTXNr(S);
+   pcname := GetPCName(S);
 
-  for B := b19 to HiBand do
-    if FreqArray[B] <> '' then
-      if pcname = GetPCName(FreqArray[B]){GetTXNr(FreqArray[B]) = tx} then
-        FreqArray[B] := '';
+   for B := b19 to HiBand do
+      if FreqArray[B] <> '' then
+         if pcname = GetPCName(FreqArray[B]) { GetTXNr(FreqArray[B]) = tx } then
+            FreqArray[B] := '';
 
-  ss := copy(S, 1, 2);
-  ss := TrimRight(ss);
-  B := TBand(StrToInt(ss));
-  FreqArray[B] := S;
-  Update;
-
+   ss := copy(S, 1, 2);
+   ss := TrimRight(ss);
+   B := TBand(StrToInt(ss));
+   FreqArray[B] := S;
+   Update;
 end;
 
 procedure TFreqList.FormShow(Sender: TObject);
 begin
-  //inherited;
-  Update;
+   // inherited;
+   Update;
 end;
 
 procedure TFreqList.FormCreate(Sender: TObject);
-var B : TBand;
+var
+   B: TBand;
 begin
-  for B := b19 to HiBand do
-    FreqArray[B] := '';
+   for B := b19 to HiBand do begin
+      FreqArray[B] := '';
+   end;
 end;
 
 procedure TFreqList.ClearBtnClick(Sender: TObject);
-var B : TBand;
+var
+   B: TBand;
 begin
-  //inherited;
-  for B := b19 to HiBand do
-    FreqArray[B] := '';
-  Update;
+   // inherited;
+   for B := b19 to HiBand do begin
+      FreqArray[B] := '';
+   end;
+
+   Update;
 end;
 
 end.

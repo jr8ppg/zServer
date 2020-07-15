@@ -4,14 +4,15 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  UBasicMultiForm, StdCtrls, Grids, Cologrid, JLLabel, ExtCtrls, zLogGlobal;
+  StdCtrls, Grids, Cologrid, JLLabel, ExtCtrls, System.UITypes,
+  UBasicMultiForm, UzLogGlobal, UzLogConst, UzLogQSO;
 
 type
   TCity = class
-    CityNumber : string[10];
-    CityName : string[40];
-    PrefNumber : string[3];
-    PrefName : string[10];
+    CityNumber : string;
+    CityName : string;
+    PrefNumber : string;
+    PrefName : string;
     Worked : array[b19..HiBand] of boolean;
     constructor Create;
     function Summary : string;
@@ -75,304 +76,301 @@ var
 
 implementation
 
-uses UServerForm;
+uses
+  UServerForm;
 
 {$R *.DFM}
 
-function TACAGMultiForm.ReturnSummary(C : TCity) : string;
+function TACAGMultiForm.ReturnSummary(C: TCity): string;
 begin
-  Result := C.ACAGSummary;
+   Result := C.ACAGSummary;
 end;
 
 procedure TACAGMultiForm.RecalcAll;
-var i : integer;
-    aQSO : TQSO;
+var
+   i: Integer;
+   aQSO: TQSO;
 begin
-  Reset;
-  for i := 1 to ServerForm.Stats.MasterLog.TotalQSO do
-    begin
-      aQSO := TQSO(ServerForm.Stats.MasterLog.List[i]);
+   Reset;
+   for i := 1 to ServerForm.Stats.MasterLog.TotalQSO do begin
+      aQSO := TQSO(ServerForm.Stats.MasterLog.QSOList[i]);
       Add(aQSO);
-    end;
-{
-  aQSO := TQSO.Create;
-  for B := b19 to HiBand do
-    begin
-      if NotWARC(B) then
-        begin
-          Log := ServerForm.Stats.Logs[B];
-          for i := 1 to Log.TotalQSO do
-            begin
-              aQSO.QSO := TQSO(Log.List[i]).QSO;
-              Add(aQSO);
-              TQSO(Log.List[i]).QSO := aQSO.QSO;
-            end;
-        end;
-    end;
-  aQSO.Free;}
+   end;
+   {
+     aQSO := TQSO.Create;
+     for B := b19 to HiBand do
+     begin
+     if NotWARC(B) then
+     begin
+     Log := ServerForm.Stats.Logs[B];
+     for i := 1 to Log.TotalQSO do
+     begin
+     aQSO.QSO := TQSO(Log.List[i]).QSO;
+     Add(aQSO);
+     TQSO(Log.List[i]).QSO := aQSO.QSO;
+     end;
+     end;
+     end;
+     aQSO.Free; }
 end;
 
-procedure TACAGMultiForm.ResetBand(B : TBand);
-var i : integer;
+procedure TACAGMultiForm.ResetBand(B: TBand);
+var
+   i: Integer;
 begin
-  for i := 0 to CityList.List.Count - 1 do
-    begin
+   for i := 0 to CityList.List.Count - 1 do begin
       TCity(CityList.List[i]).Worked[B] := False;
-      Grid.Cells[0,i] := ReturnSummary(TCity(CityList.List[i]));
-    end;
-  //UpdateCheckListBox;
-  //UpdateListBox;
+      Grid.Cells[0, i] := ReturnSummary(TCity(CityList.List[i]));
+   end;
+   // UpdateCheckListBox;
+   // UpdateListBox;
 end;
 
 procedure TACAGMultiForm.Reset;
-var B : TBand;
-    i : integer;
+var
+   B: TBand;
+   i: Integer;
 begin
-  for i := 0 to CityList.List.Count - 1 do
-    begin
+   for i := 0 to CityList.List.Count - 1 do begin
       for B := b19 to HiBand do
-        TCity(CityList.List[i]).Worked[B] := False;
-      Grid.Cells[0,i] := ReturnSummary(TCity(CityList.List[i]));
-    end;
-  {
-  ListBox.Clear;
-  for K := m101 to m50 do
-    begin
-      str := FillRight(KenNames[K], 16)+'. . . . . .';
-      ListBox.Items.Add(str);
-    end;
-  Update;}
+         TCity(CityList.List[i]).Worked[B] := False;
+      Grid.Cells[0, i] := ReturnSummary(TCity(CityList.List[i]));
+   end;
+   {
+     ListBox.Clear;
+     for K := m101 to m50 do
+     begin
+     str := FillRight(KenNames[K], 16)+'. . . . . .';
+     ListBox.Items.Add(str);
+     end;
+     Update; }
 
 end;
 
-procedure TACAGMultiForm.Add(aQSO : TQSO);
-var i : integer;
+procedure TACAGMultiForm.Add(aQSO: TQSO);
+var
+   i: Integer;
 begin
-  if aQSO.QSO.Dupe then
-    exit;
+   if aQSO.Dupe then
+      exit;
 
-  if aQSO.QSO.NewMulti1 then
-    begin
+   if aQSO.NewMulti1 then begin
       for i := 0 to CityList.List.Count - 1 do
-        if TCity(CityList.List[i]).CityNumber = aQSO.QSO.Multi1 then
-          begin
-            TCity(CityList.List[i]).Worked[aQSO.QSO.Band] := True;
-            Grid.Cells[0,i] := ReturnSummary(TCity(CityList.List[i]));
+         if TCity(CityList.List[i]).CityNumber = aQSO.Multi1 then begin
+            TCity(CityList.List[i]).Worked[aQSO.Band] := True;
+            Grid.Cells[0, i] := ReturnSummary(TCity(CityList.List[i]));
             exit;
-          end;
-    end;
+         end;
+   end;
 end;
-
 
 constructor TCity.Create;
-var B : TBand;
+var
+   B: TBand;
 begin
-  for B := b19 to HiBand do
-    Worked[B] := False;
-  CityNumber := '';
-  CityName := '';
-  PrefNumber := '';
-  PrefName := '';
+   for B := b19 to HiBand do
+      Worked[B] := False;
+   CityNumber := '';
+   CityName := '';
+   PrefNumber := '';
+   PrefName := '';
 end;
 
-function TCity.Summary : string;
-var temp : string;
-    B : TBand;
+function TCity.Summary: string;
+var
+   temp: string;
+   B: TBand;
 begin
-  temp := '';
-  temp := FillRight(CityNumber,7)+FillRight(CityName,20)+' ';
-  for B := b19 to HiBand do
-    if NotWARC(B) then
-      if Worked[B] then
-        temp := temp + '* '
-      else
-        temp := temp + '. ';
-  Result := ' '+temp;
+   temp := '';
+   temp := FillRight(CityNumber, 7) + FillRight(CityName, 20) + ' ';
+   for B := b19 to HiBand do
+      if NotWARC(B) then
+         if Worked[B] then
+            temp := temp + '* '
+         else
+            temp := temp + '. ';
+   Result := ' ' + temp;
 end;
 
-function TCity.ACAGSummary : string;
-var temp : string;
-    B : TBand;
+function TCity.ACAGSummary: string;
+var
+   temp: string;
+   B: TBand;
 begin
-  temp := '';
-  temp := FillRight(CityNumber,7)+FillRight(CityName,20)+'   ';
-  for B := b35 to HiBand do
-    if NotWARC(B) then
-      if Worked[B] then
-        temp := temp + '* '
-      else
-        temp := temp + '. ';
-  Result := ' '+temp;
+   temp := '';
+   temp := FillRight(CityNumber, 7) + FillRight(CityName, 20) + '   ';
+   for B := b35 to HiBand do
+      if NotWARC(B) then
+         if Worked[B] then
+            temp := temp + '* '
+         else
+            temp := temp + '. ';
+   Result := ' ' + temp;
 end;
 
-function TCity.FDSummary(LowBand : TBand) : string;
-var temp : string;
-    B : TBand;
+function TCity.FDSummary(LowBand: TBand): string;
+var
+   temp: string;
+   B: TBand;
 begin
-  temp := '';
-  temp := FillRight(CityNumber,7)+FillRight(CityName,20)+' '+'  ';
-  for B := LowBand to HiBand do
-    if NotWARC(B) then
-      if B in [b19..b1200] then
-        begin
-          if length(Self.CityNumber) <= 3 then
-            if Worked[B] then
-              temp := temp + '* '
+   temp := '';
+   temp := FillRight(CityNumber, 7) + FillRight(CityName, 20) + ' ' + '  ';
+   for B := LowBand to HiBand do
+      if NotWARC(B) then
+         if B in [b19 .. b1200] then begin
+            if length(Self.CityNumber) <= 3 then
+               if Worked[B] then
+                  temp := temp + '* '
+               else
+                  temp := temp + '. '
             else
-              temp := temp + '. '
-          else
-            temp := temp + '  ';
-        end
-      else
-        begin
-          if length(Self.CityNumber) > 3 then
-            if Worked[B] then
-              temp := temp + '* '
+               temp := temp + '  ';
+         end
+         else begin
+            if length(Self.CityNumber) > 3 then
+               if Worked[B] then
+                  temp := temp + '* '
+               else
+                  temp := temp + '. '
             else
-              temp := temp + '. '
-          else
-            temp := temp + '  ';
-        end;
-  Result := ' '+temp;
+               temp := temp + '  ';
+         end;
+   Result := ' ' + temp;
 end;
 
-function TCity.Summary2 : string;
-var temp : string;
-    B : TBand;
+function TCity.Summary2: string;
+var
+   temp: string;
+   B: TBand;
 begin
-  temp := '';
-  temp := FillRight(CityNumber,7)+FillRight(CityName,20)+' Worked on : ';
-  for B := b35 to HiBand do
-    if Worked[B] then
-      temp := temp + ' '+MHzString[B]
-    else
-      temp := temp + '';
-  Result := temp;
+   temp := '';
+   temp := FillRight(CityNumber, 7) + FillRight(CityName, 20) + ' Worked on : ';
+   for B := b35 to HiBand do
+      if Worked[B] then
+         temp := temp + ' ' + MHzString[B]
+      else
+         temp := temp + '';
+   Result := temp;
 end;
 
 constructor TCityList.Create;
 begin
-  List := TList.Create;
+   List := TList.Create;
 end;
 
 destructor TCityList.Destroy;
-var i : integer;
+var
+   i: Integer;
 begin
-  for i := 0 to List.Count - 1 do
-    begin
+   for i := 0 to List.Count - 1 do begin
       if List[i] <> nil then
-        TCity(List[i]).Free;
-    end;
-  List.Free;
+         TCity(List[i]).Free;
+   end;
+   List.Free;
 end;
 
-procedure TCityList.LoadFromFile(filename : string);
-var f : textfile;
-    str : string;
-    C : TCity;
+procedure TCityList.LoadFromFile(filename: string);
+var
+   f: textfile;
+   str: string;
+   C: TCity;
 begin
-  assign(f, filename);
+   assign(f, filename);
 {$I-}
-  reset(f);
+   Reset(f);
 {$I+}
-  if IOResult <> 0 then
-    begin
-      MessageDlg('DAT file '+filename+' cannot be opened', mtError,
-                 [mbOK], 0);
-      exit;    {Alert that the file cannot be opened \\}
-    end;
+   if IOResult <> 0 then begin
+      MessageDlg('DAT file ' + filename + ' cannot be opened', mtError, [mbOK], 0);
+      exit; { Alert that the file cannot be opened \\ }
+   end;
 
-  {
-  try
-    reset(f);
-  except
-    on EFOpenError do
-      begin
-        MessageDlg('DAT file '+filename+' cannot be opened', mtError,
-                   [mbOK], 0);
-        exit;
-      end;
-  end;}
+   {
+     try
+     reset(f);
+     except
+     on EFOpenError do
+     begin
+     MessageDlg('DAT file '+filename+' cannot be opened', mtError,
+     [mbOK], 0);
+     exit;
+     end;
+     end; }
 
-  readln(f, str);
-  while not(eof(f)) do
-    begin
+   readln(f, str);
+   while not(eof(f)) do begin
       readln(f, str);
-      if Pos('end of file', LowerCase(str))>0 then break;
+      if Pos('end of file', LowerCase(str)) > 0 then
+         break;
       C := TCity.Create;
       C.CityName := Copy(str, 12, 40);
       C.CityNumber := TrimRight(Copy(str, 1, 11));
       List.Add(C);
-    end;
+   end;
 end;
-
-
 
 procedure TACAGMultiForm.FormCreate(Sender: TObject);
 begin
-  inherited;
-  CityList := TCityList.Create;
-  CityList.LoadFromFile('ACAG.DAT');
-  if CityList.List.Count = 0 then exit;
-  Grid.RowCount := CityList.List.Count - 1;
+   inherited;
+   CityList := TCityList.Create;
+   CityList.LoadFromFile('ACAG.DAT');
+   if CityList.List.Count = 0 then
+      exit;
+   Grid.RowCount := CityList.List.Count - 1;
 
-  {
-  BandCombo.Items.Clear;
-  for B := b35 to HiBand do
-    if NotWARC(B) then
-      BandCombo.Items.Add(MHzString[B]);
-  BandCombo.ItemIndex := 0;
-  }
-  Reset;
+   {
+     BandCombo.Items.Clear;
+     for B := b35 to HiBand do
+     if NotWARC(B) then
+     BandCombo.Items.Add(MHzString[B]);
+     BandCombo.ItemIndex := 0;
+   }
+   Reset;
 end;
 
-procedure TACAGMultiForm.GridSetting(ARow, Acol: Integer;
-  var Fcolor: Integer; var Bold, Italic, underline: Boolean);
+procedure TACAGMultiForm.GridSetting(ARow, Acol: Integer; var Fcolor: Integer; var Bold, Italic, underline: boolean);
 begin
-  inherited;
-  FColor := clBlack;
-  {
-  B := Main.CurrentQSO.QSO.Band;
-  if TCity(CityList.List[ARow]).Worked[B] then
-    FColor := clRed
-  else
-    FColor := clBlack;
-  }
+   inherited;
+   Fcolor := clBlack;
+   {
+     B := Main.CurrentQSO.QSO.Band;
+     if TCity(CityList.List[ARow]).Worked[B] then
+     FColor := clRed
+     else
+     FColor := clBlack;
+   }
 end;
 
 procedure TACAGMultiForm.Button3Click(Sender: TObject);
-var i : integer;
+var
+   i: Integer;
 begin
-  for i := 0 to CityList.List.Count - 1 do
-    begin
+   for i := 0 to CityList.List.Count - 1 do begin
       if Pos(Edit.Text, TCity(CityList.List[i]).CityNumber) = 1 then
-        break;
-    end;
- if i < Grid.RowCount - 1 - Grid.VisibleRowCount then
-   Grid.TopRow := i
- else
-   if CityList.List.Count <= Grid.VisibleRowCount then
-     Grid.TopRow := 1
+         break;
+   end;
+   if i < Grid.RowCount - 1 - Grid.VisibleRowCount then
+      Grid.TopRow := i
+   else if CityList.List.Count <= Grid.VisibleRowCount then
+      Grid.TopRow := 1
    else
-     Grid.TopRow := Grid.RowCount - Grid.VisibleRowCount;
+      Grid.TopRow := Grid.RowCount - Grid.VisibleRowCount;
 end;
 
 procedure TACAGMultiForm.EditKeyPress(Sender: TObject; var Key: Char);
 begin
-  inherited;
-  if Key = Chr($0D) then
-    begin
+   inherited;
+   if Key = Chr($0D) then begin
       Button3Click(Self);
       Key := #0;
-    end;
+   end;
 end;
 
 procedure TACAGMultiForm.cbStayOnTopClick(Sender: TObject);
 begin
-  if cbStayOnTop.Checked then
-    FormStyle := fsStayOnTop
-  else
-    FormStyle := fsNormal;
+   if cbStayOnTop.Checked then
+      FormStyle := fsStayOnTop
+   else
+      FormStyle := fsNormal;
 end;
 
 end.

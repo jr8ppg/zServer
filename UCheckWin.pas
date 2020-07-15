@@ -4,7 +4,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  StdCtrls, ExtCtrls, zLogGlobal;
+  StdCtrls, ExtCtrls,
+  UzLogGlobal, UzLogConst, UzLogQSO;
 
 type
   TCheckWin = class(TForm)
@@ -22,10 +23,10 @@ type
     { Private declarations }
    public
     { Public declarations }
-   ListCWandPh : boolean;
-   BandRow : array[b19..HiBand] of Integer;
-   procedure ResetListBox;
-   procedure Renew(aQSO : TQSO); virtual;
+    ListCWandPh : boolean;
+    BandRow : array[b19..HiBand] of Integer;
+    procedure ResetListBox;
+    procedure Renew(aQSO : TQSO); virtual;
   end;
 
 var
@@ -33,65 +34,60 @@ var
 
 implementation
 
-//uses Main;
-
 {$R *.DFM}
 
 procedure TCheckWin.CreateParams(var Params: TCreateParams);
 begin
-  inherited CreateParams(Params);
-  Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
+   inherited CreateParams(Params);
+   Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
 end;
 
 procedure TCheckWin.Button3Click(Sender: TObject);
 begin
-  Close;
+   Close;
 end;
 
 procedure TCheckWin.StayOnTopClick(Sender: TObject);
 begin
-  If StayOnTop.Checked then
-    FormStyle := fsStayOnTop
-  else
-    FormStyle := fsNormal;
+   If StayOnTop.Checked then
+      FormStyle := fsStayOnTop
+   else
+      FormStyle := fsNormal;
 end;
 
 procedure TCheckWin.ResetListBox;
-var B : TBand;
+var
+   B: TBand;
 begin
-  ListBox.Items.Clear;
-  if ListCWandPh then
-    begin
+   ListBox.Items.Clear;
+   if ListCWandPh then begin
       for B := b19 to HiBand do
-        if BandRow[B] >= 0 then
-          begin
-            ListBox.Items.Add(FillRight(MHzString[B], 5)+' CW');
-            ListBox.Items.Add(FillRight(MHzString[B], 5)+' Ph');
-          end;
-    end
-  else
-    begin
+         if BandRow[B] >= 0 then begin
+            ListBox.Items.Add(FillRight(MHzString[B], 5) + ' CW');
+            ListBox.Items.Add(FillRight(MHzString[B], 5) + ' Ph');
+         end;
+   end
+   else begin
       for B := b19 to HiBand do
-        if BandRow[B] >= 0 then
-          ListBox.Items.Add(MHzString[B]);
-    end;
+         if BandRow[B] >= 0 then
+            ListBox.Items.Add(MHzString[B]);
+   end;
 end;
 
-procedure TCheckWin.Renew(aQSO : TQSO);
+procedure TCheckWin.Renew(aQSO: TQSO);
 begin
 end;
 
-procedure TCheckWin.FormKeyDown(Sender: TObject; var Key: Word;
-  Shift: TShiftState);
+procedure TCheckWin.FormKeyDown(Sender: TObject; var Key: Word; Shift: TShiftState);
 begin
-  {case Key of
-    VK_ESCAPE : MainForm.LastFocus.SetFocus;
-  end;}
+   { case Key of
+     VK_ESCAPE : MainForm.LastFocus.SetFocus;
+     end; }
 end;
 
 procedure TCheckWin.FormCreate(Sender: TObject);
 begin
-  ListCWandPh := False;
+   ListCWandPh := False;
 end;
 
 end.

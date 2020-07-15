@@ -4,7 +4,8 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  UBasicMultiForm, zLogGlobal, StdCtrls, checklst, ExtCtrls, ComCtrls;
+  StdCtrls, checklst, ExtCtrls, ComCtrls,
+  UBasicMultiForm, UzLogGlobal, UzLogConst, UzLogQSO;
 
 type
   TKen = (m101,m102,m103,m104,m105,m106,m107,m108,
@@ -33,11 +34,10 @@ type
     procedure Add(aQSO : TQSO); override;
     procedure UpdateCheckListBox;
     procedure UpdateListBox;
-    //procedure RecalcBand(B : TBand); override;
     procedure RecalcAll; override;
   end;
 
-const KenNames : array[m101..m50] of string[15] =
+const KenNames : array[m101..m50] of string =
 ('101 è@íJ','102 óØñG','103 è„êÏ','104 ñ‘ëñ','105 ãÛím','106 êŒéÎ','107 ç™é∫',
  '108 å„éu','109 è\èü','110 ã˙òH','111 ì˙çÇ','112 í_êU','113 ïOéR','114 ìnìá',
  '02  ê¬êX','03  ä‚éË','04  èHìc','05  éRå`','06  ã{èÈ','07  ïüìá','08  êVäÉ',
@@ -54,28 +54,10 @@ var
 
 implementation
 
-uses UServerForm;
+uses
+  UServerForm;
 
 {$R *.DFM}
-
-{procedure TALLJAMultiForm.RecalcBand(B : TBand);
-var Log : TQSOList;
-    i : integer;
-    aQSO : TQSO;
-begin
-  if NotWARC(B) and (B in [b35..b50]) = False then
-    exit;
-  Log := ServerForm.Stats.Logs[B];
-  ResetBand(B);
-  aQSO := TQSO.Create;
-  for i := 1 to Log.TotalQSO do
-    begin
-      aQSO.QSO := TQSO(Log.List[i]).QSO;
-      Add(aQSO);
-      TQSO(Log.List[i]).QSO := aQSO.QSO;
-    end;
-  aQSO.Free;
-end; }
 
 procedure TALLJAMultiForm.RecalcAll;
 var i : integer;
@@ -84,171 +66,174 @@ begin
   Reset;
   for i := 1 to ServerForm.Stats.MasterLog.TotalQSO do
     begin
-      aQSO := TQSO(ServerForm.Stats.MasterLog.List[i]);
+      aQSO := TQSO(ServerForm.Stats.MasterLog.QSOList[i]);
       Add(aQSO);
     end;
 end;
 
 procedure TALLJAMultiForm.UpdateListBox;
-var K : TKen;
-    BB : TBand;
-    str : string;
+var
+   K: TKen;
+   BB: TBand;
+   str: string;
 begin
-  ListBox.Clear;
-  for K := m101 to m50 do
-    begin
+   ListBox.Clear;
+   for K := m101 to m50 do begin
       str := '';
       for BB := b35 to b50 do
-        if NotWARC(BB) then
-          begin
+         if NotWARC(BB) then begin
             if MultiArray[BB, K] then
-              str := str + '* '
+               str := str + '* '
             else
-              str := str + '. ';
-          end;
+               str := str + '. ';
+         end;
       str := FillRight(KenNames[K], 16) + str;
       ListBox.Items.Add(str);
-    end;
+   end;
 end;
 
-procedure TALLJAMultiForm.ResetBand(B : TBand);
-var K : TKen;
+procedure TALLJAMultiForm.ResetBand(B: TBand);
+var
+   K: TKen;
 begin
-  for K := m101 to m50 do
-    MultiArray[B, K] := False;
-  UpdateCheckListBox;
-  UpdateListBox;
+   for K := m101 to m50 do
+      MultiArray[B, K] := False;
+   UpdateCheckListBox;
+   UpdateListBox;
 end;
 
 procedure TALLJAMultiForm.Reset;
-var B : TBand;
-    K : TKen;
-    str : string;
+var
+   B: TBand;
+   K: TKen;
+   str: string;
 begin
-  for B := b19 to HiBand do
-    for K := m101 to m50 do
-      MultiArray[B, K] := False;
-  ListBox.Clear;
-  for K := m101 to m50 do
-    begin
-      str := FillRight(KenNames[K], 16)+'. . . . . .';
+   for B := b19 to HiBand do
+      for K := m101 to m50 do
+         MultiArray[B, K] := False;
+   ListBox.Clear;
+   for K := m101 to m50 do begin
+      str := FillRight(KenNames[K], 16) + '. . . . . .';
       ListBox.Items.Add(str);
-    end;
-  Update;
+   end;
+   Update;
 end;
 
-
-procedure TALLJAMultiForm.Add(aQSO : TQSO);
-var M : TKen;
-    str : string;
-    I : integer;
-    B : TBand;
+procedure TALLJAMultiForm.Add(aQSO: TQSO);
+var
+   M: TKen;
+   str: string;
+   i: integer;
+   B: TBand;
 begin
 
-  if aQSO.QSO.Dupe then
-    exit;
-
-  str := aQSO.QSO.NrRcvd;
-  Delete(str, length(str), 1); // delete the last char
-
-  //aQSO.QSO.NewMulti1 := False;
-  try
-    I := StrToInt(str);
-  except
-    on EConvertError do
+   if aQSO.Dupe then
       exit;
-  end;
 
-  case I of
-    101..114 : M := TKen(I-101);
-    2..50 :    M := TKen(I - 2 + ord(m02));
-  else
-    exit;
-  end;
+   str := aQSO.NrRcvd;
+   Delete(str, length(str), 1); // delete the last char
 
-  if MultiArray[aQSO.QSO.Band, M] = False then
-    begin
-      MultiArray[aQSO.QSO.Band, M] := True;
-      //aQSO.QSO.NewMulti1 := True;
+   // aQSO.QSO.NewMulti1 := False;
+   try
+      i := StrToInt(str);
+   except
+      on EConvertError do
+         exit;
+   end;
+
+   case i of
+      101 .. 114:
+         M := TKen(i - 101);
+      2 .. 50:
+         M := TKen(i - 2 + ord(m02));
+      else
+         exit;
+   end;
+
+   if MultiArray[aQSO.Band, M] = False then begin
+      MultiArray[aQSO.Band, M] := True;
+      // aQSO.QSO.NewMulti1 := True;
       str := '';
       for B := b35 to b50 do
-        if NotWARC(B) then
-          begin
+         if NotWARC(B) then begin
             if MultiArray[B, M] then
-              str := str + '* '
+               str := str + '* '
             else
-              str := str + '. ';
-          end;
+               str := str + '. ';
+         end;
       str := FillRight(KenNames[M], 16) + str;
-      ListBox.Items.Delete(Ord(M));
-      ListBox.Items.Insert(Ord(M), str);
+      ListBox.Items.Delete(ord(M));
+      ListBox.Items.Insert(ord(M), str);
       UpdateCheckListBox;
-    end;
+   end;
 end;
 
 procedure TALLJAMultiForm.UpdateCheckListBox;
-var B : TBand;
-    K : TKen;
+var
+   B: TBand;
+   K: TKen;
 begin
-  if TabControl.TabIndex = 6 then
-    begin
-    end
-  else
-    begin
+   if TabControl.TabIndex = 6 then begin
+   end
+   else begin
       B := b19;
       case TabControl.TabIndex of
-        0 : B := b35;
-        1 : B := b7;
-        2 : B := b14;
-        3 : B := b21;
-        4 : B := b28;
-        5 : B := b50;
+         0:
+            B := b35;
+         1:
+            B := b7;
+         2:
+            B := b14;
+         3:
+            B := b21;
+         4:
+            B := b28;
+         5:
+            B := b50;
       end;
       for K := m101 to m50 do
-        CheckListBox.Checked[ord(K)] := MultiArray[B, K];
-    end;
+         CheckListBox.Checked[ord(K)] := MultiArray[B, K];
+   end;
 end;
 
 procedure TALLJAMultiForm.FormCreate(Sender: TObject);
-var K : TKen;
+var
+   K: TKen;
 begin
-  inherited;
-  TabControl.TabIndex := 6;
-  ListBox.Visible := True;
-  CheckListBox.Visible := False;
-  ListBox.Align := alClient;
-  CheckListBox.Align := alNone;
-  for K := m101 to m50 do
-    begin
+   inherited;
+   TabControl.TabIndex := 6;
+   ListBox.Visible := True;
+   CheckListBox.Visible := False;
+   ListBox.Align := alClient;
+   CheckListBox.Align := alNone;
+   for K := m101 to m50 do begin
       CheckListBox.Items.Add(KenNames[K]);
-    end;
-  Reset;
+   end;
+   Reset;
 end;
 
 procedure TALLJAMultiForm.TabControlChange(Sender: TObject);
 begin
-  inherited;
-  if TabControl.TabIndex = 6 then
-    begin
+   inherited;
+   if TabControl.TabIndex = 6 then begin
       CheckListBox.Align := alNone;
       CheckListBox.Visible := False;
       ListBox.Align := alClient;
       ListBox.Visible := True;
-    end
-  else
-    begin
+   end
+   else begin
       ListBox.Align := alNone;
       ListBox.Visible := False;
       CheckListBox.Align := alClient;
       CheckListBox.Visible := True;
       UpdateCheckListBox;
-    end;
+   end;
 end;
 
 procedure TALLJAMultiForm.CheckListBoxClickCheck(Sender: TObject);
 begin
-  inherited;
-  UpdateCheckListBox;
+   inherited;
+   UpdateCheckListBox;
 end;
 
 end.
