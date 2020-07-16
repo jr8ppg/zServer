@@ -24,7 +24,6 @@ object ChooseContest: TChooseContest
     Default = True
     ModalResult = 1
     TabOrder = 0
-    OnClick = OKBtnClick
   end
   object CancelBtn: TButton
     Left = 168

@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  StdCtrls, Grids, Cologrid, JLLabel, ExtCtrls, System.UITypes,
+  StdCtrls, Grids, JLLabel, ExtCtrls, System.UITypes,
   UBasicMultiForm, UzLogGlobal, UzLogConst, UzLogQSO;
 
 type
@@ -45,7 +45,7 @@ type
     Label2400: TRotateLabel;
     Label5600: TRotateLabel;
     Label10G: TRotateLabel;
-    Grid: TMgrid;
+    Grid: TStringGrid;
     Panel1: TPanel;
     Button3: TButton;
     Edit: TEdit;
@@ -53,8 +53,6 @@ type
     BandCombo: TComboBox;
     cbStayOnTop: TCheckBox;
     procedure FormCreate(Sender: TObject);
-    procedure GridSetting(ARow, Acol: Integer; var Fcolor: Integer;
-      var Bold, Italic, underline: Boolean);
     procedure Button3Click(Sender: TObject);
     procedure EditKeyPress(Sender: TObject; var Key: Char);
     procedure cbStayOnTopClick(Sender: TObject);
@@ -70,9 +68,6 @@ type
     procedure RecalcAll; override;
     { Public declarations }
   end;
-
-var
-  ACAGMultiForm: TACAGMultiForm;
 
 implementation
 
@@ -325,19 +320,6 @@ begin
      BandCombo.ItemIndex := 0;
    }
    Reset;
-end;
-
-procedure TACAGMultiForm.GridSetting(ARow, Acol: Integer; var Fcolor: Integer; var Bold, Italic, underline: boolean);
-begin
-   inherited;
-   Fcolor := clBlack;
-   {
-     B := Main.CurrentQSO.QSO.Band;
-     if TCity(CityList.List[ARow]).Worked[B] then
-     FColor := clRed
-     else
-     FColor := clBlack;
-   }
 end;
 
 procedure TACAGMultiForm.Button3Click(Sender: TObject);

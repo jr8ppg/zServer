@@ -23,9 +23,6 @@ type
     //procedure Update; virtual; abstract;
   end;
 
-var
-  BasicMultiForm: TBasicMultiForm;
-
 implementation
 
 {$R *.DFM}

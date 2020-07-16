@@ -40,15 +40,16 @@ unit UServerForm;
 interface
 
 uses
-  WinTypes, WinProcs, Messages, SysUtils, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, IniFiles, Menus, WinSock, ExtCtrls, System.UITypes,
+  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
+  Dialogs, StdCtrls, IniFiles, Menus, ExtCtrls, System.UITypes,
   OverbyteIcsWndControl, OverbyteIcsWSocket,
-  UzLogGlobal, UBasicStats, UBasicMultiForm, UALLJAStats, UCliForm,
-  UALLJAMultiForm, UzLogConst, UzLogQSO;
+  UBasicStats, UBasicMultiForm, UCliForm, UFreqList, UConnections,
+  UzLogGlobal, UzLogConst, UzLogQSO, JclFileUtils;
 
 const
   IniFileName = 'ZServer.ini';
-  VersionString = 'ver 1.3';
+  WM_USER_CLIENT_CLOSED = (WM_USER + 0);
+
 type
   TServerForm = class(TForm)
     SrvSocket: TWSocket;
@@ -87,7 +88,6 @@ type
     procedure FormShow(Sender: TObject);
     procedure SrvSocketSessionAvailable(Sender: TObject; Error: Word);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
-    procedure PortButtonClick(Sender: TObject);
     procedure Button1Click(Sender: TObject);
     procedure Exit1Click(Sender: TObject);
     procedure About1Click(Sender: TObject);
@@ -109,18 +109,27 @@ type
     procedure CurrentFrequencies1Click(Sender: TObject);
     procedure Graph1Click(Sender: TObject);
     procedure DeleteDupes1Click(Sender: TObject);
+    procedure FormDestroy(Sender: TObject);
   private
     { D馗larations priv馥s }
-    Initialized  : Boolean;
-    ClientNumber : Integer;
-    procedure   WMUser(var msg: TMessage); message WM_USER;
-    procedure   StartServer;
+    FInitialized  : Boolean;
+    FClientNumber : Integer;
+    FTakeLog : Boolean;
+
+    FFreqList: TFreqList;
+    FConnections: TConnections;
+
+    FClientList: TCliFormList;
+
+    procedure OnClientClosed(var msg: TMessage); message WM_USER_CLIENT_CLOSED;
+    procedure StartServer;
+    procedure LoadSettings();
+    procedure SaveSettings();
   public
     ChatOnly : boolean;
     CommandQue : TStringList;
     Stats : TBasicStats;
     MultiForm : TBasicMultiForm;
-    TakeLog : boolean;
     procedure AddToChatLog(str : string);
     procedure SendAll(str : string);
     procedure SendAllButFrom(str : string; NotThisCli : integer);
@@ -130,21 +139,149 @@ type
     procedure IdleEvent(Sender: TObject; var Done: Boolean);
     procedure AddConsole(S : string); // adds string to clientlistbox
     function GetQSObyID(id : integer) : TQSO;
+
+    property ClientList: TCliFormList read FClientList;
   end;
 
 var
   ServerForm: TServerForm;
-  CliList : array[1..99] of TCliForm;
 
 implementation
 
 uses
-  UAbout, UChooseContest, UConnections, UMergeBand, UFreqList;
+  UAbout, UChooseContest, UMergeBand,
+  UALLJAMultiForm, UALLJAStats, USixDownStats,
+  UACAGMultiForm, UFDMultiForm, UFDStats, UCQWWStats, UWWMultiForm;
 
 {$R *.DFM}
 
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+{ procedure TServerForm.CreateParams(var Params: TCreateParams);
+  begin
+  inherited CreateParams(Params);
+  Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
+  end; }
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TServerForm.FormCreate(Sender: TObject);
+var
+   ver: TJclFileVersionInfo;
+begin
+   FClientList := TCliFormList.Create();
+   CommandQue := TStringList.Create;
+   Application.OnIdle := IdleEvent;
+   FTakeLog := False;
+   ChatOnly := True;
+   FClientNumber := 0;
+
+   CheckBox2.Checked := ChatOnly;
+
+   ver := TJclFileVersionInfo.Create(Self.Handle);
+   Caption := Application.Title + ' Version ' + ver.FileVersion;
+   ver.Free();
+
+   FFreqList := TFreqList.Create(Self);
+   FConnections := TConnections.Create(Self);
+
+   LoadSettings();
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TServerForm.FormShow(Sender: TObject);
+var
+   F: TChooseContest;
+begin
+   if FInitialized then begin
+      Exit;
+   end;
+
+   FInitialized := True;
+
+   F := TChooseContest.Create(Self);
+   try
+      F.ShowModal();
+      case F.ContestNumber of
+         0: begin
+            Stats := TALLJAStats.Create(Self);
+            MultiForm := TALLJAMultiForm.Create(Self);
+         end;
+
+         1: begin
+            Stats := TSixDownStats.Create(Self);
+            MultiForm := TFDMultiForm.Create(Self);
+            TFDMultiForm(MultiForm).Init6D;
+         end;
+
+         2: begin
+            Stats := TFDStats.Create(Self);
+            MultiForm := TFDMultiForm(Self);
+         end;
+
+         3: begin
+            Stats := TALLJAStats.Create(Self);
+            MultiForm := TACAGMultiForm.Create(Self);
+            TALLJAStats(Stats).InitACAG;
+         end;
+
+         4: begin
+            Stats := TCQWWStats.Create(Self);
+            MultiForm := TWWMultiForm.Create(Self);
+         end;
+      end;
+
+      StartServer;
+   finally
+      F.Release();
+   end;
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TServerForm.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+var
+   R: Word;
+begin
+   if Stats.Saved = False then begin
+      R := MessageDlg('Save changes to ' + CurrentFileName + ' ?', mtConfirmation, [mbYes, mbNo, mbCancel], 0); { HELP context 0 }
+      case R of
+         mrYes:
+            Save1Click(self);
+         mrCancel:
+            CanClose := False;
+      end;
+   end;
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TServerForm.FormClose(Sender: TObject; var Action: TCloseAction);
+begin
+   SrvSocket.Close;
+   SaveSettings();
+end;
 
 {* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
+
+procedure TServerForm.FormDestroy(Sender: TObject);
+var
+   i: Integer;
+begin
+   FFreqList.Release();
+   FConnections.Release();
+
+   for i := 0 to FClientList.Count - 1 do begin
+      FClientList[i].Release();
+   end;
+   FClientList.Free();
+
+   CommandQue.Free();
+end;
+
+{* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
+
 function TServerForm.GetQSObyID(id: Integer): TQSO;
 var
    i, j: Integer;
@@ -193,7 +330,7 @@ begin
 
    if Pos('FREQ', temp) = 1 then begin
       temp2 := copy(temp, 6, 255);
-      FreqList.ProcessFreqData(temp2);
+      FFreqList.ProcessFreqData(temp2);
    end;
 
    if Pos('GETCONSOLE', UpperCase(temp)) = 1 then begin
@@ -220,12 +357,10 @@ begin
 
    if Pos('WHO', UpperCase(temp)) = 1 then begin
       for B := b19 to HiBand do
-         for i := 1 to 99 do begin
-            if CliList[i] = nil then
-               break;
-            if CliList[i].CurrentBand = B then begin
+         for i := 0 to FClientList.Count - 1 do begin
+            if FClientList[i].CurrentBand = B then begin
                sendbuf := ZLinkHeader + ' PUTMESSAGE ';
-               sendbuf := sendbuf + FillRight(BandString[CliList[i].CurrentBand], 9) + CliList[i].CurrentOperator;
+               sendbuf := sendbuf + FillRight(BandString[FClientList[i].CurrentBand], 9) + FClientList[i].CurrentOperator;
                SendOnly(sendbuf + LBCODE, from);
             end;
          end;
@@ -234,9 +369,9 @@ begin
 
    if Pos('OPERATOR', temp) = 1 then begin
       Delete(temp, 1, 9);
-      CliList[from].CurrentOperator := temp;
-      CliList[from].SetCaption;
-      Connections.UpdateDisplay;
+      FClientList[from].CurrentOperator := temp;
+      FClientList[from].SetCaption;
+      FConnections.UpdateDisplay;
       Exit;
    end;
 
@@ -250,22 +385,18 @@ begin
 
       B := TBand(i);
 
-      CliList[from].CurrentBand := B;
+      FClientList[from].CurrentBand := B;
 
-      for i := 1 to 99 do begin
-         if CliList[i] = nil then
-            break
-         else begin
-            if (i <> from) and (CliList[i].CurrentBand = B) then begin
-               sendbuf := ZLinkHeader + ' PUTMESSAGE ' + 'Band already in use!';
-               SendOnly(sendbuf + LBCODE, from);
-               // CliList[from].Close;
-            end;
+      for i := 0 to FClientList.Count - 1 do begin
+         if (i <> from) and (FClientList[i].CurrentBand = B) then begin
+            sendbuf := ZLinkHeader + ' PUTMESSAGE ' + 'Band already in use!';
+            SendOnly(sendbuf + LBCODE, from);
+            // CliList[from].Close;
          end;
       end;
 
-      CliList[from].SetCaption;
-      Connections.UpdateDisplay;
+      FClientList[from].SetCaption;
+      FConnections.UpdateDisplay;
       Exit;
    end;
 
@@ -320,7 +451,7 @@ begin
       temp2 := temp;
       Delete(temp2, 1, 11);
       AddConsole(temp2);
-      if TakeLog then
+      if FTakeLog then
          AddToChatLog(temp2);
    end;
 
@@ -481,6 +612,8 @@ begin
    SendAllButFrom(sendbuf + LBCODE, from);
 end;
 
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
 procedure TServerForm.Idle;
 var
    str: string;
@@ -499,12 +632,15 @@ begin
    }
    while CommandQue.Count > 0 do begin
       str := CommandQue[0];
-      if not(ChatOnly) then
+      if not(ChatOnly) then begin
          AddConsole(str);
+      end;
       ProcessCommand(str);
       CommandQue.Delete(0);
    end;
 end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
 procedure TServerForm.IdleEvent(Sender: TObject; var Done: Boolean);
 begin
@@ -513,61 +649,9 @@ begin
       ClientListBox.Items.Delete(0);
    end;
 end;
-{ procedure TServerForm.CreateParams(var Params: TCreateParams);
-  begin
-  inherited CreateParams(Params);
-  Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
-  end; }
-
-procedure TServerForm.FormShow(Sender: TObject);
-var
-   IniFile: TIniFile;
-   // Buffer  : String;
-   i: Integer;
-begin
-   if not Initialized then begin
-      ChatOnly := True;
-      Initialized := True;
-      IniFile := TIniFile.Create(IniFileName);
-      Top := IniFile.ReadInteger('Window', 'Top', Top);
-      Left := IniFile.ReadInteger('Window', 'Left', Left);
-      Width := IniFile.ReadInteger('Window', 'Width', Width);
-      Height := IniFile.ReadInteger('Window', 'Height', Height);
-      ChatOnly := IniFile.ReadBool('Options', 'ChatOnly', True);
-
-      IniFile.Free;
-      // StartServer;
-      ClientNumber := 0;
-      // CommandQue := TStringList.Create; //moved to formcreate;
-      for i := 1 to 99 do
-         CliList[i] := nil;
-      CheckBox2.Checked := ChatOnly;
-      ChooseContest.ShowModal;
-      StartServer;
-   end;
-end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-procedure TServerForm.FormClose(Sender: TObject; var Action: TCloseAction);
-var
-   IniFile: TIniFile;
-begin
-   IniFile := TIniFile.Create(IniFileName);
-   IniFile.WriteInteger('Window', 'Top', Top);
-   IniFile.WriteInteger('Window', 'Left', Left);
-   IniFile.WriteInteger('Window', 'Width', Width);
-   IniFile.WriteInteger('Window', 'Height', Height);
-   IniFile.WriteBool('Options', 'ChatOnly', ChatOnly);
-   IniFile.Free;
-end;
 
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-procedure TServerForm.PortButtonClick(Sender: TObject);
-begin
-   // StartServer;
-end;
-
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 procedure TServerForm.StartServer;
 begin
    SrvSocket.Close;
@@ -578,63 +662,43 @@ begin
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
 procedure TServerForm.SrvSocketSessionAvailable(Sender: TObject; Error: Word);
+var
+   Form: TCliForm;
+begin
+   FClientNumber := FClientList.Count + 1;
+
+   Form := TCliForm.Create(self);
+   Form.CliSocket.HSocket := SrvSocket.Accept;
+   Form.Caption := 'Client ' + IntToStr(FClientNumber);
+   Form.ClientNumber := FClientNumber;
+   Form.Show;
+   FClientList.Add(Form);
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TServerForm.OnClientClosed(var msg: TMessage);
 var
    Form: TCliForm;
    i: Integer;
 begin
-   // Inc(ClientNumber);
-   for i := 1 to 99 do begin
-      if CliList[i] = nil then begin
-         break;
-      end;
-   end;
-
-   ClientNumber := i;
-
-   Form := TCliForm.Create(self);
-   Form.CliSocket.HSocket := SrvSocket.Accept;
-   Form.Caption := 'Client ' + IntToStr(ClientNumber);
-   Form.ClientNumber := ClientNumber;
-   Form.Show;
-   CliList[ClientNumber] := Form;
-end;
-
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-procedure TServerForm.WMUser(var msg: TMessage);
-var
-   Form: TCliForm;
-   i, j: Integer;
-label
-   xxx;
-begin
    Form := TCliForm(msg.lParam);
-   Form.Release;
 
-   for i := 1 to 99 do begin
-      if CliList[i] <> nil then begin
-         if LongInt(CliList[i]) = LongInt(Form) then begin
-            CliList[i] := nil;
-            for j := i to 98 do begin
-               CliList[j] := CliList[j + 1];
-               if CliList[j] = nil then
-                  goto xxx
-               else
-                  CliList[j].ClientNumber := j;
-            end;
-            CliList[99] := nil;
-         end;
+   // クライアントリストから消去
+   for i := 0 to FClientList.Count - 1 do begin
+      if LongInt(FClientList[i]) = LongInt(Form) then begin
+         FClientList[i].Release();
+         FClientList.Delete(i);
+         Break;
       end;
    end;
 
-xxx:
-   Connections.UpdateDisplay;
-   { for I := 0 to ClientListBox.Items.Count - 1 do begin
-     if ClientListBox.Items[I] = IntToStr(LongInt(Form)) then begin
-     ClientListBox.Items.Delete(I);
-     break;
-     end;
-     end; }
+   // リナンバー
+   for i := 0 to FClientList.Count - 1 do begin
+      FClientList[i].ClientNumber := i + 1;
+   end;
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -643,11 +707,8 @@ procedure TServerForm.SendAll(str: string);
 var
    i: Integer;
 begin
-   for i := 1 to 99 do begin
-      if CliList[i] = nil then
-         Exit
-      else
-         CliList[i].SendStr(str);
+   for i := 0 to FClientList.Count - 1 do begin
+      FClientList[i].SendStr(str);
    end;
 end;
 
@@ -655,54 +716,64 @@ procedure TServerForm.SendAllButFrom(str: string; NotThisCli: Integer);
 var
    i: Integer;
 begin
-   for i := 1 to 99 do begin
-      if CliList[i] = nil then
-         Exit
-      else if i <> NotThisCli then
-         CliList[i].SendStr(str);
+   for i := 0 to FClientList.Count - 1 do begin
+      FClientList[i].SendStr(str);
    end;
 end;
 
 procedure TServerForm.SendOnly(str: string; CliNo: Integer);
 begin
-   if CliList[CliNo] <> Nil then
-      CliList[CliNo].SendStr(str);
+   if FClientList[CliNo] <> nil then begin
+      FClientList[CliNo].SendStr(str);
+   end;
 end;
 
 procedure TServerForm.Button1Click(Sender: TObject);
 begin
-   Connections.UpdateDisplay;
+   FConnections.UpdateDisplay;
 end;
 
 procedure TServerForm.Exit1Click(Sender: TObject);
 begin
-   SrvSocket.Close;
    Close;
 end;
 
 procedure TServerForm.About1Click(Sender: TObject);
+var
+   F: TAboutBox;
 begin
-   AboutBox.Show;
+   F := TAboutBox.Create(Self);
+   try
+      F.ShowModal();
+   finally
+      F.Release();
+   end;
 end;
 
 procedure TServerForm.AddToChatLog(str: string);
 var
-   f: textfile;
+   f: TextFile;
    // t : string;
 begin
-   if TakeLog = False then
+   if FTakeLog = False then begin
       Exit;
-   assignfile(f, 'log.txt');
-   if FileExists('log.txt') then
-      append(f)
-   else
-      rewrite(f);
+   end;
+
+   AssignFile(f, 'log.txt');
+   if FileExists('log.txt') then begin
+      Append(f);
+   end
+   else begin
+      Rewrite(f);
+   end;
+
    {
      t := FormatDateTime(' (hh:nn)', SysUtils.Now);
    }
-   writeln(f, str { + t } );
 
-   closefile(f);
+   WriteLn(f, str { + t } );
+
+   CloseFile(f);
 end;
 
 procedure TServerForm.SendButtonClick(Sender: TObject);
@@ -711,11 +782,16 @@ var
 begin
    t := FormatDateTime('hh:nn', SysUtils.Now);
    S := t + ' ZServer> ' + SendEdit.Text;
+
    // SendALL(ZLinkHeader + ' PUTMESSAGE '+'ZServer> '+SendEdit.Text + LBCODE);
    SendAll(ZLinkHeader + ' PUTMESSAGE ' + S + LBCODE);
+
    AddConsole(S);
-   if TakeLog then
+
+   if FTakeLog then begin
       AddToChatLog(S);
+   end;
+
    SendEdit.Clear;
    ActiveControl := SendEdit;
 end;
@@ -752,36 +828,25 @@ procedure TServerForm.SendEditKeyPress(Sender: TObject; var Key: Char);
 begin
    case Key of
       Chr($0D): begin
-            SendButtonClick(self);
-            Key := #0;
-         end;
+         SendButtonClick(self);
+         Key := #0;
+      end;
    end;
 end;
 
 procedure TServerForm.Save1Click(Sender: TObject);
 begin
    if Stats.Saved = False then begin
-      if CurrentFileName = '' then
-         if SaveDialog.Execute then
-            CurrentFileName := SaveDialog.FileName
-         else
+      if CurrentFileName = '' then begin
+         if SaveDialog.Execute then begin
+            CurrentFileName := SaveDialog.FileName;
+         end
+         else begin
             Exit;
-      Stats.SaveLogs(CurrentFileName);
-   end;
-end;
-
-procedure TServerForm.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
-var
-   R: Word;
-begin
-   if Stats.Saved = False then begin
-      R := MessageDlg('Save changes to ' + CurrentFileName + ' ?', mtConfirmation, [mbYes, mbNo, mbCancel], 0); { HELP context 0 }
-      case R of
-         mrYes:
-            Save1Click(self);
-         mrCancel:
-            CanClose := False;
+         end;
       end;
+
+      Stats.SaveLogs(CurrentFileName);
    end;
 end;
 
@@ -793,46 +858,46 @@ begin
    end;
 end;
 
-procedure TServerForm.FormCreate(Sender: TObject);
-begin
-   CommandQue := TStringList.Create;
-   Application.OnIdle := IdleEvent;
-   TakeLog := False;
-   Caption := 'Z-Server ' + VersionString;
-end;
-
 procedure TServerForm.Open1Click(Sender: TObject);
 begin
    if OpenDialog.Execute then begin
-      if MessageDlg('This will clear all data and reload from new file.', mtWarning, [mbOK, mbCancel], 0) = mrOK then
+      if MessageDlg('This will clear all data and reload from new file.', mtWarning, [mbOK, mbCancel], 0) = mrOK then begin
          CurrentFileName := OpenDialog.FileName;
+      end;
       Stats.LoadFile(OpenDialog.FileName);
    end;
 end;
 
 procedure TServerForm.Connections1Click(Sender: TObject);
 begin
-   Connections.Show;
+   FConnections.Show;
 end;
 
 procedure TServerForm.MergeFile1Click(Sender: TObject);
+var
+   F: TMergeBand;
 begin
-   if OpenDialog.Execute then begin
-      { if MessageDlg('This will clear all data and reload from new file.',
-        mtWarning,
-        [mbOK, mbCancel],
-        0) = mrOK then }
-      // CurrentFileName := OpenDialog.FileName;
-      MergeBand.FileName := OpenDialog.FileName;
-      MergeBand.ShowModal;
-      // Stats.LoadFile(OpenDialog.FileName);
+   F := TMergeBand.Create(Self);
+   try
+      if OpenDialog.Execute then begin
+         { if MessageDlg('This will clear all data and reload from new file.',
+           mtWarning,
+           [mbOK, mbCancel],
+           0) = mrOK then }
+         // CurrentFileName := OpenDialog.FileName;
+         F.FileName := OpenDialog.FileName;
+         F.ShowModal;
+         // Stats.LoadFile(OpenDialog.FileName);
+      end;
+   finally
+      F.Release();
    end;
 end;
 
 procedure TServerForm.mLogClick(Sender: TObject);
 begin
-   TakeLog := not(TakeLog);
-   if TakeLog then
+   FTakeLog := not(FTakeLog);
+   if FTakeLog then
       mLog.Caption := 'Stop &Log'
    else
       mLog.Caption := 'Start &Log';
@@ -840,7 +905,7 @@ end;
 
 procedure TServerForm.CurrentFrequencies1Click(Sender: TObject);
 begin
-   FreqList.Show;
+   FFreqList.Show;
 end;
 
 procedure TServerForm.Graph1Click(Sender: TObject);
@@ -849,11 +914,46 @@ begin
 end;
 
 procedure TServerForm.DeleteDupes1Click(Sender: TObject);
-
 begin
    Stats.MasterLog.RemoveDupes;
    MultiForm.RecalcAll;
    Stats.UpdateStats;
+end;
+
+procedure TServerForm.LoadSettings();
+var
+   IniFile: TIniFile;
+   FileName: string;
+begin
+   FileName := ChangeFileExt(Application.ExeName, '.ini');
+   IniFile := TIniFile.Create(FileName);
+   try
+      Top := IniFile.ReadInteger('Window', 'Top', Top);
+      Left := IniFile.ReadInteger('Window', 'Left', Left);
+      Width := IniFile.ReadInteger('Window', 'Width', Width);
+      Height := IniFile.ReadInteger('Window', 'Height', Height);
+      ChatOnly := IniFile.ReadBool('Options', 'ChatOnly', True);
+   finally
+      IniFile.Free;
+   end;
+end;
+
+procedure TServerForm.SaveSettings();
+var
+   IniFile: TIniFile;
+   FileName: string;
+begin
+   FileName := ChangeFileExt(Application.ExeName, '.ini');
+   IniFile := TIniFile.Create(FileName);
+   try
+      IniFile.WriteInteger('Window', 'Top', Top);
+      IniFile.WriteInteger('Window', 'Left', Left);
+      IniFile.WriteInteger('Window', 'Width', Width);
+      IniFile.WriteInteger('Window', 'Height', Height);
+      IniFile.WriteBool('Options', 'ChatOnly', ChatOnly);
+   finally
+      IniFile.Free;
+   end;
 end;
 
 end.

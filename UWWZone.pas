@@ -27,9 +27,6 @@ type
     { Public declarations }
   end;
 
-var
-  WWZone: TWWZone;
-
 implementation
 
 {$R *.DFM}
@@ -75,8 +72,8 @@ end;
 
 procedure TWWZone.FormResize(Sender: TObject);
 begin
-   if WWZone.Width > MaxWidth then begin
-      WWZone.Width := MaxWidth;
+   if Width > MaxWidth then begin
+      Width := MaxWidth;
    end;
 end;
 

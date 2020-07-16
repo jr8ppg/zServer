@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  Grids, Cologrid,
+  Grids,
   UBasicStats, UzLogGlobal, UzLogConst, UzLogQSO;
 
 type
@@ -18,9 +18,6 @@ type
     procedure InitACAG;
     { Public declarations }
   end;
-
-var
-  AllJAStats: TAllJAStats;
 
 implementation
 

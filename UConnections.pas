@@ -16,12 +16,8 @@ type
     { Private declarations }
   public
     { Public declarations }
-    CliNumber : array[0..99] of integer;
     procedure UpdateDisplay;
   end;
-
-var
-  Connections: TConnections;
 
 implementation
 
@@ -44,21 +40,21 @@ var
 begin
    ListBox.Items.Clear;
    for B := b19 to HiBand do begin
-      for i := 1 to 99 do begin
-         if UServerForm.CliList[i] = nil then
-            break;
-         if UServerForm.CliList[i].CurrentBand = B then begin
-            str := FillRight(BandString[UServerForm.CliList[i].CurrentBand], 9) + UServerForm.CliList[i].CurrentOperator;
-            ListBox.Items.Add(str);
-            CliNumber[ListBox.Items.Count - 1] := i;
+      for i := 0 to ServerForm.ClientList.Count - 1 do begin
+         if ServerForm.ClientList[i].CurrentBand = B then begin
+            str := FillRight(BandString[ServerForm.ClientList[i].CurrentBand], 9) + ServerForm.ClientList[i].CurrentOperator;
+            ListBox.Items.AddObject(str, TObject(i));
          end;
       end;
    end;
 end;
 
 procedure TConnections.ListBoxDblClick(Sender: TObject);
+var
+   i: Integer;
 begin
-   UServerForm.CliList[CliNumber[ListBox.ItemIndex]].Show;
+   i := Integer(ListBox.Items.Objects[ListBox.ItemIndex]);
+   ServerForm.ClientList[i].Show;
 end;
 
 end.

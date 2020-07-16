@@ -42,6 +42,7 @@ interface
 uses
   WinTypes, WinProcs, Messages, SysUtils, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ExtCtrls, OverbyteIcsWndControl, OverbyteIcsWSocket,
+  Generics.Collections, Generics.Defaults,
   UzLogGlobal, UzLogConst;
 
 const LBCODE = #13{+#10};
@@ -77,6 +78,13 @@ type
     procedure SendStr(str : string);
     procedure SetCaption;
     procedure AddConsole(S : string);
+  end;
+
+  TCliFormList = class(TObjectList<TCliForm>)
+  private
+  public
+    constructor Create(OwnsObjects: Boolean = False);
+    destructor Destroy(); override;
   end;
 
 implementation
@@ -146,7 +154,7 @@ procedure TCliForm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
    LineBuffer.Clear;
    LineBuffer.Free;
-   PostMessage(TForm(Owner).Handle, WM_USER, 0, LongInt(Self));
+   PostMessage(TForm(Owner).Handle, WM_USER_CLIENT_CLOSED, 0, LongInt(Self));
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -231,6 +239,18 @@ begin
    Caption := 'Parsing...';
    ParseLineBuffer;
    Caption := 'Done!';
+end;
+
+{ TCliFormList }
+
+constructor TCliFormList.Create(OwnsObjects: Boolean);
+begin
+   Inherited Create(OwnsObjects);
+end;
+
+destructor TCliFormList.Destroy();
+begin
+   Inherited;
 end;
 
 end.

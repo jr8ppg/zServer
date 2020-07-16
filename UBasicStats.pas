@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  Grids, Cologrid,
+  Grids,
   UzLogGlobal, UzLogConst, UzLogQSO;
 
 type
@@ -20,14 +20,14 @@ type
   end;
 
   TBasicStats = class(TForm)
-    Grid: TMgrid;
+    Grid: TStringGrid;
     procedure FormCreate(Sender: TObject);
-    procedure GridSetting(ARow, Acol: Integer; var Fcolor: Integer;
-      var Bold, Italic, underline: Boolean);
     procedure CreateParams(var Params: TCreateParams); override;
+    procedure GridDrawCell(Sender: TObject; ACol, ARow: Integer; Rect: TRect; State: TGridDrawState);
   private
     { Private declarations }
   public
+    { Public declarations }
     StatSummary : array[b19..b10g] of TBandSummary;
     UsedBands : array[b19..b10g] of boolean;
     Saved : Boolean;
@@ -43,11 +43,9 @@ type
     procedure InitGrid(LBand, HBand : TBand); virtual;
     procedure LoadFile(FileName : string); // resets current log and loads from file
     procedure MergeFile(FileName : string; BandSet : TBandSet); // will only update if band is in BandSet
-    { Public declarations }
   end;
 
 var
-  BasicStats: TBasicStats;
   CurrentFileName : string;
 
 implementation
@@ -56,6 +54,24 @@ uses
   UServerForm;
 
 {$R *.DFM}
+
+procedure TBasicStats.CreateParams(var Params: TCreateParams);
+begin
+   inherited CreateParams(Params);
+   Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
+end;
+
+procedure TBasicStats.FormCreate(Sender: TObject);
+var
+   b: TBand;
+begin
+   Saved := True;
+   CurrentFileName := '';
+   MasterLog := TLog.Create('Z-Server');
+   for b := b19 to HiBand do begin
+      UsedBands[b] := False;
+   end;
+end;
 
 procedure TBasicStats.InitStatSummary;
 var
@@ -251,38 +267,29 @@ begin
    }
 end;
 
-procedure TBasicStats.FormCreate(Sender: TObject);
+procedure TBasicStats.GridDrawCell(Sender: TObject; ACol, ARow: Integer; Rect: TRect; State: TGridDrawState);
 var
-   b: TBand;
+   strText: string;
 begin
-   Saved := True;
-   CurrentFileName := '';
-   MasterLog := TLog.Create('Z-Server');
-   for b := b19 to HiBand do begin
-      UsedBands[b] := False;
-   end;
-end;
+   with TStringGrid(Sender).Canvas do begin
+      if ARow = 0 then begin
+         Font.Color := clGreen;
+      end
+      else if ACol = 0 then begin
+         if ARow < TStringGrid(Sender).RowCount - 2 then begin
+            Font.Color := clBlue
+         end
+         else begin
+            Font.Color := clNavy;
+         end;
+      end
+      else begin
+         Font.Color := clBlack;
+      end;
 
-procedure TBasicStats.GridSetting(ARow, Acol: integer; var Fcolor: integer; var Bold, Italic, underline: Boolean);
-begin
-   if ARow = 0 then begin
-      Fcolor := clGreen;
-      exit;
+      strText := TStringGrid(Sender).Cells[ACol, ARow];
+      TextRect(Rect, strText, [tfRight,tfVerticalCenter,tfSingleLine]);
    end;
-   if Acol = 0 then begin
-      if ARow < Grid.RowCount - 2 then
-         Fcolor := clBlue
-      else
-         Fcolor := clNavy;
-      exit;
-   end;
-   Fcolor := clBlack;
-end;
-
-procedure TBasicStats.CreateParams(var Params: TCreateParams);
-begin
-   inherited CreateParams(Params);
-   Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
 end;
 
 end.

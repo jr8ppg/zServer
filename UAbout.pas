@@ -2,45 +2,55 @@ unit UAbout;
 
 interface
 
-uses Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
-  Buttons, ExtCtrls;
+uses
+  Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
+  Buttons, ExtCtrls, ShellApi, JclFileUtils;
 
 type
   TAboutBox = class(TForm)
     Panel1: TPanel;
     ProgramIcon: TImage;
     ProductName: TLabel;
-    label1: TLabel;
     Copyright: TLabel;
     Comments: TLabel;
     OKButton: TButton;
     Label2: TLabel;
+    Panel2: TPanel;
+    label1: TLabel;
+    LinkLabel1: TLinkLabel;
+    Label7: TLabel;
     procedure OKButtonClick(Sender: TObject);
     procedure FormCreate(Sender: TObject);
+    procedure LinkLabel1LinkClick(Sender: TObject; const Link: string;
+      LinkType: TSysLinkType);
   private
     { Private declarations }
   public
     { Public declarations }
   end;
 
-var
-  AboutBox: TAboutBox;
-
 implementation
-
-uses UServerForm;
 
 {$R *.DFM}
 
 procedure TAboutBox.OKButtonClick(Sender: TObject);
 begin
-  Close;
+   Close;
 end;
 
-
 procedure TAboutBox.FormCreate(Sender: TObject);
+var
+   ver: TJclFileVersionInfo;
 begin
-  Label1.Caption := UServerForm.VersionString;
+   ver := TJclFileVersionInfo.Create(Self.Handle);
+   Label1.Caption := Application.Title + ' Version ' + ver.FileVersion + ' —ß˜a Edition based on 1.3';
+   ver.Free();
+end;
+
+procedure TAboutBox.LinkLabel1LinkClick(Sender: TObject; const Link: string;
+  LinkType: TSysLinkType);
+begin
+   ShellExecute(Handle, 'open', PChar(Link), nil, nil, SW_SHOW);
 end;
 
 end.

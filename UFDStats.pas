@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  StdCtrls, Grids, Cologrid,
+  StdCtrls, Grids,
   UALLJAStats, UzLogGlobal, UzLogConst;
 
 type
@@ -18,9 +18,6 @@ type
     { Public declarations }
     procedure UpdateStats; override;
   end;
-
-var
-  FDStats: TFDStats;
 
 implementation
 

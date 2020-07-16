@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  Grids, Cologrid,
+  Grids,
   UBasicStats, UzLogGlobal, UzLogConst;
 
 type
@@ -18,9 +18,6 @@ type
     procedure InitGrid(LBand, HBand : TBand); override;
     procedure UpdateStats; override;
   end;
-
-var
-  SixDownStats: TSixDownStats;
 
 implementation
 

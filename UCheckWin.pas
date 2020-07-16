@@ -29,9 +29,6 @@ type
     procedure Renew(aQSO : TQSO); virtual;
   end;
 
-var
-  CheckWin: TCheckWin;
-
 implementation
 
 {$R *.DFM}

@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  UACAGMultiForm, StdCtrls, Grids, Cologrid, JLLabel, ExtCtrls,
+  UACAGMultiForm, StdCtrls, Grids, JLLabel, ExtCtrls,
   UzLogGlobal, UzLogConst;
 
 
@@ -21,9 +21,6 @@ type
     procedure Init6D; // initializes for 6m & Down Contest
     { Public declarations }
   end;
-
-var
-  FDMultiForm: TFDMultiForm;
 
 implementation
 

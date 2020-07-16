@@ -2,6 +2,7 @@ program ZServer;
 
 uses
   Forms,
+  Windows,
   UServerForm in 'UServerForm.pas' {ServerForm},
   UCliForm in 'UCliForm.pas' {CliForm},
   UAbout in 'UAbout.pas' {AboutBox},
@@ -23,30 +24,29 @@ uses
   UFreqList in 'UFreqList.pas' {FreqList},
   UzlogConst in 'UzlogConst.pas',
   UzLogQSO in 'UzLogQSO.pas',
-  UzLogGlobal in 'UzLogGlobal.pas' {dmZLogGlobal: TDataModule};
+  UzLogGlobal in 'UzLogGlobal.pas' {dmZLogGlobal: TDataModule},
+  UMultipliers in 'UMultipliers.pas';
 
 {$R *.RES}
 
+const
+  ZSERVER_MUTEX = 'Z-Server';
+
+var
+  hMutex: THandle;
+
 begin
+  hMutex := OpenMutex(MUTEX_ALL_ACCESS, False, ZSERVER_MUTEX);
+  if hMutex <> 0 then begin
+    CloseHandle( hMutex );
+    Exit;
+  end;
+  hMutex := CreateMutex(nil, False, ZSERVER_MUTEX);
+
   Application.Title := 'Z-Server';
   Application.CreateForm(TdmZLogGlobal, dmZLogGlobal);
   Application.CreateForm(TServerForm, ServerForm);
-  Application.CreateForm(TAboutBox, AboutBox);
-  Application.CreateForm(TBasicMultiForm, BasicMultiForm);
-  Application.CreateForm(TBasicStats, BasicStats);
-  Application.CreateForm(TALLJAMultiForm, ALLJAMultiForm);
-  Application.CreateForm(TAllJAStats, AllJAStats);
-  Application.CreateForm(TChooseContest, ChooseContest);
-  Application.CreateForm(TSixDownStats, SixDownStats);
-  Application.CreateForm(TACAGMultiForm, ACAGMultiForm);
-  Application.CreateForm(TFDMultiForm, FDMultiForm);
-  Application.CreateForm(TFDStats, FDStats);
-  Application.CreateForm(TCQWWStats, CQWWStats);
-  Application.CreateForm(TConnections, Connections);
-  Application.CreateForm(TMergeBand, MergeBand);
-  Application.CreateForm(TWWZone, WWZone);
-  Application.CreateForm(TWWMultiForm, WWMultiForm);
-  Application.CreateForm(TCheckWin, CheckWin);
-  Application.CreateForm(TFreqList, FreqList);
   Application.Run;
+
+  ReleaseMutex( hMutex );
 end.

@@ -2,21 +2,24 @@ inherited WWMultiForm: TWWMultiForm
   Left = 451
   Top = 109
   Caption = 'Multipliers'
+  ClientWidth = 333
+  OnDestroy = FormDestroy
   OnShow = FormShow
+  ExplicitWidth = 349
   PixelsPerInch = 96
   TextHeight = 12
   object Panel: TPanel
     Left = 0
     Top = 0
-    Width = 229
+    Width = 333
     Height = 41
     Align = alTop
     TabOrder = 0
     object RotateLabel1: TRotateLabel
       Left = 252
       Top = 20
-      Width = 15
-      Height = 14
+      Width = 14
+      Height = 15
       Escapement = 90
       TextStyle = tsNone
       Caption = '1.9'
@@ -30,8 +33,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel2: TRotateLabel
       Left = 264
       Top = 20
-      Width = 15
-      Height = 14
+      Width = 14
+      Height = 15
       Escapement = 90
       TextStyle = tsNone
       Caption = '3.5'
@@ -45,8 +48,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel3: TRotateLabel
       Left = 276
       Top = 29
-      Width = 6
-      Height = 14
+      Width = 14
+      Height = 6
       Escapement = 90
       TextStyle = tsNone
       Caption = '7'
@@ -60,8 +63,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel4: TRotateLabel
       Left = 287
       Top = 23
-      Width = 12
-      Height = 14
+      Width = 14
+      Height = 12
       Escapement = 90
       TextStyle = tsNone
       Caption = '14'
@@ -75,8 +78,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel5: TRotateLabel
       Left = 299
       Top = 23
-      Width = 12
-      Height = 14
+      Width = 14
+      Height = 12
       Escapement = 90
       TextStyle = tsNone
       Caption = '21'
@@ -90,8 +93,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel6: TRotateLabel
       Left = 311
       Top = 23
-      Width = 12
-      Height = 14
+      Width = 14
+      Height = 12
       Escapement = 90
       TextStyle = tsNone
       Caption = '28'
@@ -117,10 +120,10 @@ inherited WWMultiForm: TWWMultiForm
       OnClick = SortByClick
     end
   end
-  object Grid: TMgrid
+  object Grid: TStringGrid
     Left = 0
     Top = 41
-    Width = 229
+    Width = 333
     Height = 71
     Align = alClient
     ColCount = 1
@@ -138,16 +141,11 @@ inherited WWMultiForm: TWWMultiForm
     ParentFont = False
     ScrollBars = ssVertical
     TabOrder = 1
-    Alignment = taLeftJustify
-    BorderColor = clSilver
-    OddRowColor = clWindow
-    EvenRowColor = clWindow
-    OnSetting = GridSetting
   end
   object Panel1: TPanel
     Left = 0
     Top = 112
-    Width = 229
+    Width = 333
     Height = 41
     Align = alBottom
     TabOrder = 2

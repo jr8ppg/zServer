@@ -2,12 +2,14 @@ inherited ACAGMultiForm: TACAGMultiForm
   Left = 107
   Top = 327
   Caption = 'ACAGMultiForm'
+  ClientWidth = 340
+  ExplicitWidth = 356
   PixelsPerInch = 96
   TextHeight = 12
   object Panel: TPanel
     Left = 0
     Top = 0
-    Width = 229
+    Width = 340
     Height = 41
     Align = alTop
     Font.Charset = ANSI_CHARSET
@@ -17,11 +19,12 @@ inherited ACAGMultiForm: TACAGMultiForm
     Font.Style = []
     ParentFont = False
     TabOrder = 0
+    ExplicitWidth = 229
     object Label1R9: TRotateLabel
       Left = 174
       Top = 20
-      Width = 15
-      Height = 14
+      Width = 14
+      Height = 15
       Escapement = 90
       TextStyle = tsNone
       Caption = '1.9'
@@ -36,8 +39,8 @@ inherited ACAGMultiForm: TACAGMultiForm
     object Label3r5: TRotateLabel
       Left = 186
       Top = 20
-      Width = 15
-      Height = 14
+      Width = 14
+      Height = 15
       Escapement = 90
       TextStyle = tsNone
       Caption = '3.5'
@@ -51,8 +54,8 @@ inherited ACAGMultiForm: TACAGMultiForm
     object Label7: TRotateLabel
       Left = 198
       Top = 29
-      Width = 6
-      Height = 14
+      Width = 14
+      Height = 6
       Escapement = 90
       TextStyle = tsNone
       Caption = '7'
@@ -66,8 +69,8 @@ inherited ACAGMultiForm: TACAGMultiForm
     object Label14: TRotateLabel
       Left = 210
       Top = 23
-      Width = 12
-      Height = 14
+      Width = 14
+      Height = 12
       Escapement = 90
       TextStyle = tsNone
       Caption = '14'
@@ -81,8 +84,8 @@ inherited ACAGMultiForm: TACAGMultiForm
     object Label21: TRotateLabel
       Left = 222
       Top = 23
-      Width = 12
-      Height = 14
+      Width = 14
+      Height = 12
       Escapement = 90
       TextStyle = tsNone
       Caption = '21'
@@ -96,8 +99,8 @@ inherited ACAGMultiForm: TACAGMultiForm
     object Label28: TRotateLabel
       Left = 234
       Top = 23
-      Width = 12
-      Height = 14
+      Width = 14
+      Height = 12
       Escapement = 90
       TextStyle = tsNone
       Caption = '28'
@@ -111,8 +114,8 @@ inherited ACAGMultiForm: TACAGMultiForm
     object Label50: TRotateLabel
       Left = 247
       Top = 23
-      Width = 12
-      Height = 14
+      Width = 14
+      Height = 12
       Escapement = 90
       TextStyle = tsNone
       Caption = '50'
@@ -126,8 +129,8 @@ inherited ACAGMultiForm: TACAGMultiForm
     object Label144: TRotateLabel
       Left = 259
       Top = 17
-      Width = 18
-      Height = 14
+      Width = 14
+      Height = 18
       Escapement = 90
       TextStyle = tsNone
       Caption = '144'
@@ -141,8 +144,8 @@ inherited ACAGMultiForm: TACAGMultiForm
     object Label430: TRotateLabel
       Left = 271
       Top = 17
-      Width = 18
-      Height = 14
+      Width = 14
+      Height = 18
       Escapement = 90
       TextStyle = tsNone
       Caption = '430'
@@ -156,8 +159,8 @@ inherited ACAGMultiForm: TACAGMultiForm
     object Label1200: TRotateLabel
       Left = 283
       Top = 11
-      Width = 24
-      Height = 14
+      Width = 14
+      Height = 24
       Escapement = 90
       TextStyle = tsNone
       Caption = '1200'
@@ -171,8 +174,8 @@ inherited ACAGMultiForm: TACAGMultiForm
     object Label2400: TRotateLabel
       Left = 295
       Top = 11
-      Width = 24
-      Height = 14
+      Width = 14
+      Height = 24
       Escapement = 90
       TextStyle = tsNone
       Caption = '2400'
@@ -186,8 +189,8 @@ inherited ACAGMultiForm: TACAGMultiForm
     object Label5600: TRotateLabel
       Left = 307
       Top = 11
-      Width = 24
-      Height = 14
+      Width = 14
+      Height = 24
       Escapement = 90
       TextStyle = tsNone
       Caption = '5600'
@@ -201,8 +204,8 @@ inherited ACAGMultiForm: TACAGMultiForm
     object Label10G: TRotateLabel
       Left = 319
       Top = 9
-      Width = 26
-      Height = 14
+      Width = 14
+      Height = 26
       Escapement = 90
       TextStyle = tsNone
       Caption = '10G+'
@@ -226,10 +229,10 @@ inherited ACAGMultiForm: TACAGMultiForm
       Visible = False
     end
   end
-  object Grid: TMgrid
+  object Grid: TStringGrid
     Left = 0
     Top = 41
-    Width = 229
+    Width = 340
     Height = 71
     Align = alClient
     ColCount = 1
@@ -247,19 +250,16 @@ inherited ACAGMultiForm: TACAGMultiForm
     ParentFont = False
     ScrollBars = ssVertical
     TabOrder = 1
-    Alignment = taLeftJustify
-    BorderColor = clSilver
-    OddRowColor = clWindow
-    EvenRowColor = clWindow
-    OnSetting = GridSetting
+    ExplicitWidth = 229
   end
   object Panel1: TPanel
     Left = 0
     Top = 112
-    Width = 229
+    Width = 340
     Height = 41
     Align = alBottom
     TabOrder = 2
+    ExplicitWidth = 229
     object Button3: TButton
       Left = 264
       Top = 8

@@ -24,9 +24,6 @@ type
     { Public declarations }
   end;
 
-var
-  FreqList: TFreqList;
-
 implementation
 
 {$R *.DFM}

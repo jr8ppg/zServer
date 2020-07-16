@@ -40,9 +40,6 @@ type
     { Public declarations }
   end;
 
-var
-  MergeBand: TMergeBand;
-
 implementation
 
 uses
@@ -67,8 +64,9 @@ begin
    cbList[10] := cb2400;
    cbList[11] := cb5600;
    cbList[12] := cb10g;
-   for i := 0 to 12 do
+   for i := 0 to 12 do begin
       cbList[i].Visible := False;
+   end;
 end;
 
 procedure TMergeBand.FormShow(Sender: TObject);
@@ -82,9 +80,11 @@ begin
          cbList[i].Visible := True;
          inc(count);
       end
-      else
+      else begin
          cbList[i].Visible := False;
+      end;
    end;
+
    Height := 370 - (13 - count) * 19;
 end;
 
@@ -94,10 +94,14 @@ var
    i: integer;
 begin
    BandSet := [];
-   for i := 0 to 12 do
-      if cbList[i].Checked then
+   for i := 0 to 12 do begin
+      if cbList[i].Checked then begin
          BandSet := BandSet + [TBand(cbList[i].Tag)];
+      end;
+   end;
+
    ServerForm.Stats.MergeFile(FileName, BandSet);
+
    Close;
 end;
 

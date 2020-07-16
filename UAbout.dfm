@@ -3,27 +3,36 @@ object AboutBox: TAboutBox
   Top = 309
   BorderStyle = bsDialog
   Caption = 'About'
-  ClientHeight = 177
+  ClientHeight = 242
   ClientWidth = 344
   Color = clBtnFace
   Font.Charset = SHIFTJIS_CHARSET
   Font.Color = clWindowText
-  Font.Height = -11
+  Font.Height = -12
   Font.Name = 'MS Sans Serif'
   Font.Style = []
   OldCreateOrder = True
   Position = poScreenCenter
   OnCreate = FormCreate
+  DesignSize = (
+    344
+    242)
   PixelsPerInch = 96
-  TextHeight = 11
+  TextHeight = 12
   object Panel1: TPanel
-    Left = 7
+    Left = 8
     Top = 7
     Width = 330
     Height = 136
     BevelInner = bvRaised
     BevelOuter = bvLowered
+    Font.Charset = DEFAULT_CHARSET
+    Font.Color = clWindowText
+    Font.Height = -12
+    Font.Name = 'MS Sans Serif'
+    Font.Style = []
     ParentColor = True
+    ParentFont = False
     TabOrder = 0
     object ProgramIcon: TImage
       Left = 15
@@ -72,20 +81,6 @@ object AboutBox: TAboutBox
       ParentFont = False
       IsControl = True
     end
-    object label1: TLabel
-      Left = 146
-      Top = 58
-      Width = 32
-      Height = 12
-      Caption = 'ver xx'
-      Font.Charset = SHIFTJIS_CHARSET
-      Font.Color = clWindowText
-      Font.Height = -12
-      Font.Name = 'Arial'
-      Font.Style = []
-      ParentFont = False
-      IsControl = True
-    end
     object Copyright: TLabel
       Left = 7
       Top = 92
@@ -131,10 +126,11 @@ object AboutBox: TAboutBox
     end
   end
   object OKButton: TButton
-    Left = 146
-    Top = 152
+    Left = 144
+    Top = 215
     Width = 63
     Height = 21
+    Anchors = [akLeft, akBottom]
     Caption = 'OK'
     Default = True
     Font.Charset = SHIFTJIS_CHARSET
@@ -146,5 +142,62 @@ object AboutBox: TAboutBox
     ParentFont = False
     TabOrder = 1
     OnClick = OKButtonClick
+    ExplicitTop = 235
+  end
+  object Panel2: TPanel
+    Left = 8
+    Top = 149
+    Width = 330
+    Height = 60
+    BevelInner = bvRaised
+    BevelOuter = bvLowered
+    TabOrder = 2
+    object label1: TLabel
+      Left = 6
+      Top = 5
+      Width = 317
+      Height = 12
+      Alignment = taCenter
+      AutoSize = False
+      Caption = 'ver xx'
+      Font.Charset = SHIFTJIS_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -12
+      Font.Name = 'Arial'
+      Font.Style = []
+      ParentFont = False
+      IsControl = True
+    end
+    object Label7: TLabel
+      Left = 8
+      Top = 23
+      Width = 287
+      Height = 13
+      Caption = 'Portions created by JR8PPG are Copyright (C) 2020 JR8PPG'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -11
+      Font.Name = 'MS Sans Serif'
+      Font.Style = []
+      ParentFont = False
+      IsControl = True
+    end
+    object LinkLabel1: TLinkLabel
+      Left = 8
+      Top = 40
+      Width = 179
+      Height = 16
+      Caption = 
+        '<A HREF="https://github.com/jr8ppg/zServer">https://github.com/j' +
+        'r8ppg/zServer</A>'
+      Font.Charset = DEFAULT_CHARSET
+      Font.Color = clWindowText
+      Font.Height = -12
+      Font.Name = #65325#65331' '#65328#12468#12471#12483#12463
+      Font.Style = []
+      ParentFont = False
+      TabOrder = 0
+      OnLinkClick = LinkLabel1LinkClick
+    end
   end
 end

@@ -49,9 +49,6 @@ const KenNames : array[m101..m50] of string =
  '44  ‘å•ª','45  ‹{è','46  ­™“‡','47  ‰«“ê','48  ¬Š}Œ´','49  ‰«ƒm’¹“‡',
  '50  “ì’¹“‡');
 
-var
-  ALLJAMultiForm: TALLJAMultiForm;
-
 implementation
 
 uses
