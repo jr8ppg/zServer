@@ -320,7 +320,10 @@ var
    i, j: Integer;
    B: TBand;
 begin
-   from := StrToIntDef(TrimRight(copy(S, 1, 3)), 0);
+   from := StrToIntDef(TrimRight(copy(S, 1, 3)), -1) - 1;
+   if from < 0 then begin
+      Exit;
+   end;
 
    Delete(S, 1, 4);
 
@@ -717,15 +720,16 @@ var
    i: Integer;
 begin
    for i := 0 to FClientList.Count - 1 do begin
+      if i = NotThisCli then begin
+         Continue;
+      end;
       FClientList[i].SendStr(str);
    end;
 end;
 
 procedure TServerForm.SendOnly(str: string; CliNo: Integer);
 begin
-   if FClientList[CliNo] <> nil then begin
-      FClientList[CliNo].SendStr(str);
-   end;
+   FClientList[CliNo].SendStr(str);
 end;
 
 procedure TServerForm.Button1Click(Sender: TObject);
