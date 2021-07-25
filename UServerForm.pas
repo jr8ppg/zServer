@@ -217,7 +217,7 @@ begin
 
          2: begin
             Stats := TFDStats.Create(Self);
-            MultiForm := TFDMultiForm(Self);
+            MultiForm := TFDMultiForm.Create(Self);
          end;
 
          3: begin

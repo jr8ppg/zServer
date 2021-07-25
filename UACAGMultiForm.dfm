@@ -19,7 +19,6 @@ inherited ACAGMultiForm: TACAGMultiForm
     Font.Style = []
     ParentFont = False
     TabOrder = 0
-    ExplicitWidth = 229
     object Label1R9: TRotateLabel
       Left = 174
       Top = 20
@@ -34,7 +33,6 @@ inherited ACAGMultiForm: TACAGMultiForm
       Font.Name = 'Arial'
       Font.Style = []
       ParentFont = False
-      Visible = False
     end
     object Label3r5: TRotateLabel
       Left = 186
@@ -250,7 +248,6 @@ inherited ACAGMultiForm: TACAGMultiForm
     ParentFont = False
     ScrollBars = ssVertical
     TabOrder = 1
-    ExplicitWidth = 229
   end
   object Panel1: TPanel
     Left = 0
@@ -259,7 +256,6 @@ inherited ACAGMultiForm: TACAGMultiForm
     Height = 41
     Align = alBottom
     TabOrder = 2
-    ExplicitWidth = 229
     object Button3: TButton
       Left = 264
       Top = 8

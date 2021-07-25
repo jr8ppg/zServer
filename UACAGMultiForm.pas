@@ -91,22 +91,6 @@ begin
       aQSO := TQSO(ServerForm.Stats.MasterLog.QSOList[i]);
       Add(aQSO);
    end;
-   {
-     aQSO := TQSO.Create;
-     for B := b19 to HiBand do
-     begin
-     if NotWARC(B) then
-     begin
-     Log := ServerForm.Stats.Logs[B];
-     for i := 1 to Log.TotalQSO do
-     begin
-     aQSO.QSO := TQSO(Log.List[i]).QSO;
-     Add(aQSO);
-     TQSO(Log.List[i]).QSO := aQSO.QSO;
-     end;
-     end;
-     end;
-     aQSO.Free; }
 end;
 
 procedure TACAGMultiForm.ResetBand(B: TBand);
@@ -117,8 +101,6 @@ begin
       TCity(CityList.List[i]).Worked[B] := False;
       Grid.Cells[0, i] := ReturnSummary(TCity(CityList.List[i]));
    end;
-   // UpdateCheckListBox;
-   // UpdateListBox;
 end;
 
 procedure TACAGMultiForm.Reset;
@@ -131,15 +113,6 @@ begin
          TCity(CityList.List[i]).Worked[B] := False;
       Grid.Cells[0, i] := ReturnSummary(TCity(CityList.List[i]));
    end;
-   {
-     ListBox.Clear;
-     for K := m101 to m50 do
-     begin
-     str := FillRight(KenNames[K], 16)+'. . . . . .';
-     ListBox.Items.Add(str);
-     end;
-     Update; }
-
 end;
 
 procedure TACAGMultiForm.Add(aQSO: TQSO);
@@ -150,12 +123,13 @@ begin
       exit;
 
    if aQSO.NewMulti1 then begin
-      for i := 0 to CityList.List.Count - 1 do
+      for i := 0 to CityList.List.Count - 1 do begin
          if TCity(CityList.List[i]).CityNumber = aQSO.Multi1 then begin
             TCity(CityList.List[i]).Worked[aQSO.Band] := True;
             Grid.Cells[0, i] := ReturnSummary(TCity(CityList.List[i]));
             exit;
          end;
+      end;
    end;
 end;
 
@@ -178,12 +152,14 @@ var
 begin
    temp := '';
    temp := FillRight(CityNumber, 7) + FillRight(CityName, 20) + ' ';
-   for B := b19 to HiBand do
+   for B := b19 to HiBand do begin
       if NotWARC(B) then
          if Worked[B] then
             temp := temp + '* '
          else
             temp := temp + '. ';
+   end;
+
    Result := ' ' + temp;
 end;
 
@@ -193,13 +169,16 @@ var
    B: TBand;
 begin
    temp := '';
-   temp := FillRight(CityNumber, 7) + FillRight(CityName, 20) + '   ';
-   for B := b35 to HiBand do
-      if NotWARC(B) then
+   temp := FillRight(CityNumber, 7) + FillRight(CityName, 20) + ' ';
+   for B := b19 to HiBand do begin
+      if NotWARC(B) then begin
          if Worked[B] then
             temp := temp + '* '
          else
             temp := temp + '. ';
+      end;
+   end;
+
    Result := ' ' + temp;
 end;
 
@@ -209,8 +188,8 @@ var
    B: TBand;
 begin
    temp := '';
-   temp := FillRight(CityNumber, 7) + FillRight(CityName, 20) + ' ' + '  ';
-   for B := LowBand to HiBand do
+   temp := FillRight(CityNumber, 7) + FillRight(CityName, 20) + ' ';
+   for B := LowBand to HiBand do begin
       if NotWARC(B) then
          if B in [b19 .. b1200] then begin
             if length(Self.CityNumber) <= 3 then
@@ -230,6 +209,8 @@ begin
             else
                temp := temp + '  ';
          end;
+   end;
+
    Result := ' ' + temp;
 end;
 
@@ -240,11 +221,13 @@ var
 begin
    temp := '';
    temp := FillRight(CityNumber, 7) + FillRight(CityName, 20) + ' Worked on : ';
-   for B := b35 to HiBand do
+   for B := b19 to HiBand do begin
       if Worked[B] then
          temp := temp + ' ' + MHzString[B]
       else
          temp := temp + '';
+   end;
+
    Result := temp;
 end;
 
@@ -311,14 +294,6 @@ begin
    if CityList.List.Count = 0 then
       exit;
    Grid.RowCount := CityList.List.Count - 1;
-
-   {
-     BandCombo.Items.Clear;
-     for B := b35 to HiBand do
-     if NotWARC(B) then
-     BandCombo.Items.Add(MHzString[B]);
-     BandCombo.ItemIndex := 0;
-   }
    Reset;
 end;
 

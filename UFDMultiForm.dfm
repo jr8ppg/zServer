@@ -4,7 +4,4 @@ inherited FDMultiForm: TFDMultiForm
   Caption = 'FDMultiForm'
   PixelsPerInch = 96
   TextHeight = 12
-  inherited Panel: TPanel
-    ExplicitWidth = 340
-  end
 end

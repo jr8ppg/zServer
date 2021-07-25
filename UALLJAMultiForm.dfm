@@ -2,16 +2,21 @@ inherited ALLJAMultiForm: TALLJAMultiForm
   Left = 57
   Top = 319
   Caption = 'Multipliers'
+  ClientHeight = 197
+  ClientWidth = 437
+  ExplicitWidth = 453
+  ExplicitHeight = 235
   PixelsPerInch = 96
   TextHeight = 12
   object TabControl: TTabControl
     Left = 0
     Top = 0
-    Width = 229
-    Height = 153
+    Width = 437
+    Height = 197
     Align = alClient
     TabOrder = 0
     Tabs.Strings = (
+      '1.9 MHz'
       '3.5 MHz'
       '7 MHz'
       '14 MHz'
@@ -21,6 +26,7 @@ inherited ALLJAMultiForm: TALLJAMultiForm
       'All')
     TabIndex = 0
     OnChange = TabControlChange
+    ExplicitWidth = 355
     object CheckListBox: TCheckListBox
       Left = 8
       Top = 64
@@ -56,10 +62,11 @@ inherited ALLJAMultiForm: TALLJAMultiForm
     object Panel1: TPanel
       Left = 4
       Top = 24
-      Width = 221
+      Width = 429
       Height = 34
       Align = alTop
       TabOrder = 2
+      ExplicitWidth = 221
     end
   end
 end

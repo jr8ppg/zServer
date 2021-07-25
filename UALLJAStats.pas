@@ -74,10 +74,11 @@ end;
 procedure TAllJAStats.FormCreate(Sender: TObject);
 begin
    inherited;
-   LowBand := b35;
+   LowBand := b19;
    HighBand := b50;
    InitGrid(LowBand, HighBand);
    UpdateStats;
+   UsedBands[b19] := True;
    UsedBands[b35] := True;
    UsedBands[b7] := True;
    UsedBands[b14] := True;
@@ -88,7 +89,7 @@ end;
 
 procedure TAllJAStats.InitACAG;
 begin
-   LowBand := b35;
+   LowBand := b19;
    HighBand := b10G;
    InitGrid(LowBand, HighBand);
    Height := Height + Grid.DefaultRowHeight * 6;

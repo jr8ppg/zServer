@@ -29,7 +29,7 @@ implementation
 function TFDMultiForm.ReturnSummary(C: TCity): string;
 begin
    if TEST = testFD then
-      Result := C.FDSummary(b35)
+      Result := C.FDSummary(b19)
    else
       Result := C.FDSummary(b50);
 end;
