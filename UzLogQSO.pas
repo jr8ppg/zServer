@@ -84,6 +84,9 @@ type
     function PartialSummary(DispDate: Boolean) : string;
     function CheckCallSummary : string;
     procedure UpdateTime;
+    function zLogALL : string;
+    function DOSzLogText : string;
+    function DOSzLogTextShort : string;
     function QSOinText : string; {for data transfer}
     procedure TextToQSO(str : string); {convert text to bin}
     function QTCStr : string;
@@ -161,7 +164,8 @@ type
     constructor Create(OwnsObjects: Boolean = True);
     destructor Destroy(); override;
     function IndexOf(C: string): Integer; overload;
-    function MergeFile(filename: string): Integer;
+    function IndexOf(Q: TQSO): Integer; overload;
+    function MergeFile(filename: string; fFullMatch: Boolean): Integer;
     procedure Sort(SortMethod: TSortMethod; fWithMode: Boolean = False); overload;
     function DupeCheck(aQSO: TQSO; fWithMode: Boolean): TQSO;
     procedure SaveToFile(filename: string);
@@ -181,6 +185,14 @@ type
     FDupeCheckList: TQSOListArray;
     FBandList: TQSOListArray;
     procedure Delete(i : Integer);
+    procedure ProcessDelete(beforeQSO: TQSO);
+    procedure ProcessEdit(afterQSO: TQSO);
+    procedure ProcessInsert(afterQSO: TQSO);
+    procedure ProcessLock(xQSO: TQSO);
+    procedure ProcessUnlock(xQSO: TQSO);
+    procedure SetScoreCoeff(E: Extended);
+    function GetScoreCoeff(): Extended;
+    function GetActualFreq(b: TBand; memo: string): string;
   public
     constructor Create(memo : string);
     destructor Destroy; override;
@@ -200,6 +212,10 @@ type
     procedure Backup(Filename: string);
 
     procedure SaveToFile(Filename : string);
+    procedure SaveToFilezLogDOSTXT(Filename : string);
+    procedure SaveToFilezLogALL(Filename : string);
+    procedure SaveToFileByTX(Filename : string);
+    procedure SaveToFileByCabrillo(Filename: string);
     function IsDupe(aQSO : TQSO) : Integer;
     function IsDupe2(aQSO : TQSO; index : Integer; var dupeindex : Integer) : Boolean;
     procedure AddQue(aQSO : TQSO);
@@ -233,12 +249,14 @@ type
 
     property QsoList: TQSOList read FQsoList;
     property BandList: TQSOListArray read FBandList;
+
+    property ScoreCoeff: Extended read GetScoreCoeff write SetScoreCoeff;
   end;
 
 implementation
 
 uses
-  UzLogGlobal;
+  UzLogGlobal; //, UzLogExtension;
 
 { TQSO }
 
@@ -496,6 +514,134 @@ begin
    Result := S;
 end;
 
+function TQSO.DOSzLogText: string;
+var
+   S, temp: string;
+   Year, Month, Day, Hour, Min, Sec, MSec: word;
+begin
+   S := '';
+   DecodeDate(Self.FTime, Year, Month, Day);
+   DecodeTime(Self.FTime, Hour, Min, Sec, MSec);
+   S := S + FillLeft(IntToStr(Month), 3) + ' ' + FillLeft(IntToStr(Day), 3) + ' ';
+
+   temp := IntToStr(Hour * 100 + Min);
+   case length(temp) of
+      1:
+         temp := '000' + temp;
+      2:
+         temp := '00' + temp;
+      3:
+         temp := '0' + temp;
+   end;
+
+   S := S + temp + ' ';
+   S := S + FillRight(Self.CallSign, 11);
+   S := S + FillLeft(IntToStr(Self.RSTSent), 3);
+   S := S + FillRight(Self.NrSent, 31);
+   S := S + FillLeft(IntToStr(Self.RSTRcvd), 3);
+   S := S + FillRight(Self.NrRcvd, 31);
+
+   if Self.NewMulti1 then
+      S := S + FillLeft(Self.Multi1, 6)
+   else
+      S := S + '      ';
+
+   S := S + '  ' + FillLeft(MHzString[Self.Band], 4);
+   S := S + '  ' + FillRight(ModeString[Self.Mode], 3);
+   S := S + ' ' + FillRight(IntToStr(Self.Points), 2);
+
+   if Self.FOperator <> '' then begin
+      S := S + '%%' + Self.Operator + '%%';
+   end;
+
+   S := S + Self.Memo;
+
+   Result := S;
+end;
+
+function TQSO.DOSzLogTextShort: string;
+var
+   S, temp: string;
+   Year, Month, Day, Hour, Min, Sec, MSec: word;
+begin
+   S := '';
+   DecodeDate(Self.Time, Year, Month, Day);
+   DecodeTime(Self.Time, Hour, Min, Sec, MSec);
+   S := S + FillLeft(IntToStr(Month), 3) + ' ' + FillLeft(IntToStr(Day), 3) + ' ';
+
+   temp := IntToStr(Hour * 100 + Min);
+   case length(temp) of
+      1:
+         temp := '000' + temp;
+      2:
+         temp := '00' + temp;
+      3:
+         temp := '0' + temp;
+   end;
+
+   S := S + temp + ' ';
+   S := S + FillRight(Self.CallSign, 11);
+   S := S + FillLeft(IntToStr(Self.RSTSent), 3);
+   S := S + FillRight(Self.NrSent, 10);
+   S := S + FillLeft(IntToStr(Self.RSTRcvd), 3);
+   S := S + FillRight(Self.NrRcvd, 10);
+
+   if Self.NewMulti1 then
+      S := S + FillLeft(Self.Multi1, 6)
+   else
+      S := S + '      ';
+   S := S + '  ' + FillLeft(MHzString[Self.Band], 4);
+   S := S + '  ' + FillRight(ModeString[Self.Mode], 3);
+   S := S + ' ' + FillRight(IntToStr(Self.Points), 2);
+   if Self.Operator <> '' then begin
+      S := S + '  ' + '%%' + Self.Operator + '%%';
+   end;
+
+   S := S + '  ' + Self.Memo;
+
+   Result := S;
+end;
+
+function TQSO.zLogALL: string;
+var
+   S: string;
+   nrlen: Integer;
+begin
+   nrlen := 7;
+   S := '';
+   S := S + FormatDateTime('yyyy/mm/dd hh":"nn ', Self.Time);
+   S := S + FillRight(Self.CallSign, 13);
+   S := S + FillRight(IntToStr(Self.RSTSent), 4);
+   S := S + FillRight(Self.NrSent, nrlen + 1);
+   S := S + FillRight(IntToStr(Self.RSTRcvd), 4);
+   S := S + FillRight(Self.NrRcvd, nrlen + 1);
+
+   if Self.NewMulti1 then
+      S := S + FillRight(Self.Multi1, 6)
+   else
+      S := S + '-     ';
+
+   if Self.NewMulti2 then
+      S := S + FillRight(Self.Multi2, 6)
+   else
+      S := S + '-     ';
+
+   S := S + FillRight(MHzString[Self.Band], 5);
+   S := S + FillRight(ModeString[Self.Mode], 5);
+   S := S + FillRight(IntToStr(Self.Points), 3);
+
+   if Self.Operator <> '' then begin
+      S := S + FillRight('%%' + Self.Operator + '%%', 19);
+   end;
+
+//   if dmZlogGlobal.MultiOp > 0 then begin
+//      S := S + FillRight('TX#' + IntToStr(Self.TX), 6);
+//   end;
+
+   S := S + Self.Memo;
+   Result := S;
+end;
+
 function TQSO.SameQSO(aQSO: TQSO): Boolean;
 begin
    if (aQSO.FBand = Self.FBand) and
@@ -618,6 +764,7 @@ end;
 
 function TQSO.GetFileRecord(): TQSOData;
 begin
+   FillChar(Result, SizeOf(Result), #00);
    Result.Time       := FTime;
    Result.CallSign   := ShortString(FCallSign);
    Result.NrSent     := ShortString(FNrSent);
@@ -698,7 +845,7 @@ function TQSOList.IndexOf(C: string): Integer;
 var
    i: Integer;
 begin
-   for i := 0 to Count - 1 do begin
+   for i := 1 to Count - 1 do begin
       if Items[i].CallSign = C then begin
          Result := i;
          Exit;
@@ -708,12 +855,27 @@ begin
    Result := -1;
 end;
 
-function TQSOList.MergeFile(filename: string): Integer;
+function TQSOList.IndexOf(Q: TQSO): Integer;
+var
+   i: Integer;
+begin
+   for i := 1 to Count - 1 do begin
+      if Items[i].SameQSO(Q) then begin
+         Result := i;
+         Exit;
+      end;
+   end;
+
+   Result := -1;
+end;
+
+function TQSOList.MergeFile(filename: string; fFullMatch: Boolean): Integer;
 var
    qso: TQSO;
    dat: TQSOData;
    f: file of TQSOData;
    i, merged: integer;
+   Index: Integer;
 begin
    merged := 0;
 
@@ -727,7 +889,14 @@ begin
       qso := TQSO.Create;
       qso.FileRecord := dat;
 
-      if IndexOf(qso.Callsign) = -1 then begin
+      if fFullMatch = True then begin
+         Index := IndexOf(qso);
+      end
+      else begin
+         Index := IndexOf(qso.Callsign);
+      end;
+
+      if Index = -1 then begin
          Add(qso);
          Inc(merged);
       end
@@ -736,7 +905,7 @@ begin
       end;
    end;
 
-   System.close(f);
+   CloseFile(f);
    Result := merged;
 end;
 
@@ -834,7 +1003,8 @@ begin
    Q.Memo := Memo;
    Q.Time := 0;
    Q.RSTSent := 0;
-   Add(Q);
+   Q.RSTRcvd := 0;
+   FQsoList.Add(Q);
 
    for B := b19 to HiBand do begin
       FBandList[B].Add(Q);
@@ -943,6 +1113,8 @@ begin
    FBandList[xQSO.Band].Add(aQSO);
 
    FSaved := False;
+
+//   zyloLogUpdated(evInsertQSO, nil, aQSO);
 end;
 
 procedure TLog.AddQue(aQSO: TQSO);
@@ -958,8 +1130,7 @@ end;
 
 procedure TLog.ProcessQue;
 var
-   xQSO, yQSO, zQSO, wQSO: TQSO;
-   i, id: Integer;
+   xQSO: TQSO;
 begin
    if FQueList.Count = 0 then begin
       exit;
@@ -979,58 +1150,25 @@ begin
          end;
 
          actDelete: begin
-               for i := 1 to TotalQSO do begin
-                  yQSO := FQsoList[i];
-                  if xQSO.SameQSOID(yQSO) then begin
-                     Delete(i);
-                     break;
-                  end;
-               end;
+            ProcessDelete(xQSO);
          end;
 
          actEdit: begin
-            for i := 1 to TotalQSO do begin
-               yQSO := FQsoList[i];
-               if xQSO.SameQSOID(yQSO) then begin
-                  // FQsoList[i].QSO := xQSO.QSO;
-                  yQSO.Assign(xQSO);
-                  RebuildDupeCheckList;
-                  break;
-               end;
-            end;
+            ProcessEdit(xQSO);
+            xQSO.Free();
          end;
 
          actInsert: begin
-            for i := 1 to TotalQSO do begin
-               yQSO := FQsoList[i];
-               id := xQSO.FReserve2 div 100;
-               if id = (yQSO.FReserve3 div 100) then begin
-                  wQSO := TQSO.Create;
-                  wQSO.Assign(xQSO);
-                  Insert(i, wQSO);
-                  break;
-               end;
-            end;
+            ProcessInsert(xQSO);
+            xQSO.Free();
          end;
 
          actLock: begin
-            for i := 1 to TotalQSO do begin
-               zQSO := FQsoList[i];
-               if xQSO.SameQSOID(zQSO) then begin
-                  FQsoList[i].FReserve := actLock;
-                  break;
-               end;
-            end;
+            ProcessLock(xQSO);
          end;
 
          actUnlock: begin
-            for i := 1 to TotalQSO do begin
-               zQSO := FQsoList[i];
-               if xQSO.SameQSOID(zQSO) then begin
-                  FQsoList[i].FReserve := 0;
-                  break;
-               end;
-            end;
+            ProcessUnlock(xQSO);
          end;
       end;
 
@@ -1039,6 +1177,90 @@ begin
    end;
 
    FSaved := False;
+end;
+
+procedure TLog.ProcessDelete(beforeQSO: TQSO);
+var
+   i: Integer;
+   wQSO: TQSO;
+begin
+   for i := 1 to TotalQSO do begin
+      wQSO := FQsoList[i];
+      if beforeQSO.SameQSOID(wQSO) then begin
+         Delete(i);
+         Break;
+      end;
+   end;
+end;
+
+procedure TLog.ProcessEdit(afterQSO: TQSO);
+var
+   i: Integer;
+   beforeQSO: TQSO;
+   wQSO: TQSO;
+begin
+   beforeQSO := TQSO.Create();
+   try
+      for i := 1 to TotalQSO do begin
+         wQSO := FQsoList[i];
+         if afterQSO.SameQSOID(wQSO) then begin
+            beforeQSO.Assign(wQSO);
+            wQSO.Assign(afterQSO);  // wQSO = FQsoList[i]
+            RebuildDupeCheckList;
+//            zyloLogUpdated(evUpdateQSO, beforeQSO, afterQSO);
+            Break;
+         end;
+      end;
+   finally
+      beforeQSO.Free();
+   end;
+end;
+
+procedure TLog.ProcessInsert(afterQSO: TQSO);
+var
+   i: Integer;
+   id: Integer;
+   wQSO: TQSO;
+   newQSO: TQSO;
+begin
+   for i := 1 to TotalQSO do begin
+      wQSO := FQsoList[i];
+      id := afterQSO.FReserve2 div 100;
+      if id = (wQSO.FReserve3 div 100) then begin
+         newQSO := TQSO.Create;
+         newQSO.Assign(afterQSO);
+         Insert(i, newQSO);
+         Break;
+      end;
+   end;
+end;
+
+procedure TLog.ProcessLock(xQSO: TQSO);
+var
+   i: Integer;
+   wQSO: TQSO;
+begin
+   for i := 1 to TotalQSO do begin
+      wQSO := FQsoList[i];
+      if xQSO.SameQSOID(wQSO) then begin
+         wQSO.FReserve := actLock;
+         Break;
+      end;
+   end;
+end;
+
+procedure TLog.ProcessUnlock(xQSO: TQSO);
+var
+   i: Integer;
+   wQSO: TQSO;
+begin
+   for i := 1 to TotalQSO do begin
+      wQSO := FQsoList[i];
+      if xQSO.SameQSOID(wQSO) then begin
+         wQSO.FReserve := 0;
+         Break;
+      end;
+   end;
 end;
 
 procedure TLog.Delete(i: Integer);
@@ -1061,12 +1283,16 @@ begin
 
    FSaved := False;
    RebuildDupeCheckList;
+
+//   zyloLogUpdated(evDeleteQSO, aQSO, nil);
 end;
 
 procedure TLog.DeleteQSO(aQSO: TQSO);
 var
    Index: Integer;
 begin
+//   zyloLogUpdated(evDeleteQSO, aQSO, nil);
+
    Index := FBandList[aQSO.Band].IndexOf(aQSO);
    if Index > -1 then begin
       FBandList[aQSO.Band].Delete(Index);
@@ -1116,6 +1342,8 @@ begin
    FQsoList.Insert(i, aQSO);
    RebuildDupeCheckList;
    FSaved := False;
+
+//   zyloLogUpdated(evInsertQSO, nil, aQSO);
 end;
 
 procedure TLog.Backup(Filename: string);
@@ -1162,6 +1390,239 @@ begin
    CloseFile(f);
 
    FSaved := True;
+end;
+
+procedure TLog.SaveToFilezLogDOSTXT(Filename: string);
+var
+   f: textfile;
+   i, j, max: Integer;
+const
+   LongHeader = 'mon day time  callsign      sent                              rcvd                           multi   MHz mode pts memo';
+   ShortHeader = 'mon day time  callsign      sent         rcvd      multi   MHz mode pts memo';
+begin
+   AssignFile(f, Filename);
+   Rewrite(f);
+
+   { str := 'zLog for Windows Text File'; }
+   max := 0;
+   j := 0;
+   for i := 1 to TotalQSO do begin
+      j := length(FQsoList[i].FNrRcvd);
+      if j > max then begin
+         max := j;
+      end;
+
+      j := length(FQsoList[i].FNrSent);
+      if j > max then begin
+         max := j;
+      end;
+   end;
+
+   if j >= 10 then begin
+      writeln(f, LongHeader);
+      for i := 1 to TotalQSO do begin
+         writeln(f, FQsoList[i].DOSzLogText);
+      end;
+   end
+   else begin
+      writeln(f, ShortHeader);
+      for i := 1 to TotalQSO do begin
+         writeln(f, FQsoList[i].DOSzLogTextShort);
+      end;
+   end;
+
+   CloseFile(f);
+end;
+
+procedure TLog.SaveToFilezLogALL(Filename: string);
+var
+   f: textfile;
+   Header: string;
+   i: Integer;
+begin
+   Header := 'zLog for Windows '; // +Options.Settings._mycall;
+   AssignFile(f, Filename);
+   Rewrite(f);
+
+   { str := 'zLog for Windows Text File'; }
+   writeln(f, Header);
+
+   for i := 1 to TotalQSO do begin
+      writeln(f, FQsoList[i].zLogALL);
+   end;
+
+   CloseFile(f);
+end;
+
+procedure TLog.SaveToFileByTX(Filename: string);
+var
+   f: textfile;
+   Header: string;
+   i, j: Integer;
+   txset: set of byte;
+begin
+   txset := [];
+   for i := 1 to TotalQSO do begin
+      txset := txset + [FQsoList[i].FTX];
+   end;
+
+   Header := 'zLog for Windows '; // +Options.Settings._mycall;
+   System.Delete(Filename, length(Filename) - 2, 3);
+   for i := 0 to 255 do begin
+      if i in txset then begin
+         AssignFile(f, Filename + '.' + IntToStr(i) + '.TX');
+         Rewrite(f);
+         writeln(f, Header + ' TX# ' + IntToStr(i));
+         for j := 1 to TotalQSO do
+            if FQsoList[j].FTX = i then
+               writeln(f, FQsoList[j].zLogALL);
+         CloseFile(f);
+      end;
+   end;
+end;
+
+function TLog.GetActualFreq(b: TBand; memo: string): string;
+var
+   p: Integer;
+   s: string;
+const
+   FREQ: array[b19..b10g] of string = (
+   ' 1800', ' 3500', ' 7000', '10000', '14000', '18000', '21000', '24500',
+   '28000', '   50', '  144', '  432', ' 1.2G', ' 2.3G', ' 5.7G', '  10G'
+   );
+begin
+   if b > b28 then begin
+      Result := FREQ[b];
+      Exit;
+   end;
+
+   p := Pos('(', memo);
+   if p = 0 then begin
+      Result := FREQ[b];
+      Exit;
+   end;
+
+   s := Copy(memo, p + 1);
+
+   p := Pos(')', s);
+   if p = 0 then begin
+      Result := FREQ[b];
+      Exit;
+   end;
+
+   s := Copy(s, 1, p - 1);
+
+   p := Pos('.', s);
+   if p = 0 then begin
+      Result := RightStr('     ' + s, 5);
+      Exit;
+   end;
+
+   s := Copy(s, 1, p - 1);
+   Result := RightStr('     ' + s, 5);
+end;
+
+// https://wwrof.org/cabrillo/
+// https://wwrof.org/cabrillo/cabrillo-qso-data/
+//                              --------info sent------- -------info rcvd--------
+//QSO:  freq mo date       time call          rst exch   call          rst exch   t
+//QSO: ***** ** yyyy-mm-dd nnnn ************* nnn ****** ************* nnn ****** n
+//QSO:  3799 PH 1999-03-06 0711 HC8N           59 700    W1AW           59 CT     0
+//QSO:  3799 PH 1999-03-06 0712 HC8N           59 700    N5KO           59 CA     0
+
+procedure TLog.SaveToFileByCabrillo(Filename: string);
+var
+   F: TextFile;
+   i: Integer;
+   strText: string;
+   Q: TQSO;
+   utc: TDateTime;
+   offhour: Integer;
+   offsetmin: Integer;
+begin
+   AssignFile(F, Filename);
+   ReWrite(F);
+
+   WriteLn(F, 'START-OF-LOG: 3.0');
+//   WriteLn(F, 'CALLSIGN: ' + dmZLogGlobal.MyCall);
+   WriteLn(F, 'CONTEST: ');
+   WriteLn(F, 'CATEGORY-ASSISTED: ');
+   WriteLn(F, 'CATEGORY-BAND: ');
+   WriteLn(F, 'CATEGORY-MODE: ');
+   WriteLn(F, 'CATEGORY-OPERATOR: ');
+   WriteLn(F, 'CATEGORY-POWER: ');
+   WriteLn(F, 'CATEGORY-STATION: ');
+   WriteLn(F, 'CATEGORY-TIME: ');
+   WriteLn(F, 'CATEGORY-TRANSMITTER: ');
+   WriteLn(F, 'CATEGORY-OVERLAY: ');
+   WriteLn(F, 'CERTIFICATE: ');
+   WriteLn(F, 'CLAIMED-SCORE: ');
+   WriteLn(F, 'CLUB: ');
+   WriteLn(F, 'CREATED-BY: ');
+   WriteLn(F, 'EMAIL: ');
+   WriteLn(F, 'GRID-LOCATOR: ');
+   WriteLn(F, 'LOCATION: ');
+   WriteLn(F, 'NAME: ');
+   WriteLn(F, 'ADDRESS: ');
+   WriteLn(F, 'ADDRESS-CITY: ');
+   WriteLn(F, 'ADDRESS-STATE-PROVINCE: ');
+   WriteLn(F, 'ADDRESS-POSTALCODE: ');
+   WriteLn(F, 'ADDRESS-COUNTRY: ');
+   WriteLn(F, 'OPERATORS: ');
+   WriteLn(F, 'OFFTIME: ');
+   WriteLn(F, 'SOAPBOX: ');
+
+   offsetmin := FQsoList[0].RSTsent;
+   if offsetmin = _USEUTC then begin
+      offhour := 0;
+   end
+   else begin
+      offhour := offsetmin div 60;
+   end;
+
+   for i := 1 to FQSOList.Count - 1 do begin
+      Q := FQSOList[i];
+
+      strText := 'QSO: ';
+
+      strText := strText  + GetActualFreq(Q.Band, Q.Memo) + ' ';
+
+      if Q.Mode = mCW then begin
+         strText := strText + 'CW ';
+      end
+      else if Q.Mode = mSSB then begin
+         strText := strText + 'PH ';
+      end
+      else if Q.Mode = mFM then begin
+         strText := strText + 'FM ';
+      end
+      else if Q.Mode = mRTTY then begin
+         strText := strText + 'RY ';
+      end
+      else begin
+         strText := strText + '   ';
+      end;
+
+      utc := IncHour(Q.Time, offhour);
+      strText := strText + FormatDateTime('yyyy-mm-dd', utc) + ' ';
+      strText := strText + FormatDateTime('hhmm', utc) + ' ';
+
+//      strText := strText + FillRight(dmZLogGlobal.MyCall, 13) + ' ';
+      strText := strText + FillLeft(IntToStr(Q.RSTSent), 3) + ' ';
+      strText := strText + FillRight(Q.NrSent, 6) + ' ';
+
+      strText := strText + FillRight(Q.Callsign, 13) + ' ';
+      strText := strText + FillLeft(IntToStr(Q.RSTRcvd), 3) + ' ';
+      strText := strText + FillRight(Q.NrRcvd, 6) + ' ';
+
+      strText := strText + IntToStr(Q.TX);
+
+      WriteLn(F, strText);
+   end;
+
+   WriteLn(F, 'END-OF-LOG:');
+
+   CloseFile(F);
 end;
 
 procedure TLog.RebuildDupeCheckList;
@@ -1254,11 +1715,17 @@ begin
    str := CoreCall(aQSO.CallSign);
 
    for i := 1 to TotalQSO do begin
-      if (aQSO.FBand = FQsoList[i].Band) and (str = CoreCall(FQsoList[i].CallSign)) and ((index <= 0) or (index <> i)) then begin
+      // “¯ˆêQSO‚Íœ‚­
+      if FQsoList[i].SameQSOID(aQSO) = True then begin
+         Continue;
+      end;
+
+      if (aQSO.FBand = FQsoList[i].Band) and (str = CoreCall(FQsoList[i].CallSign)) then begin
          if Not(AcceptDifferentMode) or (AcceptDifferentMode and aQSO.SameMode(FQsoList[i])) then begin
             boo := True;
-            if index > 0 then
+            if index > 0 then begin
                dupeindex := i;
+            end;
             break;
          end;
       end;
@@ -1527,6 +1994,22 @@ begin
    end;
 
    Result := True;
+end;
+
+function TLog.GetScoreCoeff(): Extended;
+begin
+   Result := FQsoList[0].RSTRcvd / 100;
+end;
+
+procedure TLog.SetScoreCoeff(E: Extended);
+var
+   N: Integer;
+begin
+   N := Trunc(E * 100);
+   if FQsoList[0].RSTRcvd <> N then begin
+      FQsoList[0].RSTRcvd := N;
+      Saved := False;
+   end;
 end;
 
 { TQSOCallsignComparer }

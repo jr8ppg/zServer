@@ -543,7 +543,6 @@ begin
       aQSO.TextToQSO(temp2); // delete "PUTQSO "
       Stats.Add(aQSO);
       MultiForm.Add(aQSO);
-      aQSO.Free;
    end;
 
    if Pos('PUTLOG ', temp) = 1 then begin
@@ -553,8 +552,6 @@ begin
       aQSO.TextToQSO(temp2);
       Stats.AddNoUpdate(aQSO);
       MultiForm.Add(aQSO);
-      aQSO.Free;
-      // Exit;
    end;
 
    if Pos('DELQSO', temp) = 1 then begin
