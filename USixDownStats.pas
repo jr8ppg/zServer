@@ -25,14 +25,14 @@ implementation
 
 procedure TSixDownStats.UpdateStats;
 var
-   i, _totalqso, _totalmulti, _totalpoints, _totalcw, _totalph: integer;
+   i, _totalqso, _totalmulti, _totalcw, _totalph, _totalpts: integer;
    temp: string;
    B: TBand;
    R: double;
 begin
    _totalqso := 0;
+   _totalpts := 0;
    _totalmulti := 0;
-   _totalpoints := 0;
    _totalcw := 0;
    _totalph := 0;
    i := 1;
@@ -53,7 +53,7 @@ begin
          Grid.Cells[6, i] := temp;
 
          inc(_totalqso, StatSummary[B].qso);
-         inc(_totalpoints, StatSummary[B].points);
+         inc(_totalpts, StatSummary[B].points);
          inc(_totalmulti, StatSummary[B].multi1);
          inc(_totalcw, StatSummary[B].cwqso);
          inc(_totalph, StatSummary[B].noncwqso);
@@ -61,7 +61,7 @@ begin
       end;
    end;
    Grid.Cells[1, i] := IntToStr(_totalqso);
-   Grid.Cells[2, i] := IntToStr(_totalpoints);
+   Grid.Cells[2, i] := IntToStr(_totalpts);
    Grid.Cells[3, i] := IntToStr(_totalmulti);
    Grid.Cells[4, i] := IntToStr(_totalcw);
    Grid.Cells[5, i] := IntToStr(_totalph);
@@ -72,7 +72,7 @@ begin
 
    temp := Format('%3.1f', [R]);
    Grid.Cells[6, i] := temp;
-   Grid.Cells[3, i + 1] := IntToStr(_totalpoints * _totalmulti);
+   Grid.Cells[3, i + 1] := IntToStr(_totalpts * _totalmulti);
 end;
 
 procedure TSixDownStats.InitGrid(LBand, HBand: TBand);
@@ -85,6 +85,7 @@ begin
       for B := LBand to HBand do
          if NotWARC(B) then
             inc(i);
+
       i := i + 3;
       RowCount := i;
 
@@ -105,9 +106,10 @@ begin
          end;
       Cells[0, i] := 'Total';
       Cells[0, i + 1] := 'Score';
-      Height := DefaultRowHeight * RowCount + 2;
-      Width := DefaultColWidth * ColCount + 2;
    end;
+
+   ClientHeight := Grid.DefaultRowHeight * Grid.RowCount + 2;
+   ClientWidth := Grid.DefaultColWidth * Grid.ColCount + 2;
 end;
 
 procedure TSixDownStats.FormCreate(Sender: TObject);

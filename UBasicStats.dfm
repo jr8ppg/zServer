@@ -24,7 +24,7 @@ object BasicStats: TBasicStats
     Align = alClient
     BorderStyle = bsNone
     Color = clBtnFace
-    ColCount = 4
+    ColCount = 7
     DefaultColWidth = 56
     DefaultRowHeight = 16
     DefaultDrawing = False

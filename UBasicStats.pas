@@ -125,13 +125,14 @@ begin
       i := i + 3;
       RowCount := i;
 
-      ColCount := 6;
+      ColCount := 7;
       Cells[0, 0] := 'MHz';
       Cells[1, 0] := 'QSOs';
-      Cells[2, 0] := 'Mult';
-      Cells[3, 0] := 'CW';
-      Cells[4, 0] := 'Ph';
-      Cells[5, 0] := 'CW%';
+      Cells[2, 0] := 'Points';
+      Cells[3, 0] := 'Multi';
+      Cells[4, 0] := 'CW';
+      Cells[5, 0] := 'Ph';
+      Cells[6, 0] := 'CW%';
 
       i := 1;
       for b := LBand to HBand do begin
@@ -143,16 +144,14 @@ begin
 
       Cells[0, i] := 'Total';
       Cells[0, i + 1] := 'Score';
-      Height := DefaultRowHeight * RowCount + 2;
-      Width := DefaultColWidth * ColCount + 2;
    end;
+
+   ClientHeight := Grid.DefaultRowHeight * Grid.RowCount + 2;
+   ClientWidth := Grid.DefaultColWidth * Grid.ColCount + 2;
 end;
 
 procedure TBasicStats.SaveLogs(Filename: string);
 var
-   f: file of TQSOdata;
-   D: TQSOdata;
-   i: word;
    back: string;
 begin
    back := Filename;
@@ -163,21 +162,12 @@ begin
 
    RenameFile(Filename, back);
 
-   AssignFile(f, Filename);
-   Rewrite(f);
-
-   D.memo := 'ZServer';
-   Write(f, D);
-
    MasterLog.SortByTime;
    ServerForm.MultiForm.RecalcAll;
 
-   for i := 1 to MasterLog.TotalQSO do begin
-      D := MasterLog.QSOList[i].FileRecord;
-      Write(f, D);
-   end;
+   MasterLog.QsoList[0].Memo := 'ZServer';
+   MasterLog.SaveToFile(Filename);
 
-   CloseFile(f);
    Saved := True;
 end;
 
@@ -210,30 +200,23 @@ end;
 
 procedure TBasicStats.LoadFile(Filename: string);
 var
-   f: file of TQSOdata;
-   D: TQSOdata;
    Q: TQSO;
+   i: Integer;
 begin
-   if FileExists(Filename) = False then
+   if FileExists(Filename) = False then begin
       exit;
+   end;
 
-   AssignFile(f, Filename);
-   Reset(f);
+   MasterLog.LoadFromFile(Filename);
 
-   ClearAll;
-   ServerForm.MultiForm.reset;
-   Q := TQSO.Create;
-   Read(f, D);
-   while not(eof(f)) do begin
-      Read(f, D);
-      Q.FileRecord := D;
-      MasterLog.Add(Q);
+   for i := 1 to MasterLog.TotalQSO do begin
+      Q := MasterLog.QsoList[i];
       ServerForm.MultiForm.Add(Q);
    end;
-   Q.Free;
+
    UpdateStats;
+
    ServerForm.CommandQue.Add('999 ' + ZLinkHeader + ' FILELOADED');
-   CloseFile(f);
 end;
 
 procedure TBasicStats.MergeFile(Filename: string; BandSet: TBandSet);
