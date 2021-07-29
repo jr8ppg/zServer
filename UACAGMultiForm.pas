@@ -87,8 +87,16 @@ var
    aQSO: TQSO;
 begin
    Reset;
+
+   ServerForm.Stats.MasterLog.SetDupeFlags;
+
    for i := 1 to ServerForm.Stats.MasterLog.TotalQSO do begin
-      aQSO := TQSO(ServerForm.Stats.MasterLog.QSOList[i]);
+      aQSO := ServerForm.Stats.MasterLog.QSOList[i];
+
+      if ServerForm.Stats.MasterLog.CountHigherPoints = True then begin
+         ServerForm.Stats.MasterLog.IsDupe(aQSO); // called to set log.differentmodepointer
+      end;
+
       Add(aQSO);
    end;
 end;
@@ -122,13 +130,13 @@ begin
    if aQSO.Dupe then
       exit;
 
-   if aQSO.NewMulti1 then begin
-      for i := 0 to CityList.List.Count - 1 do begin
-         if TCity(CityList.List[i]).CityNumber = aQSO.Multi1 then begin
-            TCity(CityList.List[i]).Worked[aQSO.Band] := True;
-            Grid.Cells[0, i] := ReturnSummary(TCity(CityList.List[i]));
-            exit;
-         end;
+   aQSO.NewMulti1 := False;
+   for i := 0 to CityList.List.Count - 1 do begin
+      if TCity(CityList.List[i]).CityNumber = aQSO.Multi1 then begin
+         TCity(CityList.List[i]).Worked[aQSO.Band] := True;
+         aQSO.NewMulti1 := True;
+         Grid.Cells[0, i] := ReturnSummary(TCity(CityList.List[i]));
+         Exit;
       end;
    end;
 end;

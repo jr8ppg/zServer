@@ -5,7 +5,7 @@ inherited ALLJAMultiForm: TALLJAMultiForm
   ClientHeight = 197
   ClientWidth = 437
   ExplicitWidth = 453
-  ExplicitHeight = 235
+  ExplicitHeight = 236
   PixelsPerInch = 96
   TextHeight = 12
   object TabControl: TTabControl
@@ -26,7 +26,6 @@ inherited ALLJAMultiForm: TALLJAMultiForm
       'All')
     TabIndex = 0
     OnChange = TabControlChange
-    ExplicitWidth = 355
     object CheckListBox: TCheckListBox
       Left = 8
       Top = 64
@@ -66,7 +65,6 @@ inherited ALLJAMultiForm: TALLJAMultiForm
       Height = 34
       Align = alTop
       TabOrder = 2
-      ExplicitWidth = 221
     end
   end
 end

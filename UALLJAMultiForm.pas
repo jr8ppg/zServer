@@ -62,8 +62,16 @@ var
    aQSO : TQSO;
 begin
    Reset;
+
+   ServerForm.Stats.MasterLog.SetDupeFlags;
+
    for i := 1 to ServerForm.Stats.MasterLog.TotalQSO do begin
-      aQSO := TQSO(ServerForm.Stats.MasterLog.QSOList[i]);
+      aQSO := ServerForm.Stats.MasterLog.QSOList[i];
+
+      if ServerForm.Stats.MasterLog.CountHigherPoints = True then begin
+         ServerForm.Stats.MasterLog.IsDupe(aQSO); // called to set log.differentmodepointer
+      end;
+
       Add(aQSO);
    end;
 end;
@@ -138,7 +146,7 @@ begin
    str := aQSO.NrRcvd;
    Delete(str, length(str), 1); // delete the last char
 
-   // aQSO.QSO.NewMulti1 := False;
+   aQSO.NewMulti1 := False;
    try
       i := StrToInt(str);
    except
@@ -157,7 +165,8 @@ begin
 
    if MultiArray[aQSO.Band, M] = False then begin
       MultiArray[aQSO.Band, M] := True;
-      // aQSO.QSO.NewMulti1 := True;
+      aQSO.NewMulti1 := True;
+
       str := '';
       for B := b19 to b50 do begin
          if NotWARC(B) then begin

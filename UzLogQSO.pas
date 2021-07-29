@@ -1777,6 +1777,7 @@ begin
          end;
       end
       else begin
+         aQSO.Points := 1;       // ‚Æ‚è‚ ‚¦‚¸1‚Å
          aQSO.Dupe := False;
 
          temp := aQSO.Memo;

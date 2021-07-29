@@ -186,9 +186,7 @@ end;
 
 procedure TBasicStats.Delete(aQSO: TQSO);
 begin
-   aQSO.Reserve := actDelete;
-   MasterLog.AddQue(aQSO);
-   MasterLog.ProcessQue;
+   MasterLog.DeleteQSO(aQSO);
    UpdateStats;
    Saved := False;
 end;
