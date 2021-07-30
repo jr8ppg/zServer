@@ -782,7 +782,7 @@ var
    t, S: string;
 begin
    t := FormatDateTime('hh:nn', SysUtils.Now);
-   S := t + ' ZServer> ' + SendEdit.Text;
+   S := t + '  ZServer> ' + SendEdit.Text;
 
    // SendALL(ZLinkHeader + ' PUTMESSAGE '+'ZServer> '+SendEdit.Text + LBCODE);
    SendAll(ZLinkHeader + ' PUTMESSAGE ' + S + LBCODE);

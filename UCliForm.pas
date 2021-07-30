@@ -207,7 +207,7 @@ procedure TCliForm.CliSocketSessionClosed(Sender: TObject; Error: Word);
 var
    temp: string;
 begin
-   temp := ZLinkHeader + ' PUTMESSAGE !' + MHzString[CurrentBand] + ' MHz client disconnected from network.';
+   temp := ZLinkHeader + ' PUTMESSAGE !' + MHzString[CurrentBand] + ' client disconnected from network.';
    temp := FillRight(IntToStr(ClientNumber), 3) + ' ' + temp;
    ServerForm.ProcessCommand(temp);
    Close;
@@ -218,9 +218,9 @@ procedure TCliForm.SendButtonClick(Sender: TObject);
 var
    S: string;
 begin
-   S := ZLinkHeader + ' PUTMESSAGE ZServer> ' + SendEdit.Text + LBCODE;
+   S := ZLinkHeader + ' PUTMESSAGE  ZServer> ' + SendEdit.Text + LBCODE;
    CliSocket.SendStr(S);
-   S := 'ZServer> ' + SendEdit.Text + LBCODE;
+   S := ' ZServer> ' + SendEdit.Text + LBCODE;
    AddConsole(S);
    SendEdit.Clear;
    ActiveControl := SendEdit;
