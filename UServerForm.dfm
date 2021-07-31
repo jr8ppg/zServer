@@ -3,32 +3,33 @@ object ServerForm: TServerForm
   Top = 189
   ActiveControl = SendButton
   Caption = 'ab'
-  ClientHeight = 232
-  ClientWidth = 385
+  ClientHeight = 211
+  ClientWidth = 344
   Color = clBtnFace
-  Font.Charset = SHIFTJIS_CHARSET
+  Constraints.MinHeight = 200
+  Constraints.MinWidth = 360
+  Font.Charset = DEFAULT_CHARSET
   Font.Color = clWindowText
-  Font.Height = -11
-  Font.Name = 'MS Sans Serif'
+  Font.Height = -12
+  Font.Name = #65325#65331' '#65328#12468#12471#12483#12463
   Font.Style = []
   Menu = MainMenu1
   OldCreateOrder = True
   Position = poScreenCenter
-  Scaled = False
   OnClose = FormClose
   OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnShow = FormShow
   PixelsPerInch = 96
-  TextHeight = 11
+  TextHeight = 12
   object ClientListBox: TListBox
     Left = 0
-    Top = 35
-    Width = 385
-    Height = 163
+    Top = 30
+    Width = 344
+    Height = 151
     Align = alClient
-    Font.Charset = SHIFTJIS_CHARSET
+    Font.Charset = DEFAULT_CHARSET
     Font.Color = clWindowText
     Font.Height = -12
     Font.Name = #65325#65331' '#12468#12471#12483#12463
@@ -37,16 +38,23 @@ object ServerForm: TServerForm
     ItemHeight = 12
     ParentFont = False
     TabOrder = 0
+    ExplicitTop = 35
+    ExplicitWidth = 385
+    ExplicitHeight = 163
   end
   object Panel1: TPanel
     Left = 0
     Top = 0
-    Width = 385
-    Height = 35
+    Width = 344
+    Height = 30
     Align = alTop
+    BevelOuter = bvNone
     TabOrder = 1
+    DesignSize = (
+      344
+      30)
     object Button1: TButton
-      Left = 256
+      Left = 152
       Top = 8
       Width = 75
       Height = 17
@@ -62,74 +70,59 @@ object ServerForm: TServerForm
       OnClick = Button1Click
     end
     object Button2: TButton
-      Left = 317
-      Top = 8
+      Left = 276
+      Top = 4
       Width = 63
-      Height = 19
+      Height = 22
+      Anchors = [akTop, akRight]
       Caption = '&Clear'
-      Font.Charset = SHIFTJIS_CHARSET
-      Font.Color = clWindowText
-      Font.Height = -12
-      Font.Name = 'MS Sans Serif'
-      Font.Style = []
-      ParentFont = False
       TabOrder = 1
       OnClick = Button2Click
     end
     object CheckBox2: TCheckBox
-      Left = 16
-      Top = 8
+      Left = 6
+      Top = 7
       Width = 113
       Height = 17
       Caption = 'Monitor chat only'
-      Font.Charset = SHIFTJIS_CHARSET
-      Font.Color = clWindowText
-      Font.Height = -12
-      Font.Name = 'MS Sans Serif'
-      Font.Style = []
-      ParentFont = False
       TabOrder = 2
       OnClick = CheckBox2Click
     end
   end
   object Panel2: TPanel
     Left = 0
-    Top = 198
-    Width = 385
-    Height = 34
+    Top = 181
+    Width = 344
+    Height = 30
     Align = alBottom
+    BevelOuter = bvNone
     TabOrder = 2
+    ExplicitTop = 202
+    ExplicitWidth = 387
+    DesignSize = (
+      344
+      30)
     object SendButton: TButton
-      Left = 317
-      Top = 8
+      Left = 276
+      Top = 5
       Width = 63
-      Height = 19
+      Height = 21
+      Anchors = [akTop, akRight]
       Caption = '&Send'
       Default = True
-      Font.Charset = SHIFTJIS_CHARSET
-      Font.Color = clWindowText
-      Font.Height = -12
-      Font.Name = 'MS Sans Serif'
-      Font.Style = []
-      ParentFont = False
       TabOrder = 0
       OnClick = SendButtonClick
     end
     object SendEdit: TEdit
-      Left = 9
-      Top = 8
-      Width = 296
+      Left = 6
+      Top = 6
+      Width = 265
       Height = 18
       TabStop = False
+      Anchors = [akLeft, akTop, akRight]
       AutoSelect = False
       AutoSize = False
-      Font.Charset = SHIFTJIS_CHARSET
-      Font.Color = clWindowText
-      Font.Height = -12
-      Font.Name = #65325#65331' '#12468#12471#12483#12463
-      Font.Style = []
       ImeName = 'MS-IME97 '#26085#26412#35486#20837#21147#65404#65405#65411#65425
-      ParentFont = False
       TabOrder = 1
     end
   end
@@ -206,6 +199,7 @@ object ServerForm: TServerForm
       end
       object Graph1: TMenuItem
         Caption = 'Graph'
+        Visible = False
         OnClick = Graph1Click
       end
     end

@@ -217,11 +217,15 @@ end;
 procedure TCliForm.SendButtonClick(Sender: TObject);
 var
    S: string;
+   t: string;
 begin
-   S := ZLinkHeader + ' PUTMESSAGE  ZServer> ' + SendEdit.Text + LBCODE;
-   CliSocket.SendStr(S);
-   S := ' ZServer> ' + SendEdit.Text + LBCODE;
+   t := FormatDateTime('hh:nn', SysUtils.Now);
+   S := t + '  ZServer> ' + SendEdit.Text;
+
+   CliSocket.SendStr(ZLinkHeader + ' PUTMESSAGE ' + S + LBCODE);
+
    AddConsole(S);
+
    SendEdit.Clear;
    ActiveControl := SendEdit;
 end;
