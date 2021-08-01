@@ -34,7 +34,6 @@ type
     procedure Add(aQSO : TQSO); override;
     procedure UpdateCheckListBox;
     procedure UpdateListBox;
-    procedure RecalcAll; override;
   end;
 
 const KenNames : array[m101..m48] of string =
@@ -55,26 +54,6 @@ uses
   UServerForm;
 
 {$R *.DFM}
-
-procedure TALLJAMultiForm.RecalcAll;
-var
-   i : integer;
-   aQSO : TQSO;
-begin
-   Reset;
-
-   ServerForm.Stats.MasterLog.SetDupeFlags;
-
-   for i := 1 to ServerForm.Stats.MasterLog.TotalQSO do begin
-      aQSO := ServerForm.Stats.MasterLog.QSOList[i];
-
-      if ServerForm.Stats.MasterLog.CountHigherPoints = True then begin
-         ServerForm.Stats.MasterLog.IsDupe(aQSO); // called to set log.differentmodepointer
-      end;
-
-      Add(aQSO);
-   end;
-end;
 
 procedure TALLJAMultiForm.UpdateListBox;
 var

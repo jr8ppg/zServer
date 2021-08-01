@@ -75,7 +75,7 @@ var
 begin
    count := 0;
    for i := 0 to 12 do begin
-      if ServerForm.Stats.UsedBands[TBand(cbList[i].Tag)] = True then begin
+      if ServerForm.IsBandUsed(TBand(cbList[i].Tag)) = True then begin
          cbList[i].Top := 58 + 19 * count;
          cbList[i].Visible := True;
          inc(count);
@@ -100,7 +100,7 @@ begin
       end;
    end;
 
-   ServerForm.Stats.MergeFile(FileName, BandSet);
+   ServerForm.MergeFile(FileName, BandSet);
 
    Close;
 end;

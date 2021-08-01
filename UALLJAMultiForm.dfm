@@ -5,7 +5,7 @@ inherited ALLJAMultiForm: TALLJAMultiForm
   ClientHeight = 197
   ClientWidth = 437
   ExplicitWidth = 453
-  ExplicitHeight = 236
+  ExplicitHeight = 235
   PixelsPerInch = 96
   TextHeight = 12
   object TabControl: TTabControl

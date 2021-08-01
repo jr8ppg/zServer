@@ -59,14 +59,12 @@ type
   private
     { Private declarations }
   public
+    { Public declarations }
     CityList : TCityList;
     function ReturnSummary(C : TCity) : string; virtual; //returns appropriate summary for each contest
     procedure ResetBand(B : TBand); override;
     procedure Reset; override;
     procedure Add(aQSO : TQSO); override;
-    //procedure RecalcBand(B : TBand); override;
-    procedure RecalcAll; override;
-    { Public declarations }
   end;
 
 implementation
@@ -79,26 +77,6 @@ uses
 function TACAGMultiForm.ReturnSummary(C: TCity): string;
 begin
    Result := C.ACAGSummary;
-end;
-
-procedure TACAGMultiForm.RecalcAll;
-var
-   i: Integer;
-   aQSO: TQSO;
-begin
-   Reset;
-
-   ServerForm.Stats.MasterLog.SetDupeFlags;
-
-   for i := 1 to ServerForm.Stats.MasterLog.TotalQSO do begin
-      aQSO := ServerForm.Stats.MasterLog.QSOList[i];
-
-      if ServerForm.Stats.MasterLog.CountHigherPoints = True then begin
-         ServerForm.Stats.MasterLog.IsDupe(aQSO); // called to set log.differentmodepointer
-      end;
-
-      Add(aQSO);
-   end;
 end;
 
 procedure TACAGMultiForm.ResetBand(B: TBand);

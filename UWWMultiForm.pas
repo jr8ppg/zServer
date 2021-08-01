@@ -46,13 +46,9 @@ type
     procedure Add(aQSO : TQSO); override;
     procedure SortDefault;
     procedure SortZone;
-    procedure RecalcAll; override;
   end;
 
 implementation
-
-uses
-  UServerForm;
 
 {$R *.DFM}
 
@@ -204,52 +200,6 @@ begin
             exit;
          end;
    end;
-end;
-
-{ procedure TWWMultiForm.RecalcBand(B : TBand);
-  var Log : TQSOList;
-  i : integer;
-  aQSO : TQSO;
-  begin
-  if NotWARC(B) and (B in [b19..b28]) = False then
-  exit;
-  Log := ServerForm.Stats.Logs[B];
-  ResetBand(B);
-  aQSO := TQSO.Create;
-  for i := 1 to Log.TotalQSO do
-  begin
-  aQSO.QSO := TQSO(Log.List[i]).QSO;
-  Add(aQSO);
-  TQSO(Log.List[i]).QSO := aQSO.QSO;
-  end;
-  aQSO.Free;
-  end; }
-
-procedure TWWMultiForm.RecalcAll;
-var
-   i: integer;
-   aQSO: TQSO;
-begin
-   Reset;
-   for i := 1 to ServerForm.Stats.MasterLog.TotalQSO do begin
-      aQSO := TQSO(ServerForm.Stats.MasterLog.QSOList[i]);
-      Add(aQSO);
-   end;
-   { aQSO := TQSO.Create;
-     for B := b19 to HiBand do
-     begin
-     if NotWARC(B) then
-     begin
-     Log := ServerForm.Stats.Logs[B];
-     for i := 1 to Log.TotalQSO do
-     begin
-     aQSO.QSO := TQSO(Log.List[i]).QSO;
-     Add(aQSO);
-     TQSO(Log.List[i]).QSO := aQSO.QSO;
-     end;
-     end;
-     end;
-     aQSO.Free; }
 end;
 
 procedure TWWMultiForm.SortByClick(Sender: TObject);

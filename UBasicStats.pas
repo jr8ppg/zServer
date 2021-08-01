@@ -41,12 +41,8 @@ type
     procedure UpdateStats; virtual; abstract;
     procedure SaveLogs(Filename : string);
     procedure InitGrid(LBand, HBand : TBand); virtual;
-    procedure LoadFile(FileName : string); // resets current log and loads from file
     procedure MergeFile(FileName : string; BandSet : TBandSet); // will only update if band is in BandSet
   end;
-
-var
-  CurrentFileName : string;
 
 implementation
 
@@ -66,7 +62,6 @@ var
    b: TBand;
 begin
    Saved := True;
-   CurrentFileName := '';
    MasterLog := TLog.Create('Z-Server');
    for b := b19 to HiBand do begin
       UsedBands[b] := False;
@@ -163,7 +158,7 @@ begin
    RenameFile(Filename, back);
 
    MasterLog.SortByTime;
-   ServerForm.MultiForm.RecalcAll;
+   ServerForm.RecalcAll;
 
    MasterLog.QsoList[0].Memo := 'ZServer';
    MasterLog.SaveToFile(Filename);
@@ -194,27 +189,6 @@ end;
 procedure TBasicStats.ClearAll;
 begin
    // MasterLog.Clear;
-end;
-
-procedure TBasicStats.LoadFile(Filename: string);
-var
-   Q: TQSO;
-   i: Integer;
-begin
-   if FileExists(Filename) = False then begin
-      exit;
-   end;
-
-   MasterLog.LoadFromFile(Filename);
-
-   for i := 1 to MasterLog.TotalQSO do begin
-      Q := MasterLog.QsoList[i];
-      ServerForm.MultiForm.Add(Q);
-   end;
-
-   UpdateStats;
-
-   ServerForm.CommandQue.Add('999 ' + ZLinkHeader + ' FILELOADED');
 end;
 
 procedure TBasicStats.MergeFile(Filename: string; BandSet: TBandSet);

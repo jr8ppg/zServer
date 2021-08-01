@@ -1,38 +1,18 @@
 {* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
 
-Author:       François PIETTE
-Description:  Demonstration for Server program using TWSocket.
-EMail:        francois.piette@ping.be  http://www.rtfm.be/fpiette
-              francois.piette@rtfm.be
-Creation:     8 december 1997
-Version:      1.01
-WebSite:      http://www.rtfm.be/fpiette/indexuk.htm
-Support:      Use the mailing list twsocket@rtfm.be See website for details.
-Legal issues: Copyright (C) 1997 by François PIETTE <francois.piette@ping.be>
-
-              This software is provided 'as-is', without any express or
-              implied warranty.  In no event will the author be held liable
-              for any  damages arising from the use of this software.
-
-              Permission is granted to anyone to use this software for any
-              purpose, including commercial applications, and to alter it
-              and redistribute it freely, subject to the following
-              restrictions:
-
-              1. The origin of this software must not be misrepresented,
-                 you must not claim that you wrote the original software.
-                 If you use this software in a product, an acknowledgment
-                 in the product documentation would be appreciated but is
-                 not required.
-
-              2. Altered source versions must be plainly marked as such, and
-                 must not be misrepresented as being the original software.
-
-              3. This notice may not be removed or altered from any source
-                 distribution.
-
-Updates:
-Dec 09, 1997 V1.01 Made it compatible with Delphi 1
+Author:       Yokobayashi Yohei, JARL Contest Committee, JR8PPG
+Description:  This program acts as a server when using zLog for multiple operations.
+EMail:        zlog@zlog.org, jr8ppg@jarl.com
+Creation:     1 August 2021
+Version:      2.7
+WebSite:      https://www.zlog.org/
+              https://github.com/jr8ppg/zServer
+Support:      Use the mailing list zlog-reiwa@cq-test.net
+              See website for details below.
+              https://github.com/jr8ppg/zLog/wiki/%E3%83%A1%E3%82%A4%E3%83%AA%E3%83%B3%E3%82%B0%E3%83%AA%E3%82%B9%E3%83%88
+Legal issues: Copyright 1997-2002 by Yohei Yokobayashi
+              Portions created by JR8PPG are Copyright (C) 2020-2021 JR8PPG
+              This software is released under the MIT License.
 
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
 unit UServerForm;
@@ -110,6 +90,7 @@ type
     procedure Graph1Click(Sender: TObject);
     procedure DeleteDupes1Click(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
+    procedure Windows1Click(Sender: TObject);
   private
     { Déclarations privées }
     FInitialized  : Boolean;
@@ -120,16 +101,19 @@ type
     FConnections: TConnections;
 
     FClientList: TCliFormList;
+    FStats: TBasicStats;
+    FMultiForm: TBasicMultiForm;
+
+    FCurrentFileName: string;
 
     procedure OnClientClosed(var msg: TMessage); message WM_USER_CLIENT_CLOSED;
     procedure StartServer;
     procedure LoadSettings();
     procedure SaveSettings();
+    function GetMasterLog(): TLog;
   public
     ChatOnly : boolean;
     CommandQue : TStringList;
-    Stats : TBasicStats;
-    MultiForm : TBasicMultiForm;
     procedure AddToChatLog(str : string);
     procedure SendAll(str : string);
     procedure SendAllButFrom(str : string; NotThisCli : integer);
@@ -139,8 +123,12 @@ type
     procedure IdleEvent(Sender: TObject; var Done: Boolean);
     procedure AddConsole(S : string); // adds string to clientlistbox
     function GetQSObyID(id : integer) : TQSO;
+    function IsBandUsed(b: TBand): Boolean;
+    procedure MergeFile(FileName : string; BandSet : TBandSet);
+    procedure RecalcAll();
 
     property ClientList: TCliFormList read FClientList;
+    property MasterLog: TLog read GetMasterLog;
   end;
 
 var
@@ -151,7 +139,7 @@ implementation
 uses
   UAbout, UChooseContest, UMergeBand,
   UALLJAMultiForm, UALLJAStats, USixDownStats,
-  UACAGMultiForm, UFDMultiForm, UFDStats, UCQWWStats, UWWMultiForm;
+  UACAGMultiForm, UFDMultiForm, UFDStats, UCQWWStats, UWWMultiForm, USimpleStats;
 
 {$R *.DFM}
 
@@ -175,6 +163,7 @@ begin
    FTakeLog := False;
    ChatOnly := True;
    FClientNumber := 0;
+   FCurrentFileName := '';
 
    CheckBox2.Checked := ChatOnly;
 
@@ -204,31 +193,42 @@ begin
    try
       F.ShowModal();
       case F.ContestNumber of
+         // ALL JA
          0: begin
-            Stats := TALLJAStats.Create(Self);
-            MultiForm := TALLJAMultiForm.Create(Self);
+            FStats := TALLJAStats.Create(Self);
+            FMultiForm := TALLJAMultiForm.Create(Self);
          end;
 
+         // 6m&DOWN
          1: begin
-            Stats := TSixDownStats.Create(Self);
-            MultiForm := TFDMultiForm.Create(Self);
-            TFDMultiForm(MultiForm).Init6D;
+            FStats := TSixDownStats.Create(Self);
+            FMultiForm := TFDMultiForm.Create(Self);
+            TFDMultiForm(FMultiForm).Init6D;
          end;
 
+         // Field Day
          2: begin
-            Stats := TFDStats.Create(Self);
-            MultiForm := TFDMultiForm.Create(Self);
+            FStats := TFDStats.Create(Self);
+            FMultiForm := TFDMultiForm.Create(Self);
          end;
 
+         // ACAG
          3: begin
-            Stats := TALLJAStats.Create(Self);
-            MultiForm := TACAGMultiForm.Create(Self);
-            TALLJAStats(Stats).InitACAG;
+            FStats := TALLJAStats.Create(Self);
+            FMultiForm := TACAGMultiForm.Create(Self);
+            TALLJAStats(FStats).InitACAG;
          end;
 
+         // CQWW
          4: begin
-            Stats := TCQWWStats.Create(Self);
-            MultiForm := TWWMultiForm.Create(Self);
+            FStats := TCQWWStats.Create(Self);
+            FMultiForm := TWWMultiForm.Create(Self);
+         end;
+
+         // Simple
+         5: begin
+            FStats := TSimpleStats.Create(Self);
+            FMultiForm := nil;
          end;
       end;
 
@@ -244,8 +244,8 @@ procedure TServerForm.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
 var
    R: Word;
 begin
-   if Stats.Saved = False then begin
-      R := MessageDlg('Save changes to ' + CurrentFileName + ' ?', mtConfirmation, [mbYes, mbNo, mbCancel], 0); { HELP context 0 }
+   if FStats.Saved = False then begin
+      R := MessageDlg('Save changes to ' + FCurrentFileName + ' ?', mtConfirmation, [mbYes, mbNo, mbCancel], 0); { HELP context 0 }
       case R of
          mrYes:
             Save1Click(self);
@@ -289,8 +289,8 @@ var
 begin
    Result := nil;
    j := id div 100;
-   for i := 1 to Stats.MasterLog.TotalQSO do begin
-      aQSO := TQSO(Stats.MasterLog.QSOList[i]);
+   for i := 1 to FStats.MasterLog.TotalQSO do begin
+      aQSO := FStats.MasterLog.QSOList[i];
       if j = ((aQSO.Reserve3) div 100) then begin
          Result := aQSO;
          Exit;
@@ -463,11 +463,11 @@ begin
 
    if Pos('SENDLOG', temp) = 1 then // will send all qsos in server's log and renew command
    begin
-      if Stats.MasterLog.TotalQSO = 0 then
+      if FStats.MasterLog.TotalQSO = 0 then
          Exit;
 
-      for i := 1 to Stats.MasterLog.TotalQSO do begin
-         sendbuf := ZLinkHeader + ' PUTLOG ' + TQSO(Stats.MasterLog.QSOList[i]).QSOinText;
+      for i := 1 to FStats.MasterLog.TotalQSO do begin
+         sendbuf := ZLinkHeader + ' PUTLOG ' + FStats.MasterLog.QSOList[i].QSOinText;
          SendOnly(sendbuf + LBCODE, from);
       end;
       sendbuf := ZLinkHeader + ' RENEW';
@@ -478,13 +478,13 @@ begin
    if Pos('GETQSOIDS', temp) = 1 then // will send all qso ids in server's log
    begin
       i := 1;
-      while i <= Stats.MasterLog.TotalQSO do begin
+      while i <= FStats.MasterLog.TotalQSO do begin
          sendbuf := ZLinkHeader + ' QSOIDS ';
          repeat
-            sendbuf := sendbuf + IntToStr(TQSO(Stats.MasterLog.QSOList[i]).Reserve3);
+            sendbuf := sendbuf + IntToStr(FStats.MasterLog.QSOList[i].Reserve3);
             sendbuf := sendbuf + ' ';
             inc(i);
-         until (i mod 10 = 0) or (i > Stats.MasterLog.TotalQSO);
+         until (i mod 10 = 0) or (i > FStats.MasterLog.TotalQSO);
          SendOnly(sendbuf + LBCODE, from);
       end;
       sendbuf := ZLinkHeader + ' ENDQSOIDS';
@@ -541,8 +541,10 @@ begin
       temp2 := temp;
       Delete(temp2, 1, 7);
       aQSO.TextToQSO(temp2); // delete "PUTQSO "
-      Stats.Add(aQSO);
-      MultiForm.Add(aQSO);
+      FStats.Add(aQSO);
+      if Assigned(FMultiForm) then begin
+         FMultiForm.Add(aQSO);
+      end;
    end;
 
    if Pos('PUTLOG ', temp) = 1 then begin
@@ -550,8 +552,10 @@ begin
       temp2 := temp;
       Delete(temp2, 1, 7);
       aQSO.TextToQSO(temp2);
-      Stats.AddNoUpdate(aQSO);
-      MultiForm.Add(aQSO);
+      FStats.AddNoUpdate(aQSO);
+      if Assigned(FMultiForm) then begin
+         FMultiForm.Add(aQSO);
+      end;
    end;
 
    if Pos('DELQSO', temp) = 1 then begin
@@ -559,10 +563,9 @@ begin
       temp2 := temp;
       Delete(temp2, 1, 7);
       aQSO.TextToQSO(temp2);
-      Stats.Delete(aQSO);
-      // MultiForm.RecalcBand(aQSO.QSO.Band);
-      MultiForm.RecalcAll;
-      Stats.UpdateStats; // 0.24
+      FStats.Delete(aQSO);
+      RecalcAll;
+      FStats.UpdateStats; // 0.24
       aQSO.Free;
    end;
 
@@ -579,11 +582,12 @@ begin
 
       { Stats.Logs[aQSO.QSO.Band].AddQue(aQSO);
         Stats.Logs[aQSO.QSO.Band].ProcessQue; }
-      Stats.MasterLog.AddQue(aQSO);
-      Stats.MasterLog.ProcessQue;
+      FStats.MasterLog.AddQue(aQSO);
+      FStats.MasterLog.ProcessQue;
 
-      MultiForm.RecalcAll;
-      Stats.UpdateStats;
+      RecalcAll;
+
+      FStats.UpdateStats;
       aQSO.Free;
    end;
 
@@ -592,7 +596,7 @@ begin
    end;
 
    if Pos('RENEW', temp) = 1 then begin
-      Stats.UpdateStats;
+      FStats.UpdateStats;
    end;
 
    if Pos('INSQSO ', temp) = 1 then begin
@@ -601,10 +605,10 @@ begin
       Delete(temp2, 1, 7);
       aQSO.TextToQSO(temp2);
       aQSO.Reserve := actInsert;
-      Stats.MasterLog.AddQue(aQSO);
-      Stats.MasterLog.ProcessQue;
-      MultiForm.RecalcAll;
-      Stats.UpdateStats;
+      FStats.MasterLog.AddQue(aQSO);
+      FStats.MasterLog.ProcessQue;
+      RecalcAll;
+      FStats.UpdateStats;
       aQSO.Free;
    end;
 
@@ -810,14 +814,21 @@ begin
    end;
 end;
 
+procedure TServerForm.Windows1Click(Sender: TObject);
+begin
+   Multipliers1.Enabled := Assigned(FMultiForm);
+end;
+
 procedure TServerForm.ScoreandStatistics1Click(Sender: TObject);
 begin
-   Stats.Show;
+   FStats.Show;
 end;
 
 procedure TServerForm.Multipliers1Click(Sender: TObject);
 begin
-   MultiForm.Show;
+   if Assigned(FMultiForm) then begin
+      FMultiForm.Show;
+   end;
 end;
 
 procedure TServerForm.CheckBox2Click(Sender: TObject);
@@ -837,35 +848,45 @@ end;
 
 procedure TServerForm.Save1Click(Sender: TObject);
 begin
-   if Stats.Saved = False then begin
-      if CurrentFileName = '' then begin
+   if FStats.Saved = False then begin
+      if FCurrentFileName = '' then begin
          if SaveDialog.Execute then begin
-            CurrentFileName := SaveDialog.FileName;
+            FCurrentFileName := SaveDialog.FileName;
          end
          else begin
             Exit;
          end;
       end;
 
-      Stats.SaveLogs(CurrentFileName);
+      FStats.SaveLogs(FCurrentFileName);
    end;
 end;
 
 procedure TServerForm.SaveAs1Click(Sender: TObject);
 begin
    If SaveDialog.Execute then begin
-      CurrentFileName := SaveDialog.FileName;
-      Stats.SaveLogs(CurrentFileName);
+      FCurrentFileName := SaveDialog.FileName;
+      FStats.SaveLogs(FCurrentFileName);
    end;
 end;
 
 procedure TServerForm.Open1Click(Sender: TObject);
 begin
    if OpenDialog.Execute then begin
-      if MessageDlg('This will clear all data and reload from new file.', mtWarning, [mbOK, mbCancel], 0) = mrOK then begin
-         CurrentFileName := OpenDialog.FileName;
+      if MessageDlg('This will clear all data and reload from new file.', mtWarning, [mbOK, mbCancel], 0) <> mrOK then begin
+         Exit;
       end;
-      Stats.LoadFile(OpenDialog.FileName);
+
+      FCurrentFileName := OpenDialog.FileName;
+
+      if FileExists(FCurrentFileName) = False then begin
+         exit;
+      end;
+
+      FStats.MasterLog.LoadFromFile(FCurrentFileName);
+      RecalcAll();
+      FStats.UpdateStats();
+      CommandQue.Add('999 ' + ZLinkHeader + ' FILELOADED');
    end;
 end;
 
@@ -916,9 +937,9 @@ end;
 
 procedure TServerForm.DeleteDupes1Click(Sender: TObject);
 begin
-   Stats.MasterLog.RemoveDupes;
-   MultiForm.RecalcAll;
-   Stats.UpdateStats;
+   FStats.MasterLog.RemoveDupes;
+   RecalcAll;
+   FStats.UpdateStats;
 end;
 
 procedure TServerForm.LoadSettings();
@@ -954,6 +975,45 @@ begin
       IniFile.WriteBool('Options', 'ChatOnly', ChatOnly);
    finally
       IniFile.Free;
+   end;
+end;
+
+function TServerForm.IsBandUsed(b: TBand): Boolean;
+begin
+   Result := FStats.UsedBands[b];
+end;
+
+procedure TServerForm.MergeFile(FileName : string; BandSet : TBandSet);
+begin
+   FStats.MergeFile(FileName, BandSet);
+end;
+
+function TServerForm.GetMasterLog(): TLog;
+begin
+   Result := FStats.MasterLog;
+end;
+
+procedure TServerForm.RecalcAll();
+var
+   i : integer;
+   aQSO : TQSO;
+begin
+   if Assigned(FMultiForm) then begin
+      FMultiForm.Reset;
+   end;
+
+   FStats.MasterLog.SetDupeFlags;
+
+   for i := 1 to FStats.MasterLog.TotalQSO do begin
+      aQSO := FStats.MasterLog.QSOList[i];
+
+      if FStats.MasterLog.CountHigherPoints = True then begin
+         FStats.MasterLog.IsDupe(aQSO); // called to set log.differentmodepointer
+      end;
+
+      if Assigned(FMultiForm) then begin
+         FMultiForm.Add(aQSO);
+      end;
    end;
 end;
 

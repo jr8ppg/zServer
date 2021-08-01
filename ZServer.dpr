@@ -9,7 +9,7 @@ uses
   UBasicMultiForm in 'UBasicMultiForm.pas' {BasicMultiForm},
   UBasicStats in 'UBasicStats.pas' {BasicStats},
   UALLJAMultiForm in 'UALLJAMultiForm.pas' {ALLJAMultiForm},
-  UALLJAStats in 'UALLJAStats.pas' {AllJAStats},
+  USimpleStats in 'USimpleStats.pas' {SimpleStats},
   UChooseContest in 'UChooseContest.pas' {ChooseContest},
   USixDownStats in 'USixDownStats.pas' {SixDownStats},
   UACAGMultiForm in 'UACAGMultiForm.pas' {ACAGMultiForm},
@@ -25,7 +25,8 @@ uses
   UzlogConst in 'UzlogConst.pas',
   UzLogQSO in 'UzLogQSO.pas',
   UzLogGlobal in 'UzLogGlobal.pas' {dmZLogGlobal: TDataModule},
-  UMultipliers in 'UMultipliers.pas';
+  UMultipliers in 'UMultipliers.pas',
+  UALLJAStats in 'UALLJAStats.pas' {AllJAStats};
 
 {$R *.RES}
 

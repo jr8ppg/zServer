@@ -3,8 +3,8 @@ object ChooseContest: TChooseContest
   Top = 241
   BorderStyle = bsDialog
   Caption = 'Choose a Contest'
-  ClientHeight = 136
-  ClientWidth = 262
+  ClientHeight = 195
+  ClientWidth = 202
   Color = clBtnFace
   Font.Charset = ANSI_CHARSET
   Font.Color = clWindowText
@@ -16,8 +16,8 @@ object ChooseContest: TChooseContest
   PixelsPerInch = 96
   TextHeight = 13
   object OKBtn: TButton
-    Left = 99
-    Top = 112
+    Left = 33
+    Top = 166
     Width = 63
     Height = 21
     Caption = 'OK'
@@ -26,8 +26,8 @@ object ChooseContest: TChooseContest
     TabOrder = 0
   end
   object CancelBtn: TButton
-    Left = 168
-    Top = 112
+    Left = 102
+    Top = 166
     Width = 63
     Height = 21
     Cancel = True
@@ -37,10 +37,10 @@ object ChooseContest: TChooseContest
     Visible = False
   end
   object ContestBox: TRadioGroup
-    Left = 32
+    Left = 29
     Top = 8
-    Width = 185
-    Height = 97
+    Width = 140
+    Height = 153
     Caption = 'Contest'
     Font.Charset = SHIFTJIS_CHARSET
     Font.Color = clWindowText
@@ -53,7 +53,8 @@ object ChooseContest: TChooseContest
       '6m && Down'
       #12501#12451#12540#12523#12489#12487#12540
       #20840#24066#20840#37089
-      'CQWW')
+      'CQWW'
+      'Simple (No Multi)')
     ParentFont = False
     TabOrder = 2
   end

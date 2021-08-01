@@ -18,8 +18,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel1: TRotateLabel
       Left = 252
       Top = 20
-      Width = 14
-      Height = 15
+      Width = 15
+      Height = 14
       Escapement = 90
       TextStyle = tsNone
       Caption = '1.9'
@@ -33,8 +33,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel2: TRotateLabel
       Left = 264
       Top = 20
-      Width = 14
-      Height = 15
+      Width = 15
+      Height = 14
       Escapement = 90
       TextStyle = tsNone
       Caption = '3.5'
@@ -48,8 +48,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel3: TRotateLabel
       Left = 276
       Top = 29
-      Width = 14
-      Height = 6
+      Width = 6
+      Height = 14
       Escapement = 90
       TextStyle = tsNone
       Caption = '7'
@@ -63,8 +63,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel4: TRotateLabel
       Left = 287
       Top = 23
-      Width = 14
-      Height = 12
+      Width = 12
+      Height = 14
       Escapement = 90
       TextStyle = tsNone
       Caption = '14'
@@ -78,8 +78,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel5: TRotateLabel
       Left = 299
       Top = 23
-      Width = 14
-      Height = 12
+      Width = 12
+      Height = 14
       Escapement = 90
       TextStyle = tsNone
       Caption = '21'
@@ -93,8 +93,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel6: TRotateLabel
       Left = 311
       Top = 23
-      Width = 14
-      Height = 12
+      Width = 12
+      Height = 14
       Escapement = 90
       TextStyle = tsNone
       Caption = '28'

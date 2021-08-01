@@ -38,9 +38,6 @@ object ServerForm: TServerForm
     ItemHeight = 12
     ParentFont = False
     TabOrder = 0
-    ExplicitTop = 35
-    ExplicitWidth = 385
-    ExplicitHeight = 163
   end
   object Panel1: TPanel
     Left = 0
@@ -97,8 +94,6 @@ object ServerForm: TServerForm
     Align = alBottom
     BevelOuter = bvNone
     TabOrder = 2
-    ExplicitTop = 202
-    ExplicitWidth = 387
     DesignSize = (
       344
       30)
@@ -181,6 +176,7 @@ object ServerForm: TServerForm
     end
     object Windows1: TMenuItem
       Caption = '&Windows'
+      OnClick = Windows1Click
       object ScoreandStatistics1: TMenuItem
         Caption = '&Score and Statistics'
         OnClick = ScoreandStatistics1Click

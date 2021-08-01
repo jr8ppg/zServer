@@ -15,12 +15,8 @@ type
   public
     { Public declarations }
     procedure ResetBand(B : TBand); virtual; abstract;
-    //procedure RecalcBand(B : TBand); virtual; abstract;
-    procedure RecalcAll; virtual; abstract;
     procedure Reset; virtual; abstract;
     procedure Add(aQSO : TQSO); virtual; abstract;
-    //procedure AddNoUpdate(aQSO : TQSO); virtual; abstract;
-    //procedure Update; virtual; abstract;
   end;
 
 implementation
