@@ -93,6 +93,9 @@ end;
 procedure TdmZLogGlobal.ReadWindowState(form: TForm; strWindowName: string; fPositionOnly: Boolean );
 var
    ini: TIniFile;
+   l, t, w, h: Integer;
+   pt: TPoint;
+   mon: TMonitor;
 begin
    ini := TIniFile.Create(ChangeFileExt(Application.ExeName, '.ini'));
    try
@@ -100,12 +103,39 @@ begin
          strWindowName := form.Name;
       end;
 
+      l := ini.ReadInteger('Windows', strWindowName + '_X', -1);
+      t := ini.ReadInteger('Windows', strWindowName + '_Y', -1);
+      h := ini.ReadInteger('Windows', strWindowName + '_H', -1);
+      w := ini.ReadInteger('Windows', strWindowName + '_W', -1);
+
       form.Visible := ini.ReadBool('Windows', strWindowName + '_Open', False);
-      form.Left    := ini.ReadInteger('Windows', strWindowName + '_X', 10);
-      form.Top     := ini.ReadInteger('Windows', strWindowName + '_Y', 10);
+
+      pt.X := l;
+      pt.Y := t;
+      mon := Screen.MonitorFromPoint(pt, mdNearest);
+      if l < mon.Left then begin
+         l := mon.Left;
+      end;
+      if (l + w) > (mon.Left + mon.Width) then begin
+         l := (mon.Left + mon.Width) - w;
+      end;
+      if t < mon.Top then begin
+         t := mon.Top;
+      end;
+      if (t + h) > (mon.Top + mon.Height) then begin
+         t := (mon.Top + mon.Height) - H;
+      end;
+
+      form.Left := l;
+      form.Top := t;
+
       if fPositionOnly = False then begin
-         form.Height  := ini.ReadInteger('Windows', strWindowName + '_H', 10);
-         form.Width   := ini.ReadInteger('Windows', strWindowName + '_W', 10);
+         if h >= 0 then begin
+            form.Height  := ini.ReadInteger('Windows', strWindowName + '_H', -1);
+         end;
+         if w >= 0 then begin
+            form.Width   := ini.ReadInteger('Windows', strWindowName + '_W', -1);
+         end;
       end;
    finally
       ini.Free();

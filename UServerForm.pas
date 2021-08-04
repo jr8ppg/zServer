@@ -111,6 +111,10 @@ type
     procedure LoadSettings();
     procedure SaveSettings();
     function GetMasterLog(): TLog;
+
+    procedure RestoreWindowsPos();
+    procedure RestoreWindowStates;
+    procedure RecordWindowStates;
   public
     ChatOnly : boolean;
     CommandQue : TStringList;
@@ -175,6 +179,8 @@ begin
    FConnections := TConnections.Create(Self);
 
    LoadSettings();
+
+   RestoreWindowsPos();
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -232,6 +238,8 @@ begin
          end;
       end;
 
+      RestoreWindowStates;
+
       StartServer;
    finally
       F.Release();
@@ -261,6 +269,10 @@ procedure TServerForm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
    SrvSocket.Close;
    SaveSettings();
+   if FInitialized then begin
+      RecordWindowStates;
+      dmZlogGlobal.WriteMainFormState(Left, top, Width, Height, False, False);
+   end;
 end;
 
 {* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
@@ -1015,6 +1027,59 @@ begin
          FMultiForm.Add(aQSO);
       end;
    end;
+end;
+
+procedure TServerForm.RestoreWindowsPos();
+var
+   X, Y, W, H: Integer;
+   B, BB: Boolean;
+   mon: TMonitor;
+   pt: TPoint;
+begin
+   dmZlogGlobal.ReadMainFormState(X, Y, W, H, B, BB);
+
+   if (W > 0) and (H > 0) then begin
+      pt.X := X;
+      pt.Y := Y;
+      mon := Screen.MonitorFromPoint(pt, mdNearest);
+      if X < mon.Left then begin
+         X := mon.Left;
+      end;
+      if X > (mon.Left + mon.Width) then begin
+         X := (mon.Left + mon.Width) - W;
+      end;
+      if Y < mon.Top then begin
+         Y := mon.Top;
+      end;
+      if Y > (mon.Top + mon.Height) then begin
+         Y := (mon.Top + mon.Height) - H;
+      end;
+
+      Position := poDesigned;
+      Left := X;
+      top := Y;
+      Width := W;
+      Height := H;
+   end
+   else begin
+      Position := poScreenCenter;
+   end;
+end;
+
+procedure TServerForm.RestoreWindowStates;
+begin
+   dmZlogGlobal.ReadWindowState(FConnections);
+   dmZlogGlobal.ReadWindowState(FStats);
+   dmZlogGlobal.ReadWindowState(FMultiForm);
+   dmZlogGlobal.ReadWindowState(FFreqList);
+end;
+
+procedure TServerForm.RecordWindowStates;
+begin
+   dmZlogGlobal.WriteWindowState(FConnections);
+   dmZlogGlobal.WriteWindowState(FStats);
+   dmZlogGlobal.WriteWindowState(FMultiForm);
+   dmZlogGlobal.WriteWindowState(FFreqList);
 end;
 
 end.
