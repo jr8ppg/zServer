@@ -1070,7 +1070,9 @@ procedure TServerForm.RestoreWindowStates;
 begin
    dmZlogGlobal.ReadWindowState(FConnections);
    dmZlogGlobal.ReadWindowState(FStats);
-   dmZlogGlobal.ReadWindowState(FMultiForm);
+   if Assigned(FMultiForm) then begin
+      dmZlogGlobal.ReadWindowState(FMultiForm);
+   end;
    dmZlogGlobal.ReadWindowState(FFreqList);
 end;
 
@@ -1078,7 +1080,9 @@ procedure TServerForm.RecordWindowStates;
 begin
    dmZlogGlobal.WriteWindowState(FConnections);
    dmZlogGlobal.WriteWindowState(FStats);
-   dmZlogGlobal.WriteWindowState(FMultiForm);
+   if Assigned(FMultiForm) then begin
+      dmZlogGlobal.WriteWindowState(FMultiForm);
+   end;
    dmZlogGlobal.WriteWindowState(FFreqList);
 end;
 
