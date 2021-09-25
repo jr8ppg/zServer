@@ -169,8 +169,6 @@ begin
    FClientNumber := 0;
    FCurrentFileName := '';
 
-   CheckBox2.Checked := ChatOnly;
-
    ver := TJclFileVersionInfo.Create(Self.Handle);
    Caption := Application.Title + ' Version ' + ver.FileVersion;
    ver.Free();
@@ -181,6 +179,7 @@ begin
    LoadSettings();
 
    RestoreWindowsPos();
+   CheckBox2.Checked := ChatOnly;
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -820,9 +819,14 @@ end;
 
 procedure TServerForm.Timer1Timer(Sender: TObject);
 begin
-   // Idle;
-   while ClientListBox.Items.Count > 400 do begin
-      ClientListBox.Items.Delete(0);
+   Timer1.Enabled := False;
+   try
+      // Idle;
+      while ClientListBox.Items.Count > 400 do begin
+         ClientListBox.Items.Delete(0);
+      end;
+   finally
+      Timer1.Enabled := True;
    end;
 end;
 
