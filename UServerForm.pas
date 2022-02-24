@@ -4,14 +4,14 @@ Author:       Yokobayashi Yohei, JARL Contest Committee, JR8PPG
 Description:  This program acts as a server when using zLog for multiple operations.
 EMail:        zlog@zlog.org, jr8ppg@jarl.com
 Creation:     1 August 2021
-Version:      2.7
+Version:      2.8
 WebSite:      https://www.zlog.org/
               https://github.com/jr8ppg/zServer
 Support:      Use the mailing list zlog-reiwa@cq-test.net
               See website for details below.
               https://github.com/jr8ppg/zLog/wiki/%E3%83%A1%E3%82%A4%E3%83%AA%E3%83%B3%E3%82%B0%E3%83%AA%E3%82%B9%E3%83%88
 Legal issues: Copyright 1997-2002 by Yohei Yokobayashi
-              Portions created by JR8PPG are Copyright (C) 2020-2021 JR8PPG
+              Portions created by JR8PPG are Copyright (C) 2020-2022 JR8PPG
               This software is released under the MIT License.
 
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
@@ -513,7 +513,7 @@ begin
          j := StrToInt(temp2);
          aQSO := GetQSObyID(j);
          if aQSO <> nil then begin
-            sendbuf := ZLinkHeader + ' PUTLOG ' + aQSO.QSOinText;
+            sendbuf := ZLinkHeader + ' PUTLOGEX ' + aQSO.QSOinText;
             SendOnly(sendbuf + LBCODE, from);
          end;
          i := Pos(' ', temp);
