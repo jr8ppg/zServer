@@ -36,7 +36,7 @@ type
     procedure UpdateStatSummary;
     procedure Add(aQSO : TQSO);
     procedure AddNoUpdate(aQSO : TQSO);
-    procedure Delete(aQSO : TQSO);
+    procedure Delete(aQSO : TQSO; fUpdateStats: Boolean = True);
     procedure ClearAll;
     procedure UpdateStats; virtual; abstract;
     procedure SaveLogs(Filename : string);
@@ -179,10 +179,12 @@ begin
    Saved := False;
 end;
 
-procedure TBasicStats.Delete(aQSO: TQSO);
+procedure TBasicStats.Delete(aQSO: TQSO; fUpdateStats: Boolean);
 begin
    MasterLog.DeleteQSO(aQSO);
-   UpdateStats;
+   if fUpdateStats then begin
+      UpdateStats;
+   end;
    Saved := False;
 end;
 
@@ -227,6 +229,11 @@ var
    strText: string;
 begin
    with TStringGrid(Sender).Canvas do begin
+
+      Brush.Color := TStringGrid(Sender).FixedColor;
+      Brush.Style := bsSolid;
+      FillRect(Rect);
+
       if ARow = 0 then begin
          Font.Color := clGreen;
       end

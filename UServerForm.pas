@@ -22,7 +22,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, IniFiles, Menus, ExtCtrls, System.UITypes,
-  OverbyteIcsWndControl, OverbyteIcsWSocket,
+  OverbyteIcsWndControl, OverbyteIcsWSocket, System.SyncObjs,
   UBasicStats, UBasicMultiForm, UCliForm, UFreqList, UConnections,
   UzLogGlobal, UzLogConst, UzLogQSO, JclFileUtils;
 
@@ -106,6 +106,8 @@ type
 
     FCurrentFileName: string;
 
+    FCommandQue: TStringList;
+
     procedure OnClientClosed(var msg: TMessage); message WM_USER_CLIENT_CLOSED;
     procedure StartServer;
     procedure LoadSettings();
@@ -117,7 +119,7 @@ type
     procedure RecordWindowStates;
   public
     ChatOnly : boolean;
-    CommandQue : TStringList;
+    procedure AddCommandQue(str: string);
     procedure AddToChatLog(str : string);
     procedure SendAll(str : string);
     procedure SendAllButFrom(str : string; NotThisCli : integer);
@@ -137,6 +139,8 @@ type
 
 var
   ServerForm: TServerForm;
+
+  FQueLock: TCriticalSection;
 
 implementation
 
@@ -162,8 +166,7 @@ var
    ver: TJclFileVersionInfo;
 begin
    FClientList := TCliFormList.Create();
-   CommandQue := TStringList.Create;
-   Application.OnIdle := IdleEvent;
+   FCommandQue := TStringList.Create;
    FTakeLog := False;
    ChatOnly := True;
    FClientNumber := 0;
@@ -180,6 +183,8 @@ begin
 
    RestoreWindowsPos();
    CheckBox2.Checked := ChatOnly;
+
+   Application.OnIdle := IdleEvent;
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -288,7 +293,7 @@ begin
    end;
    FClientList.Free();
 
-   CommandQue.Free();
+   FCommandQue.Free();
 end;
 
 {* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
@@ -569,6 +574,15 @@ begin
       end;
    end;
 
+   if Pos('EXDELQSO', temp) = 1 then begin
+      aQSO := TQSO.Create;
+      temp2 := temp;
+      Delete(temp2, 1, 9);
+      aQSO.TextToQSO(temp2);
+      FStats.Delete(aQSO, False);
+      aQSO.Free;
+   end;
+
    if Pos('DELQSO', temp) = 1 then begin
       aQSO := TQSO.Create;
       temp2 := temp;
@@ -576,7 +590,7 @@ begin
       aQSO.TextToQSO(temp2);
       FStats.Delete(aQSO);
       RecalcAll;
-      FStats.UpdateStats; // 0.24
+      FStats.UpdateStats;
       aQSO.Free;
    end;
 
@@ -607,7 +621,9 @@ begin
    end;
 
    if Pos('RENEW', temp) = 1 then begin
+      RecalcAll;
       FStats.UpdateStats;
+      FStats.Refresh();
    end;
 
    if Pos('INSQSO ', temp) = 1 then begin
@@ -633,25 +649,16 @@ procedure TServerForm.Idle;
 var
    str: string;
 begin
-   { if CommandQue.Count = 0 then
-     if Connections.Visible then
-     Connections.Update; }
-   {
-     for i := 1 to 99 do
-     begin
-     if CliList[i] = nil then
-     break
-     else
-     CliList[i].ParseLineBuffer;
-     end;
-   }
-   while CommandQue.Count > 0 do begin
-      str := CommandQue[0];
+   while FCommandQue.Count > 0 do begin
+      Application.ProcessMessages();
+      FQueLock.Enter();
+      str := FCommandQue[0];
       if not(ChatOnly) then begin
          AddConsole(str);
       end;
       ProcessCommand(str);
-      CommandQue.Delete(0);
+      FCommandQue.Delete(0);
+      FQueLock.Leave();
    end;
 end;
 
@@ -764,6 +771,13 @@ begin
    finally
       F.Release();
    end;
+end;
+
+procedure TServerForm.AddCommandQue(str: string);
+begin
+   FQueLock.Enter();
+   FCommandQue.Add(str);
+   FQueLock.Leave();
 end;
 
 procedure TServerForm.AddToChatLog(str: string);
@@ -902,7 +916,7 @@ begin
       FStats.MasterLog.LoadFromFile(FCurrentFileName);
       RecalcAll();
       FStats.UpdateStats();
-      CommandQue.Add('999 ' + ZLinkHeader + ' FILELOADED');
+      FCommandQue.Add('999 ' + ZLinkHeader + ' FILELOADED');
    end;
 end;
 
@@ -1089,5 +1103,11 @@ begin
    end;
    dmZlogGlobal.WriteWindowState(FFreqList);
 end;
+
+initialization
+   FQueLock := TCriticalSection.Create();
+
+finalization
+   FQueLock.Free();
 
 end.

@@ -174,7 +174,7 @@ begin
             x := Pos(ZLinkHeader, CommTemp);
             if x > 0 then begin
                CommTemp := Copy(CommTemp, x, 255);
-               ServerForm.CommandQue.Add(FillRight(IntToStr(ClientNumber), 3) + ' ' + CommTemp);
+               ServerForm.AddCommandQue(FillRight(IntToStr(ClientNumber), 3) + ' ' + CommTemp);
             end;
             CommTemp := '';
          end

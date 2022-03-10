@@ -2,7 +2,7 @@ object CliForm: TCliForm
   Left = 54
   Top = 283
   Caption = 'Client'
-  ClientHeight = 161
+  ClientHeight = 162
   ClientWidth = 344
   Color = clBtnFace
   Constraints.MinHeight = 200
@@ -19,7 +19,7 @@ object CliForm: TCliForm
   TextHeight = 12
   object Panel1: TPanel
     Left = 0
-    Top = 131
+    Top = 132
     Width = 344
     Height = 30
     Align = alBottom
@@ -83,7 +83,7 @@ object CliForm: TCliForm
     Left = 0
     Top = 30
     Width = 344
-    Height = 101
+    Height = 102
     Align = alClient
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWindowText
@@ -94,9 +94,6 @@ object CliForm: TCliForm
     ItemHeight = 12
     ParentFont = False
     TabOrder = 2
-    ExplicitTop = 35
-    ExplicitWidth = 365
-    ExplicitHeight = 124
   end
   object CliSocket: TWSocket
     LineEnd = #13#10

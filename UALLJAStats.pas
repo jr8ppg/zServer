@@ -73,6 +73,7 @@ begin
    temp := Format('%3.1f', [R]);
    Grid.Cells[6, i] := temp;
    Grid.Cells[3, i + 1] := IntToStr(_totalpts * _totalmulti);
+   Grid.Refresh();
 end;
 
 procedure TAllJAStats.FormCreate(Sender: TObject);
