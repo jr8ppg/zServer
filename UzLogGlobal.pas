@@ -20,6 +20,7 @@ type
     procedure DataModuleDestroy(Sender: TObject);
   private
     { Private 宣言 }
+    FErrorLogFileName: string;
 public
     { Public 宣言 }
     FLog : TLog;
@@ -32,6 +33,7 @@ public
     procedure CreateLog();
 
     function NewQSOID(): Integer;
+    procedure WriteErrorLog(msg: string);
   end;
 
 function Log(): TLog;
@@ -72,6 +74,16 @@ function ZBoolToStr(fValue: Boolean): string;
 function ZStrToBool(strValue: string): Boolean;
 
 function ZStringToColorDef(str: string; defcolor: TColor): TColor;
+function IsDomestic(strCallsign: string): Boolean;
+function CheckDiskFreeSpace(strPath: string; nNeed_MegaByte: Integer): Boolean;
+
+//procedure SetQsyViolation(aQSO: TQSO);
+//procedure ResetQsyViolation(aQSO: TQSO);
+procedure SetDupeQso(aQSO: TQSO);
+procedure ResetDupeQso(aQSO: TQSO);
+
+function TextToBand(text: string): TBand;
+function TextToMode(text: string): TMode;
 
 var
   dmZLogGlobal: TdmZLogGlobal;
@@ -686,7 +698,7 @@ end;
 
 function ZStrToBool(strValue: string): Boolean;
 begin
-   if strValue = '0' then begin
+   if (strValue = '0') or (strValue = '') then begin
       Result := False;
    end
    else begin
@@ -702,6 +714,185 @@ begin
    else begin
       Result := defcolor;
    end;
+end;
+
+function ZColorToString(color: TColor): string;
+begin
+   Result := '$' + IntToHex(color, 8);
+end;
+
+function ExPos(substr, str: string): Integer;
+var
+   i, j: integer;
+   bad: boolean;
+begin
+   Result := 0;
+   if (Length(substr) > Length(str)) or (substr = '') then
+      exit;
+   for i := 1 to (Length(str) - Length(substr) + 1) do begin
+      bad := false;
+      for j := 1 to Length(substr) do begin
+         if substr[j] <> '?' then
+            if substr[j] <> str[i + j - 1] then
+               bad := true;
+      end;
+      if bad = false then begin
+         Result := i;
+         exit;
+      end;
+   end;
+end;
+
+// JA1?JS1, 7J1, 8J1?8N1, 7K1?7N4
+// JA2?JS2, 7J2, 8J2?8N2
+// JA3?JS3, 7J3, 8J3?8N3
+// JA4?JS4, 7J4, 8J4?8N4
+// JA5?JS5, 7J5, 8J5?8N5
+// JA6?JS6, 7J6, 8J6?8N6
+// JA7?JS7, 7J7, 8J7?8N7
+// JA8?JS8, 7J8, 8J8?8N8
+// JA9?JS9, 7J9, 8J9?8N9
+// JA0?JS0, 7J0, 8J0?8N0
+function IsDomestic(strCallsign: string): Boolean;
+var
+   S1: Char;
+   S2: Char;
+   S3: Char;
+begin
+   S1 := strCallsign[1];
+   S2 := strCallsign[2];
+   S3 := strCallsign[3];
+
+   if S1 = 'J' then begin
+      if (S2 >= 'A') and (S2 <= 'S') then begin
+         Result := True;
+         Exit;
+      end;
+   end;
+
+   if (S1 = '7') and (S2 = 'J') then begin
+      Result := True;
+      Exit;
+   end;
+
+   if S1 = '7' then begin
+      if (S2 >= 'K') and (S2 <= 'N') then begin
+         if (S3 >= '1') and (S3 <= '4') then begin
+            Result := True;
+            Exit;
+         end;
+      end;
+   end;
+
+   if S1 = '8' then begin
+      if (S2 >= 'J') and (S2 <= 'N') then begin
+         Result := True;
+         Exit;
+      end;
+   end;
+
+   Result := False;
+end;
+
+function CheckDiskFreeSpace(strPath: string; nNeed_MegaByte: Integer): Boolean;
+var
+   nAvailable: TLargeInteger;
+   nTotalBytes: TLargeInteger;
+   nTotalFreeBytes: TLargeInteger;
+   nNeedBytes: TLargeInteger;
+begin
+   nNeedBytes := TLargeInteger(nNeed_MegaByte) * TLargeInteger(1024) * TLargeInteger(1024);
+
+   // 空き容量取得
+   if GetDiskFreeSpaceEx(PWideChar(strPath), nAvailable, nTotalBytes, @nTotalFreeBytes) = False then begin
+      Result := False;
+      Exit;
+   end;
+
+   // 空き領域は必要としている容量未満か
+   if (nTotalFreeBytes < nNeedBytes) then begin
+      Result := False;
+      Exit;
+   end;
+
+   Result := True;
+end;
+
+procedure SetQsyViolation(aQSO: TQSO);
+begin
+   if Pos(MEMO_QSY_VIOLATION, aQSO.Memo) > 0 then begin
+      Exit;
+   end;
+
+   if aQSO.Memo <> '' then begin
+      aQSO.Memo := aQSO.Memo + ' ';
+   end;
+
+   aQSO.Memo := aQSO.Memo + MEMO_QSY_VIOLATION;
+end;
+
+procedure ResetQsyViolation(aQSO: TQSO);
+begin
+   aQSO.Memo := Trim(StringReplace(aQSO.Memo, MEMO_QSY_VIOLATION, '', [rfReplaceAll]));
+end;
+
+procedure SetDupeQso(aQSO: TQSO);
+begin
+   aQSO.Points := 0;
+   aQSO.Dupe := True;
+end;
+
+procedure ResetDupeQso(aQSO: TQSO);
+begin
+   aQSO.Dupe := False;
+   aQSO.Memo := Trim(StringReplace(aQSO.Memo, MEMO_DUPE, '', [rfReplaceAll]));
+end;
+
+function TextToBand(text: string): TBand;
+var
+   b: TBand;
+begin
+   for b := Low(MHzString) to High(MHzString) do begin
+      if MHzString[b] = text then begin
+         Result := b;
+         Exit;
+      end;
+   end;
+   Result := bUnknown;
+end;
+
+function TextToMode(text: string): TMode;
+var
+   m: TMode;
+begin
+   for m := Low(ModeString) to High(ModeString) do begin
+      if ModeString[m] = text then begin
+         Result := m;
+         Exit;
+      end;
+   end;
+   Result := mOther;
+end;
+
+procedure TdmZLogGlobal.WriteErrorLog(msg: string);
+var
+   str: string;
+   txt: TextFile;
+begin
+   AssignFile(txt, FErrorLogFileName);
+   if FileExists(FErrorLogFileName) then begin
+      Reset(txt);
+   end
+   else begin
+      Rewrite(txt);
+   end;
+
+   str := FormatDateTime( 'yyyy/mm/dd hh:nn:ss ', Now ) + msg;
+
+   Append( txt );
+   WriteLn( txt, str );
+   Flush( txt );
+   CloseFile( txt );
 end;
 
 end.

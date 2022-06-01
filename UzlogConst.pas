@@ -10,11 +10,19 @@ type
   TBand = (b19, b35, b7, b10, b14, b18, b21, b24, b28, b50, b144, b430, b1200, b2400, b5600, b10g, bTarget, bUnknown);
   TPower = (p001, p002, p005, p010, p020, p025, p050, p100, p200, p500, p1000);
 
+  TContestMode = (cmMix = 0, cmCw, cmPh, cmOther, cmAll);
+  TContestCategory = (ccSingleOp = 0, ccMultiOpMultiTx, ccMultiOpSingleTx, ccMultiOpTwoTx);
+  TSo2rType = (so2rNone = 0, so2rCom, so2rNeo);
+  TQslState = (qsNone = 0, qsPseQsl, qsNoQsl);
+
 const
   HiBand = b10g;
 
 type
   TBandBool = array[b19..HiBand] of boolean;
+
+type
+  TPlayMessageFinishedProc = procedure(Sender: TObject; mode: TMode; fAbort: Boolean) of object;
 
 const
   // SerialContestType
@@ -24,6 +32,9 @@ const
   SER_ALL = 1;
   SER_BAND = 2;
   SER_MS = 3;    // separate serial for run/multi stns
+
+  TXLIST_MM = '0,1,2,3,4,5,6,7,8,9';
+  TXLIST_MS = '0,1';
 
 const
   RIGNAMES : array[0..17] of string =
@@ -59,6 +70,7 @@ const
   actEdit = $0E;
   actLock = $AA;
   actUnlock = $BB;
+  actEditOrAdd = $0C;
 
   LineBreakCode : array [0..2] of string
     = (Chr($0d)+Chr($0a), Chr($0d), Chr($0a));
@@ -84,6 +96,7 @@ const
                                              '6cm','3cm');
 
   ModeString : array[mCW..mOther] of string = ('CW','SSB','FM','AM','RTTY','Other');
+  ModeString2 : array[mCW..mOther] of string = ('CW','PH','PH','PH','RTTY','Other');
 
   pwrP = TPower(0);
   pwrL = TPower(1);
@@ -93,6 +106,9 @@ const
 type
   TQSORateStyle = ( rsOriginal = 0, rsByBand, rsByFreqRange );
   TQSORateStartPosition = ( spFirstQSO = 0, spCurrentTime, spLastQSO );
+
+type
+  TSendRepeatEvent = procedure(Sender: TObject; nLoopCount: Integer) of object;
 
 const
   default_graph_bar_color: array[b19..HiBand] of TColor = (
@@ -109,7 +125,7 @@ const
   );
 
 const
-  default_primary_shortcut: array[0..132] of string = (
+  default_primary_shortcut: array[0..155] of string = (
     'Ctrl+F1',          // #00
     'Ctrl+F2',
     'Ctrl+F3',
@@ -242,10 +258,33 @@ const
     '',                 // #129 actionToggleAntiZeroin
     '',                 // #130 actionAntiZeroin
     '',                 // #131 actionFunctionKeyPanel
-    ''                  // #132 actionShowQsoRateEx
+    '',                 // #132 actionShowQsoRateEx
+    '',                 // #133 actionShowQsyInfo
+    '',                 // #134 actionShowSo2rNeoCp
+    '',                 // #135 actionSo2rNeoRx1
+    '',                 // #136 actionSo2rNeoRx2
+    '',                 // #137 actionSo2rNeoRxBoth
+    '',                 // #138 actionSelectRig1
+    '',                 // #139 actionSelectRig2
+    '',                 // #140 actionSelectRig3
+    '',                 // #141 actionSo2rNeoCanRxSel
+    '',                 // #142 actionShowInformation
+    '',                 // #143 actionToggleSo2r2bsiq
+    '',                 // #144 actionSo2rNeoToggleAutoRxSelect
+    'Shift+V',          // #145 actionToggleTx
+    '',                 // #146 actionToggleSo2rWait
+    'Shift+C',          // #147 actionToggleRx
+    '',                 // #148 actionMatchRxToTx
+    '',                 // #149 actionMatchTxToRx
+    'Shift+D',          // #150 actionToggleRigPair
+    'Ctrl+0',           // #151 actionChangeTxNr0
+    'Ctrl+1',           // #152 actionChangeTxNr1
+    '',                 // #153 actionChangeTxNr2
+    '',                 // #154 actionPseQsl
+    ''                  // #155 actionNoQsl
   );
 
-  default_secondary_shortcut: array[0..132] of string = (
+  default_secondary_shortcut: array[0..155] of string = (
     '',                 // #00
     '',
     '',
@@ -378,13 +417,37 @@ const
     '',                 // #129 actionToggleAntiZeroin
     '',                 // #130 actionAntiZeroin
     '',                 // #131 actionFunctionKeyPanel
-    ''                  // #132 actionShowQsoRateEx
+    '',                 // #132 actionShowQsoRateEx
+    '',                 // #133 actionShowQsyInfo
+    '',                 // #134 actionShowSo2rNeoCp
+    '',                 // #135 actionSo2rNeoRx1
+    '',                 // #136 actionSo2rNeoRx2
+    '',                 // #137 actionSo2rNeoRxBoth
+    '',                 // #138 actionSelectRig1
+    '',                 // #139 actionSelectRig2
+    '',                 // #140 actionSelectRig3
+    '',                 // #141 actionSo2rNeoCanRxSel
+    '',                 // #142 actionShowInformation
+    '',                 // #143 actionToggleAutoRigSwitch
+    '',                 // #144 actionSo2rNeoToggleAutoRxSelect
+    '',                 // #145 actionToggleTx
+    '',                 // #146 actionToggleCqInvert
+    '',                 // #147 actionToggleRx
+    '',                 // #148 actionMatchRxToTx
+    '',                 // #149 actionMatchTxToRx
+    '',                 // #150 actionToggleRigPair
+    '',                 // #151 actionChangeTxNr0
+    '',                 // #152 actionChangeTxNr1
+    '',                 // #153 actionChangeTxNr2
+    '',                 // #154 actionPseQsl
+    ''                  // #155 actionNoQsl
   );
 
 const
   MEMO_DUPE = '-DUPE-';
   MEMO_PSE_QSL = 'PSE QSL';
   MEMO_NO_QSL = 'NO QSL';
+  MEMO_QSY_VIOLATION = '*QSY Violation*';
 
 implementation
 
