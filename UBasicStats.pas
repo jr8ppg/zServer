@@ -161,7 +161,7 @@ begin
    ServerForm.RecalcAll;
 
    MasterLog.QsoList[0].Memo := 'ZServer';
-   MasterLog.SaveToFile(Filename);
+   MasterLog.SaveToFileEx(Filename);
 
    Saved := True;
 end;

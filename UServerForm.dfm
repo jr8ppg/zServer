@@ -224,13 +224,13 @@ object ServerForm: TServerForm
   end
   object SaveDialog: TSaveDialog
     DefaultExt = 'zlo'
-    Filter = 'zLog binary files (*.ZLO)|*.ZLO'
+    Filter = 'zLog Extended binary files (*.ZLOX)|*.ZLOX'
     Left = 232
     Top = 88
   end
   object OpenDialog: TOpenDialog
     DefaultExt = 'ZLO'
-    Filter = 'zLog binary files (*.ZLO)|*.ZLO'
+    Filter = 'zLog binary files (*.ZLO;*.ZLOX)|*.ZLO;*.ZLOX'
     Left = 144
     Top = 72
   end
