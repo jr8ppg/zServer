@@ -523,6 +523,11 @@ begin
          end;
          i := Pos(' ', temp);
       end;
+
+      // ‘S•”‘—‚Á‚½‚çÄŒvZ‚³‚¹‚é
+      sendbuf := ZLinkHeader + ' RENEW ' + aQSO.QSOinText;
+      SendOnly(sendbuf + LBCODE, from);
+
       Exit;
    end;
 
