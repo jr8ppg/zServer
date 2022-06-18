@@ -525,7 +525,7 @@ begin
       end;
 
       // ‘S•”‘—‚Á‚½‚çÄŒvZ‚³‚¹‚é
-      sendbuf := ZLinkHeader + ' RENEW ' + aQSO.QSOinText;
+      sendbuf := ZLinkHeader + ' RENEW';
       SendOnly(sendbuf + LBCODE, from);
 
       Exit;
