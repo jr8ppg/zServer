@@ -96,6 +96,7 @@ type
     FInitialized  : Boolean;
     FClientNumber : Integer;
     FTakeLog : Boolean;
+    FLogFileName: string;
 
     FFreqList: TFreqList;
     FConnections: TConnections;
@@ -185,6 +186,8 @@ begin
    CheckBox2.Checked := ChatOnly;
 
    Application.OnIdle := IdleEvent;
+
+   FLogFileName := StringReplace(Application.ExeName, '.exe', '_' + FormatDateTime('yyyymmdd', Now) + '.txt', [rfReplaceAll]);
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -787,28 +790,23 @@ end;
 
 procedure TServerForm.AddToChatLog(str: string);
 var
-   f: TextFile;
-   // t : string;
+   F: TextFile;
 begin
    if FTakeLog = False then begin
       Exit;
    end;
 
-   AssignFile(f, 'log.txt');
-   if FileExists('log.txt') then begin
-      Append(f);
+   AssignFile(F, FLogFileName);
+   if FileExists(FLogFileName) then begin
+      Append(F);
    end
    else begin
-      Rewrite(f);
+      Rewrite(F);
    end;
 
-   {
-     t := FormatDateTime(' (hh:nn)', SysUtils.Now);
-   }
+   WriteLn(F, str);
 
-   WriteLn(f, str { + t } );
-
-   CloseFile(f);
+   CloseFile(F);
 end;
 
 procedure TServerForm.SendButtonClick(Sender: TObject);
