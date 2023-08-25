@@ -91,6 +91,9 @@ type
     procedure DeleteDupes1Click(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure Windows1Click(Sender: TObject);
+    procedure SrvSocketError(Sender: TObject);
+    procedure SrvSocketException(Sender: TObject; SocExcept: ESocketException);
+    procedure SrvSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
   private
     { Déclarations privées }
     FInitialized  : Boolean;
@@ -693,6 +696,21 @@ end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
+procedure TServerForm.SrvSocketError(Sender: TObject);
+begin
+//
+end;
+
+procedure TServerForm.SrvSocketException(Sender: TObject; SocExcept: ESocketException);
+var
+   S: string;
+   t: string;
+begin
+   t := FormatDateTime('hh:nn', SysUtils.Now);
+   S := t + ' [' + SocExcept.IPStr + '] ' + IntToStr(SocExcept.ErrorCode) + ':' + SocExcept.ErrorMessage;
+   AddToChatLog(S);
+end;
+
 procedure TServerForm.SrvSocketSessionAvailable(Sender: TObject; Error: Word);
 var
    Form: TCliForm;
@@ -705,6 +723,16 @@ begin
    Form.ClientNumber := FClientNumber;
    Form.Show;
    FClientList.Add(Form);
+end;
+
+procedure TServerForm.SrvSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
+var
+   S: string;
+   t: string;
+begin
+   t := FormatDateTime('hh:nn', SysUtils.Now);
+   S := t + IntToStr(Error) + ':' + Msg;
+   AddToChatLog(S);
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }

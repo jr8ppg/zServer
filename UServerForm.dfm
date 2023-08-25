@@ -132,7 +132,10 @@ object ServerForm: TServerForm
     ComponentOptions = []
     ListenBacklog = 15
     OnSessionAvailable = SrvSocketSessionAvailable
+    OnError = SrvSocketError
+    OnSocksError = SrvSocketSocksError
     SocketErrs = wsErrTech
+    onException = SrvSocketException
     Left = 24
     Top = 56
   end
