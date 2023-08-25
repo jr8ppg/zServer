@@ -206,8 +206,14 @@ end;
 procedure TCliForm.CliSocketSessionClosed(Sender: TObject; Error: Word);
 var
    temp: string;
+   S: string;
+   t: string;
+   msg: string;
 begin
-   temp := ZLinkHeader + ' PUTMESSAGE !' + MHzString[CurrentBand] + ' client disconnected from network.';
+   t := FormatDateTime('hh:nn', SysUtils.Now);
+   S := t + ' ' + MHzString[CurrentBand] + ' client disconnected from network.';
+
+   temp := ZLinkHeader + ' PUTMESSAGE ' + S;
    temp := FillRight(IntToStr(ClientNumber), 3) + ' ' + temp;
    ServerForm.ProcessCommand(temp);
    Close;
