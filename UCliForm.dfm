@@ -108,6 +108,7 @@ object CliForm: TCliForm
     OnDataAvailable = CliSocketDataAvailable
     OnSessionClosed = CliSocketSessionClosed
     SocketErrs = wsErrTech
+    onException = CliSocketException
     Left = 40
     Top = 72
   end

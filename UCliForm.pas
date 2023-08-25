@@ -65,6 +65,7 @@ type
     procedure SendButtonClick(Sender: TObject);
     procedure DisconnectButtonClick(Sender: TObject);
     procedure Button1Click(Sender: TObject);
+    procedure CliSocketException(Sender: TObject; SocExcept: ESocketException);
   private
     Initialized : Boolean;
     LineBuffer : TStringList;
@@ -199,6 +200,16 @@ begin
    LineBuffer.Add(str);
 
    ParseLineBuffer;
+end;
+
+procedure TCliForm.CliSocketException(Sender: TObject; SocExcept: ESocketException);
+var
+   S: string;
+   t: string;
+begin
+   t := FormatDateTime('hh:nn', SysUtils.Now);
+   S := t + ' [' + SocExcept.IPStr + '] ' + IntToStr(SocExcept.ErrorCode) + ':' + SocExcept.ErrorMessage;
+   AddConsole(S);
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
