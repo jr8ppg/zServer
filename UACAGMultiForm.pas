@@ -5,29 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   StdCtrls, Grids, JLLabel, ExtCtrls, System.UITypes,
-  UBasicMultiForm, UzLogGlobal, UzLogConst, UzLogQSO;
-
-type
-  TCity = class
-    CityNumber : string;
-    CityName : string;
-    PrefNumber : string;
-    PrefName : string;
-    Worked : array[b19..HiBand] of boolean;
-    constructor Create;
-    function Summary : string;
-    function ACAGSummary : string;
-    function Summary2 : string;
-    function FDSummary(LowBand : TBand) : string;
-  end;
-
-  TCityList = class
-    List : TList;
-    constructor Create;
-    destructor Destroy; override;
-    procedure LoadFromFile(filename : string);
-  end;
-
+  UBasicMultiForm, UzLogGlobal, UzLogConst, UzLogQSO, UMultipliers;
 
 type
   TACAGMultiForm = class(TBasicMultiForm)
@@ -76,7 +54,7 @@ uses
 
 function TACAGMultiForm.ReturnSummary(C: TCity): string;
 begin
-   Result := C.ACAGSummary;
+   Result := C.Summary;
 end;
 
 procedure TACAGMultiForm.ResetBand(B: TBand);
@@ -116,159 +94,6 @@ begin
          Grid.Cells[0, i] := ReturnSummary(TCity(CityList.List[i]));
          Exit;
       end;
-   end;
-end;
-
-constructor TCity.Create;
-var
-   B: TBand;
-begin
-   for B := b19 to HiBand do
-      Worked[B] := False;
-   CityNumber := '';
-   CityName := '';
-   PrefNumber := '';
-   PrefName := '';
-end;
-
-function TCity.Summary: string;
-var
-   temp: string;
-   B: TBand;
-begin
-   temp := '';
-   temp := FillRight(CityNumber, 7) + FillRight(CityName, 20) + ' ';
-   for B := b19 to HiBand do begin
-      if NotWARC(B) then
-         if Worked[B] then
-            temp := temp + '* '
-         else
-            temp := temp + '. ';
-   end;
-
-   Result := ' ' + temp;
-end;
-
-function TCity.ACAGSummary: string;
-var
-   temp: string;
-   B: TBand;
-begin
-   temp := '';
-   temp := FillRight(CityNumber, 7) + FillRight(CityName, 20) + ' ';
-   for B := b19 to HiBand do begin
-      if NotWARC(B) then begin
-         if Worked[B] then
-            temp := temp + '* '
-         else
-            temp := temp + '. ';
-      end;
-   end;
-
-   Result := ' ' + temp;
-end;
-
-function TCity.FDSummary(LowBand: TBand): string;
-var
-   temp: string;
-   B: TBand;
-begin
-   temp := '';
-   temp := FillRight(CityNumber, 7) + FillRight(CityName, 20) + ' ';
-   for B := LowBand to HiBand do begin
-      if NotWARC(B) then
-         if B in [b19 .. b1200] then begin
-            if length(Self.CityNumber) <= 3 then
-               if Worked[B] then
-                  temp := temp + '* '
-               else
-                  temp := temp + '. '
-            else
-               temp := temp + '  ';
-         end
-         else begin
-            if length(Self.CityNumber) > 3 then
-               if Worked[B] then
-                  temp := temp + '* '
-               else
-                  temp := temp + '. '
-            else
-               temp := temp + '  ';
-         end;
-   end;
-
-   Result := ' ' + temp;
-end;
-
-function TCity.Summary2: string;
-var
-   temp: string;
-   B: TBand;
-begin
-   temp := '';
-   temp := FillRight(CityNumber, 7) + FillRight(CityName, 20) + ' Worked on : ';
-   for B := b19 to HiBand do begin
-      if Worked[B] then
-         temp := temp + ' ' + MHzString[B]
-      else
-         temp := temp + '';
-   end;
-
-   Result := temp;
-end;
-
-constructor TCityList.Create;
-begin
-   List := TList.Create;
-end;
-
-destructor TCityList.Destroy;
-var
-   i: Integer;
-begin
-   for i := 0 to List.Count - 1 do begin
-      if List[i] <> nil then
-         TCity(List[i]).Free;
-   end;
-   List.Free;
-end;
-
-procedure TCityList.LoadFromFile(filename: string);
-var
-   f: textfile;
-   str: string;
-   C: TCity;
-begin
-   assign(f, filename);
-{$I-}
-   Reset(f);
-{$I+}
-   if IOResult <> 0 then begin
-      MessageDlg('DAT file ' + filename + ' cannot be opened', mtError, [mbOK], 0);
-      exit; { Alert that the file cannot be opened \\ }
-   end;
-
-   {
-     try
-     reset(f);
-     except
-     on EFOpenError do
-     begin
-     MessageDlg('DAT file '+filename+' cannot be opened', mtError,
-     [mbOK], 0);
-     exit;
-     end;
-     end; }
-
-   readln(f, str);
-   while not(eof(f)) do begin
-      readln(f, str);
-      if Pos('end of file', LowerCase(str)) > 0 then
-         break;
-      C := TCity.Create;
-      C.CityName := Copy(str, 12, 40);
-      C.CityNumber := TrimRight(Copy(str, 1, 11));
-      List.Add(C);
    end;
 end;
 

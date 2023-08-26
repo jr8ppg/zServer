@@ -85,6 +85,8 @@ procedure ResetDupeQso(aQSO: TQSO);
 function TextToBand(text: string): TBand;
 function TextToMode(text: string): TMode;
 
+function LoadFromResourceName(hinst: THandle; filename: string): TStringList;
+
 var
   dmZLogGlobal: TdmZLogGlobal;
 
@@ -232,6 +234,27 @@ begin
    rr := random(100);
 
    Result := tt * 100000000 + ss * 10000 + rr * 100;
+end;
+
+procedure TdmZLogGlobal.WriteErrorLog(msg: string);
+var
+   str: string;
+   txt: TextFile;
+begin
+   AssignFile(txt, FErrorLogFileName);
+   if FileExists(FErrorLogFileName) then begin
+      Reset(txt);
+   end
+   else begin
+      Rewrite(txt);
+   end;
+
+   str := FormatDateTime( 'yyyy/mm/dd hh:nn:ss ', Now ) + msg;
+
+   Append( txt );
+   WriteLn( txt, str );
+   Flush( txt );
+   CloseFile( txt );
 end;
 
 function Log(): TLog;
@@ -874,25 +897,23 @@ begin
    Result := mOther;
 end;
 
-procedure TdmZLogGlobal.WriteErrorLog(msg: string);
+function LoadFromResourceName(hinst: THandle; filename: string): TStringList;
 var
-   str: string;
-   txt: TextFile;
+   RS: TResourceStream;
+   SL: TStringList;
+   resname: string;
 begin
-   AssignFile(txt, FErrorLogFileName);
-   if FileExists(FErrorLogFileName) then begin
-      Reset(txt);
-   end
-   else begin
-      Rewrite(txt);
+   resname := 'IDF_' + StringReplace(filename, '.', '_', [rfReplaceAll]);
+
+   RS := TResourceStream.Create(hinst, resname, RT_RCDATA);
+   SL := TStringList.Create();
+   SL.StrictDelimiter := True;
+   try
+      SL.LoadFromStream(RS);
+   finally
+      RS.Free();
+      Result := SL;
    end;
-
-   str := FormatDateTime( 'yyyy/mm/dd hh:nn:ss ', Now ) + msg;
-
-   Append( txt );
-   WriteLn( txt, str );
-   Flush( txt );
-   CloseFile( txt );
 end;
 
 end.

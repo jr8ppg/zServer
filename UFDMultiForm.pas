@@ -5,7 +5,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
   UACAGMultiForm, StdCtrls, Grids, JLLabel, ExtCtrls,
-  UzLogGlobal, UzLogConst;
+  UzLogGlobal, UzLogConst, UMultipliers;
 
 
 const testFD = $01;

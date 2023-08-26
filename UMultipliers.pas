@@ -107,17 +107,22 @@ type
     function SummaryGeneral : string;
     function Summary2 : string;
     function FDSummary(LowBand : TBand) : string;
+    function WorkedOn(): string;
   end;
 
   TCityList = class
-    List : TList;
-    SortedMultiList : TStringList;
+  private
+    FList: TList;
+    FSortedMultiList: TStringList;
+  public
     constructor Create;
     destructor Destroy; override;
     procedure Reset;
-    function GetCity(Name : string) : TCity;
-    procedure LoadFromFile(filename : string);
-    function AddAndSort(C : TCity) : integer; // returns the index inserted
+    function GetCity(Name : string): TCity;
+    procedure LoadFromFile(filename: string);
+    function AddAndSort(C : TCity): integer; // returns the index inserted
+    property List: TList read FList;
+    property SortedMultiList: TStringList read FSortedMultiList;
   end;
 
 function LoadCTY_DAT(CL: TCountryList; PL: TPrefixList): Boolean;
@@ -815,6 +820,8 @@ begin
 end;
 *)
 
+{ TCity }
+
 constructor TCity.Create;
 var
    B: TBand;
@@ -856,18 +863,12 @@ begin
 
    for B := b19 to HiBand do begin
       if NotWARC(B) then begin
-//         if (MainForm.BandMenu.Items[Ord(B)].Visible = True) and
-//            (dmZlogGlobal.Settings._activebands[B] = True) then begin
-            if Worked[B] then begin
-               temp := temp + '* ';
-            end
-            else begin
-               temp := temp + '. ';
-            end;
-//         end
-//         else begin
-//            temp := temp + '  ';
-//         end;
+         if Worked[B] then begin
+            temp := temp + '* ';
+         end
+         else begin
+            temp := temp + '. ';
+         end;
       end;
    end;
 
@@ -888,18 +889,15 @@ begin
    end;
 
    temp := FillRight( { CityNumber } Abbrev, 7) +
-           FillRight(_cityname, 20) + ' ';
+           FillRight(_cityname, 24) + ' ';
 
    for B := b19 to HiBand do begin
-//      if (MainForm.BandMenu.Items[Ord(B)].Visible = True) and
-//         (dmZlogGlobal.Settings._activebands[B] = True) then begin
-         if Worked[B] then begin
-            temp := temp + '* ';
-         end
-         else begin
-            temp := temp + '. ';
-         end;
-//      end;
+      if Worked[B] then begin
+         temp := temp + '* ';
+      end
+      else begin
+         temp := temp + '. ';
+      end;
    end;
 
    Result := ' ' + temp;
@@ -912,7 +910,7 @@ var
 begin
    temp := '';
    temp := FillRight(CityNumber, 7) +
-           FillRight(CityName, 20) + ' ' + '  ';
+           FillRight(CityName, 20) + ' ';
 
    for B := LowBand to HiBand do begin
       if NotWARC(B) then begin
@@ -959,11 +957,33 @@ begin
    Result := temp;
 end;
 
+function TCity.WorkedOn(): string;
+var
+   temp: string;
+   B: TBand;
+begin
+   temp := '';
+
+   for B := b35 to HiBand do begin
+      if Worked[B] then begin
+         temp := temp + ' ' + MHzString[B];
+      end;
+   end;
+
+   if temp <> '' then begin
+      temp := 'Worked on:' + temp;
+   end;
+
+   Result := temp;
+end;
+
+{ TCityList }
+
 constructor TCityList.Create;
 begin
-   List := TList.Create;
-   SortedMultiList := TStringList.Create;
-   SortedMultiList.Sorted := true;
+   FList := TList.Create;
+   FSortedMultiList := TStringList.Create;
+   FSortedMultiList.Sorted := true;
 end;
 
 procedure TCityList.Reset;
@@ -981,50 +1001,46 @@ var
    i: integer;
 begin
    Result := nil;
-   i := SortedMultiList.IndexOf(Name);
+   i := FSortedMultiList.IndexOf(Name);
    if i >= 0 then
-      Result := TCity(SortedMultiList.Objects[i]);
+      Result := TCity(FSortedMultiList.Objects[i]);
 end;
 
 destructor TCityList.Destroy;
 var
    i: integer;
 begin
-   for i := 0 to List.Count - 1 do begin
-      if List[i] <> nil then
-         TCity(List[i]).Free;
+   for i := 0 to FList.Count - 1 do begin
+      if FList[i] <> nil then
+         TCity(FList[i]).Free;
    end;
-   List.Free;
-   SortedMultiList.Clear;
-   SortedMultiList.Free;
+   FList.Free;
+   FSortedMultiList.Clear;
+   FSortedMultiList.Free;
 end;
 
 procedure TCityList.LoadFromFile(filename: string);
 var
-   f: textfile;
    str: string;
    C: TCity;
    i: integer;
    fullpath: string;
+   SL: TStringList;
+   L: Integer;
 begin
-   fullpath := filename;
+   fullpath := ExtractFilePath(Application.ExeName) + filename;
    if FileExists(fullpath) = False then begin
-      fullpath := {dmZLogGlobal.Settings._cfgdatpath +} filename;
-      if FileExists(fullpath) = False then begin
-         fullpath := ExtractFilePath(Application.ExeName) + filename;
-         if FileExists(fullpath) = False then begin
-            MessageDlg('DAT file [' + fullpath + '] cannot be opened', mtError, [mbOK], 0);
-            Exit;
-         end;
-      end;
+      SL := LoadFromResourceName(SysInit.HInstance, filename);
+   end
+   else begin
+      SL := TStringList.Create();
+      SL.LoadFromFile(fullpath);
    end;
 
-   Assign(f, fullpath);
-   System.Reset(f);
-   ReadLn(f, str);
+   for L := 1 to SL.Count - 1 do begin
 
-   while not(eof(f)) do begin
-      ReadLn(f, str);
+      str := SL[L];
+
       if pos('end of file', LowerCase(str)) > 0 then begin
          break;
       end;
@@ -1041,32 +1057,32 @@ begin
 
       C.Index := List.Count;
 
-      List.Add(C);
-      SortedMultiList.AddObject(C.CityNumber, C);
+      FList.Add(C);
+      FSortedMultiList.AddObject(C.CityNumber, C);
    end;
 
-   closefile(f);
+   SL.Free();
 end;
 
 function TCityList.AddAndSort(C: TCity): integer;
 var
    i: integer;
 begin
-   if List.Count = 0 then begin
-      List.Add(C);
+   if FList.Count = 0 then begin
+      FList.Add(C);
       Result := 0;
       exit;
    end;
 
    for i := 0 to List.Count - 1 do begin
       if StrMore(TCity(List[i]).CityNumber, C.CityNumber) then begin
-         List.Insert(i, C);
+         FList.Insert(i, C);
          Result := i;
          exit;
       end;
    end;
 
-   List.Add(C);
+   FList.Add(C);
 
    Result := List.Count - 1;
 end;

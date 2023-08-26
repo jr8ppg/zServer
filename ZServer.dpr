@@ -1,5 +1,7 @@
 program ZServer;
 
+{$R 'resource.res' 'resource.rc'}
+
 uses
   Forms,
   Windows,
