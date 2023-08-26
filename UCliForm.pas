@@ -114,8 +114,11 @@ var
    S: string;
 begin
    S := BandString[CurrentBand];
-   if CurrentOperator <> '' then
+
+   if CurrentOperator <> '' then begin
       S := S + ' by ' + CurrentOperator;
+   end;
+
    Caption := S;
 end;
 
@@ -219,7 +222,6 @@ var
    temp: string;
    S: string;
    t: string;
-   msg: string;
 begin
    t := FormatDateTime('hh:nn', SysUtils.Now);
    S := t + ' ' + MHzString[CurrentBand] + ' client disconnected from network.';

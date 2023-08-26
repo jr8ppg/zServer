@@ -404,7 +404,7 @@ begin
       Delete(temp, 1, 5);
 
       i := StrToIntDef(temp, -1);
-      if not(i in [0 .. ord(HiBand)]) then begin
+      if not(i in [0 .. ord(HiBand), ord(bUnknown)]) then begin
          Exit;
       end;
 
@@ -412,11 +412,13 @@ begin
 
       FClientList[from].CurrentBand := B;
 
-      for i := 0 to FClientList.Count - 1 do begin
-         if (i <> from) and (FClientList[i].CurrentBand = B) then begin
-            sendbuf := ZLinkHeader + ' PUTMESSAGE ' + 'Band already in use!';
-            SendOnly(sendbuf + LBCODE, from);
-            // CliList[from].Close;
+      if B <> bUnknown then begin
+         for i := 0 to FClientList.Count - 1 do begin
+            if (i <> from) and (FClientList[i].CurrentBand = B) then begin
+               sendbuf := ZLinkHeader + ' PUTMESSAGE ' + 'Band already in use!';
+               SendOnly(sendbuf + LBCODE, from);
+               // CliList[from].Close;
+            end;
          end;
       end;
 
