@@ -14,6 +14,7 @@ object CliForm: TCliForm
   Font.Style = []
   OldCreateOrder = True
   OnClose = FormClose
+  OnCreate = FormCreate
   OnShow = FormShow
   PixelsPerInch = 96
   TextHeight = 12
@@ -68,16 +69,6 @@ object CliForm: TCliForm
       TabOrder = 0
       OnClick = DisconnectButtonClick
     end
-    object Button1: TButton
-      Left = 272
-      Top = 4
-      Width = 75
-      Height = 25
-      Caption = 'Button1'
-      TabOrder = 1
-      Visible = False
-      OnClick = Button1Click
-    end
   end
   object ListBox: TListBox
     Left = 0
@@ -107,6 +98,9 @@ object CliForm: TCliForm
     ListenBacklog = 15
     OnDataAvailable = CliSocketDataAvailable
     OnSessionClosed = CliSocketSessionClosed
+    OnSessionConnected = CliSocketSessionConnected
+    OnError = CliSocketError
+    OnSocksError = CliSocketSocksError
     SocketErrs = wsErrTech
     onException = CliSocketException
     Left = 40

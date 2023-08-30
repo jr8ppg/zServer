@@ -3,7 +3,7 @@
         <ProjectGuid>{8819F7DC-5B6D-4DCA-8C50-A0189FC316E9}</ProjectGuid>
         <MainSource>ZServer.dpr</MainSource>
         <Base>True</Base>
-        <Config Condition="'$(Config)'==''">Release</Config>
+        <Config Condition="'$(Config)'==''">Debug</Config>
         <TargetedPlatforms>3</TargetedPlatforms>
         <AppType>Application</AppType>
         <FrameworkType>VCL</FrameworkType>
@@ -225,6 +225,7 @@
             <FormType>dfm</FormType>
         </DCCReference>
         <DCCReference Include="UzLogExtension.pas"/>
+        <DCCReference Include="UzLogMessages.pas"/>
         <None Include="resource\ACAG.DAT"/>
         <None Include="resource\ARDX.DAT"/>
         <None Include="resource\ARRL10.DAT"/>

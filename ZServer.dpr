@@ -29,7 +29,8 @@ uses
   UzLogGlobal in 'UzLogGlobal.pas' {dmZLogGlobal: TDataModule},
   UMultipliers in 'UMultipliers.pas',
   UALLJAStats in 'UALLJAStats.pas' {AllJAStats},
-  UzLogExtension in 'UzLogExtension.pas';
+  UzLogExtension in 'UzLogExtension.pas',
+  UzLogMessages in 'UzLogMessages.pas';
 
 {$R *.RES}
 

@@ -1,40 +1,3 @@
-{* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
-
-Author:       FranÁois PIETTE
-Description:  Demonstration for Server program using TWSocket.
-EMail:        francois.piette@ping.be  http://www.rtfm.be/fpiette
-              francois.piette@rtfm.be
-Creation:     8 december 1997
-Version:      1.00
-WebSite:      http://www.rtfm.be/fpiette/indexuk.htm
-Support:      Use the mailing list twsocket@rtfm.be See website for details.
-Legal issues: Copyright (C) 1997 by FranÁois PIETTE <francois.piette@ping.be>
-
-              This software is provided 'as-is', without any express or
-              implied warranty.  In no event will the author be held liable
-              for any  damages arising from the use of this software.
-
-              Permission is granted to anyone to use this software for any
-              purpose, including commercial applications, and to alter it
-              and redistribute it freely, subject to the following
-              restrictions:
-
-              1. The origin of this software must not be misrepresented,
-                 you must not claim that you wrote the original software.
-                 If you use this software in a product, an acknowledgment
-                 in the product documentation would be appreciated but is
-                 not required.
-
-              2. Altered source versions must be plainly marked as such, and
-                 must not be misrepresented as being the original software.
-
-              3. This notice may not be removed or altered from any source
-                 distribution.
-
-Updates:
-
-
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
 unit UCliForm;
 
 interface
@@ -43,7 +6,7 @@ uses
   WinTypes, WinProcs, Messages, SysUtils, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ExtCtrls, OverbyteIcsWndControl, OverbyteIcsWSocket,
   Generics.Collections, Generics.Defaults,
-  UzLogGlobal, UzLogConst;
+  UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages;
 
 const LBCODE = #13{+#10};
 
@@ -56,27 +19,36 @@ type
     Panel2: TPanel;
     DisconnectButton: TButton;
     ListBox: TListBox;
-    Button1: TButton;
     procedure CreateParams(var Params: TCreateParams); override;
+    procedure FormCreate(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure CliSocketDataAvailable(Sender: TObject; Error: Word);
     procedure CliSocketSessionClosed(Sender: TObject; Error: Word);
     procedure SendButtonClick(Sender: TObject);
     procedure DisconnectButtonClick(Sender: TObject);
-    procedure Button1Click(Sender: TObject);
     procedure CliSocketException(Sender: TObject; SocExcept: ESocketException);
+    procedure CliSocketError(Sender: TObject);
+    procedure CliSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
+    procedure CliSocketSessionConnected(Sender: TObject; ErrCode: Word);
+    procedure OnClientSendLog(var msg: TMessage); message WM_USER_CLIENT_SENDLOG;
+    procedure OnClientGetQsoIDs(var msg: TMessage); message WM_USER_CLIENT_GETQSOIDS;
+    procedure OnClientGetLogQsoID(var msg: TMessage); message WM_USER_CLIENT_GETLOGQSOID;
   private
-    Initialized : Boolean;
+    FInitialized : Boolean;
     LineBuffer : TStringList;
     CommTemp : string; //work string for parsing LineBuffer
+    procedure AddServerConsole(msg: string);
+    procedure SendLog();
+    procedure GetQsoIDs();
+    procedure GetLogQsoID(p: PChar);
   public
     ClientNumber : Integer;
     Bands : array[b19..HiBand] of boolean;
     CurrentBand : TBand;
     CurrentOperator : string;
-    procedure ParseLineBuffer;
     procedure SendStr(str : string);
+    procedure ParseLineBuffer;
     procedure SetCaption;
     procedure AddConsole(S : string);
   end;
@@ -95,32 +67,7 @@ uses
 
 {$R *.DFM}
 
-procedure TCliForm.AddConsole(S: string);
-var
-   _VisRows: Integer;
-   _TopRow: Integer;
-begin
-   ListBox.Items.Add(S);
-   _VisRows := ListBox.ClientHeight div ListBox.ItemHeight;
-   _TopRow := ListBox.Items.Count - _VisRows + 1;
-   if _TopRow > 0 then
-      ListBox.TopIndex := _TopRow
-   else
-      ListBox.TopIndex := 0;
-end;
-
-procedure TCliForm.SetCaption;
-var
-   S: string;
-begin
-   S := BandString[CurrentBand];
-
-   if CurrentOperator <> '' then begin
-      S := S + ' by ' + CurrentOperator;
-   end;
-
-   Caption := S;
-end;
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
 procedure TCliForm.CreateParams(var Params: TCreateParams);
 begin
@@ -128,9 +75,11 @@ begin
    Params.ExStyle := Params.ExStyle or WS_EX_APPWINDOW;
 end;
 
-procedure TCliForm.SendStr(str: string);
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TCliForm.FormCreate(Sender: TObject);
 begin
-   CliSocket.SendStr(str);
+   FInitialized := False;
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -139,8 +88,8 @@ procedure TCliForm.FormShow(Sender: TObject);
 var
    B: TBand;
 begin
-   if not Initialized then begin
-      Initialized := TRUE;
+   if not FInitialized then begin
+      FInitialized := TRUE;
       // DisplayMemo.Clear;
       SendEdit.Text := '';
       ActiveControl := SendEdit;
@@ -159,6 +108,48 @@ begin
    LineBuffer.Clear;
    LineBuffer.Free;
    PostMessage(TForm(Owner).Handle, WM_USER_CLIENT_CLOSED, 0, LongInt(Self));
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TCliForm.AddConsole(S: string);
+var
+   _VisRows: Integer;
+   _TopRow: Integer;
+begin
+   ListBox.Items.Add(S);
+   _VisRows := ListBox.ClientHeight div ListBox.ItemHeight;
+   _TopRow := ListBox.Items.Count - _VisRows + 1;
+   if _TopRow > 0 then
+      ListBox.TopIndex := _TopRow
+   else
+      ListBox.TopIndex := 0;
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TCliForm.SetCaption;
+var
+   S: string;
+begin
+   S := BandString[CurrentBand];
+
+   if CurrentOperator <> '' then begin
+      S := S + ' by ' + CurrentOperator;
+   end;
+
+   Caption := S;
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TCliForm.SendStr(str: string);
+begin
+   if CliSocket.LastError <> 0 then begin
+      Exit;
+   end;
+
+   CliSocket.SendStr(str);
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -205,51 +196,95 @@ begin
    ParseLineBuffer;
 end;
 
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TCliForm.AddServerConsole(msg: string);
+var
+   S: string;
+begin
+   S := FillRight(IntToStr(ClientNumber), 3) + ' ' +
+        ZLinkHeader + ' PUTMESSAGE ' +
+        FormatDateTime('hh:nn', SysUtils.Now) + ' ' +
+        msg;
+
+   ServerForm.ProcessCommand(S);
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TCliForm.CliSocketError(Sender: TObject);
+var
+   S: string;
+begin
+   S := 'CliSocketError error code = ' + IntToStr(CliSocket.LastError);
+   AddServerConsole(S);
+
+   CliSocket.Close();
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
 procedure TCliForm.CliSocketException(Sender: TObject; SocExcept: ESocketException);
 var
    S: string;
-   t: string;
 begin
-   t := FormatDateTime('hh:nn', SysUtils.Now);
-   S := t + ' [' + SocExcept.IPStr + '] ' + IntToStr(SocExcept.ErrorCode) + ':' + SocExcept.ErrorMessage;
-   AddConsole(S);
+   S := '[' + SocExcept.IPStr + '] ' + IntToStr(SocExcept.ErrorCode) + ':' + SocExcept.ErrorMessage;
+   AddServerConsole(S);
+
+   CliSocket.Close();
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
 procedure TCliForm.CliSocketSessionClosed(Sender: TObject; Error: Word);
 var
-   temp: string;
    S: string;
-   t: string;
 begin
-   t := FormatDateTime('hh:nn', SysUtils.Now);
-   S := t + ' ' + MHzString[CurrentBand] + ' client disconnected from network.';
+   S := MHzString[CurrentBand] + ' client disconnected from network.';
 
-   temp := ZLinkHeader + ' PUTMESSAGE ' + S;
-   temp := FillRight(IntToStr(ClientNumber), 3) + ' ' + temp;
-   ServerForm.ProcessCommand(temp);
+   AddServerConsole(S);
+
    Close;
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TCliForm.CliSocketSessionConnected(Sender: TObject; ErrCode: Word);
+begin
+//
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TCliForm.CliSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
+var
+   S: string;
+begin
+   S := 'CliSocketSocksError: ' + msg + '(' + IntToStr(Error) + ')';
+   AddServerConsole(S);
+
+   CliSocket.Close();
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
 procedure TCliForm.SendButtonClick(Sender: TObject);
 var
    S: string;
    t: string;
 begin
    t := FormatDateTime('hh:nn', SysUtils.Now);
-   S := t + '  ZServer> ' + SendEdit.Text;
+   S := ' ZServer> ' + SendEdit.Text;
 
-   CliSocket.SendStr(ZLinkHeader + ' PUTMESSAGE ' + S + LBCODE);
-
-   AddConsole(S);
+   AddServerConsole(S);
+   AddConsole(t + ' ' + S);
 
    SendEdit.Clear;
    ActiveControl := SendEdit;
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
 procedure TCliForm.DisconnectButtonClick(Sender: TObject);
 begin
    Close;
@@ -257,11 +292,113 @@ end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
-procedure TCliForm.Button1Click(Sender: TObject);
+procedure TCliForm.OnClientSendLog(var msg: TMessage);
 begin
-   Caption := 'Parsing...';
-   ParseLineBuffer;
-   Caption := 'Done!';
+   SendLog();
+end;
+
+procedure TCliForm.OnClientGetQsoIDs(var msg: TMessage);
+begin
+   GetQsoIDs();
+end;
+
+procedure TCliForm.OnClientGetLogQsoID(var msg: TMessage);
+begin
+   GetLogQsoID(PChar(msg.LParam));
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TCliForm.SendLog();
+var
+   i: Integer;
+   S: string;
+   C: Integer;
+begin
+   S := '*** BEGIN SENDLOG ***';
+   AddServerConsole(S);
+
+   C := 0;
+   try
+      for i := 1 to ServerForm.MasterLog.TotalQSO do begin
+         Application.ProcessMessages();
+
+         if CliSocket.LastError <> 0 then begin
+            Exit;
+         end;
+
+         S := ZLinkHeader + ' PUTLOG ' + ServerForm.MasterLog.QSOList[i].QSOinText + LBCODE;
+         SendStr(S);
+
+         Sleep(0);
+         Inc(C);
+      end;
+
+      if CliSocket.LastError <> 0 then begin
+         Exit;
+      end;
+
+      S := ZLinkHeader + ' RENEW' + LBCODE;
+      SendStr(S);
+   finally
+      S := '*** END SENDLOG = ' + IntToStr(C) + ' QSOs sent ***';
+      AddServerConsole(S);
+   end;
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TCliForm.GetQsoIDs();
+var
+   i: Integer;
+   S: string;
+begin
+   i := 1;
+   while i <= ServerForm.MasterLog.TotalQSO do begin
+      S := ZLinkHeader + ' QSOIDS ';
+      repeat
+         S := S + IntToStr(ServerForm.MasterLog.QSOList[i].Reserve3);
+         S := S + ' ';
+         inc(i);
+      until (i mod 10 = 0) or (i > ServerForm.MasterLog.TotalQSO);
+
+      SendStr(S + LBCODE);
+   end;
+
+   S := ZLinkHeader + ' ENDQSOIDS';
+   SendStr(S + LBCODE);
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TCliForm.GetLogQsoID(p: PChar);
+var
+   i: Integer;
+   qsoid: Integer;
+   S: string;
+   temp: string;
+   temp2: string;
+   aQSO: TQSO;
+begin
+   temp := p;
+
+   Delete(temp, 1, 12);
+   i := Pos(' ', temp);
+   while i > 1 do begin
+      temp2 := copy(temp, 1, i - 1);
+      Delete(temp, 1, i);
+      qsoid := StrToInt(temp2);
+      aQSO := ServerForm.GetQSObyID(qsoid);
+      if aQSO <> nil then begin
+         S := ZLinkHeader + ' PUTLOGEX ' + aQSO.QSOinText;
+         SendStr(S + LBCODE);
+      end;
+      i := Pos(' ', temp);
+   end;
+
+   // ëSïîëóÇ¡ÇΩÇÁçƒåvéZÇ≥ÇπÇÈ
+   S := ZLinkHeader + ' RENEW';
+   SendStr(S + LBCODE);
 end;
 
 { TCliFormList }

@@ -24,11 +24,10 @@ uses
   Dialogs, StdCtrls, IniFiles, Menus, ExtCtrls, System.UITypes,
   OverbyteIcsWndControl, OverbyteIcsWSocket, System.SyncObjs,
   UBasicStats, UBasicMultiForm, UCliForm, UFreqList, UConnections,
-  UzLogGlobal, UzLogConst, UzLogQSO, JclFileUtils;
+  UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages, JclFileUtils;
 
 const
   IniFileName = 'ZServer.ini';
-  WM_USER_CLIENT_CLOSED = (WM_USER + 0);
 
 type
   TServerForm = class(TForm)
@@ -95,7 +94,7 @@ type
     procedure SrvSocketException(Sender: TObject; SocExcept: ESocketException);
     procedure SrvSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
   private
-    { Déclarations privées }
+    { Declarations privates }
     FInitialized  : Boolean;
     FClientNumber : Integer;
     FTakeLog : Boolean;
@@ -334,12 +333,14 @@ begin
       ClientListBox.TopIndex := 0;
 end;
 
+// *****************************************************************************
+
 procedure TServerForm.ProcessCommand(S: string);
 var
    temp, temp2, sendbuf: string;
    from: Integer;
    aQSO: TQSO;
-   i, j: Integer;
+   i: Integer;
    B: TBand;
 begin
    from := StrToIntDef(TrimRight(copy(S, 1, 3)), -1) - 1;
@@ -429,57 +430,17 @@ begin
 
    if Pos('RESET', temp) = 1 then begin
       Exit;
-      {
-        temp := copy(temp, 7, 255);
-        try
-        i := StrToInt(temp);
-        except
-        on EConvertError do
-        i := -1;
-        end;
-        if not(i in [0..ord(HiBand)]) then
-        Exit;
-        Stats.Logs[TBand(i)].Clear;
-        Stats.UpdateStats;
-        MultiForm.ResetBand(TBand(i)); }
    end;
 
    if Pos('ENDLOG', temp) = 1 then // received when zLog finishes uploading
    begin
       Exit;
-      {
-        temp := copy(temp, 8, 255);
-        try
-        i := StrToInt(temp);
-        except
-        on EConvertError do
-        i := -1;
-        end;
-        if not(i in [0..ord(HiBand)]) then
-        Exit;
-
-        sendbuf := ZLinkHeader + ' RESETSUB ' +IntToStr(i);
-        SendAllButFrom(sendbuf+LBCODE, from);
-
-        for j := 1 to Stats.Logs[TBand(i)].TotalQSO do
-        begin
-        sendbuf := ZLinkHeader + ' PUTLOGSUB '+TQSO(Stats.Logs[TBand(i)].List[j]).QSOinText;
-        SendAllButFrom(sendbuf+LBCODE, from);
-        end;
-
-        sendbuf := ZLinkHeader + ' RENEW ';
-        SendAllButFrom(sendbuf+LBCODE, from);
-
-        MultiForm.RecalcAll;
-        Stats.UpdateStats; }
    end;
 
    if Pos('PUTMESSAGE', temp) = 1 then begin
       temp2 := temp;
       Delete(temp2, 1, 11);
       AddConsole(temp2);
-      if FTakeLog then
-         AddToChatLog(temp2);
    end;
 
    if Pos('SPOT', temp) = 1 then begin
@@ -487,82 +448,28 @@ begin
 
    if Pos('SENDLOG', temp) = 1 then // will send all qsos in server's log and renew command
    begin
-      if FStats.MasterLog.TotalQSO = 0 then
+      if FStats.MasterLog.TotalQSO = 0 then begin
          Exit;
-
-      for i := 1 to FStats.MasterLog.TotalQSO do begin
-         sendbuf := ZLinkHeader + ' PUTLOG ' + FStats.MasterLog.QSOList[i].QSOinText;
-         SendOnly(sendbuf + LBCODE, from);
       end;
-      sendbuf := ZLinkHeader + ' RENEW';
-      SendOnly(sendbuf + LBCODE, from);
+
+      PostMessage(FClientList[from].Handle, WM_USER_CLIENT_SENDLOG, 0, 0);
       Exit;
    end;
 
    if Pos('GETQSOIDS', temp) = 1 then // will send all qso ids in server's log
    begin
-      i := 1;
-      while i <= FStats.MasterLog.TotalQSO do begin
-         sendbuf := ZLinkHeader + ' QSOIDS ';
-         repeat
-            sendbuf := sendbuf + IntToStr(FStats.MasterLog.QSOList[i].Reserve3);
-            sendbuf := sendbuf + ' ';
-            inc(i);
-         until (i mod 10 = 0) or (i > FStats.MasterLog.TotalQSO);
-         SendOnly(sendbuf + LBCODE, from);
-      end;
-      sendbuf := ZLinkHeader + ' ENDQSOIDS';
-      SendOnly(sendbuf + LBCODE, from);
+      PostMessage(FClientList[from].Handle, WM_USER_CLIENT_GETQSOIDS, 0, 0);
       Exit;
    end;
 
    if Pos('GETLOGQSOID', temp) = 1 then // will send all qso ids in server's log
    begin
-      Delete(temp, 1, 12);
-      i := Pos(' ', temp);
-      while i > 1 do begin
-         temp2 := copy(temp, 1, i - 1);
-         Delete(temp, 1, i);
-         j := StrToInt(temp2);
-         aQSO := GetQSObyID(j);
-         if aQSO <> nil then begin
-            sendbuf := ZLinkHeader + ' PUTLOGEX ' + aQSO.QSOinText;
-            SendOnly(sendbuf + LBCODE, from);
-         end;
-         i := Pos(' ', temp);
-      end;
-
-      // ‘S•”‘—‚Á‚½‚çÄŒvŽZ‚³‚¹‚é
-      sendbuf := ZLinkHeader + ' RENEW';
-      SendOnly(sendbuf + LBCODE, from);
-
+      PostMessage(FClientList[from].Handle, WM_USER_CLIENT_GETLOGQSOID, 0, LPARAM(PChar(temp)));
       Exit;
    end;
 
    if Pos('SENDCURRENT', temp) = 1 then begin
       Exit;
-      { Delete(temp, 1, 12);
-        try
-        i := StrToInt(temp);
-        except
-        on EConvertError do
-        i := -1;
-        end;
-        if not(i in [0..ord(HiBand)]) then
-        Exit;
-
-        B := TBand(i);
-
-        if Stats.Logs[B].TotalQSO = 0 then
-        Exit;
-
-        for i := 1 to Stats.Logs[B].TotalQSO do
-        begin
-        sendbuf := ZLinkHeader + ' PUTLOG '+TQSO(Stats.Logs[B].List[i]).QSOinText;
-        SendOnly(sendbuf+LBCODE, from);
-        end;
-        sendbuf := ZLinkHeader + ' RENEW ';
-        SendOnly(sendbuf+LBCODE, from); }
    end;
 
    if Pos('PUTQSO', temp) = 1 then begin
@@ -618,8 +525,6 @@ begin
       aQSO.TextToQSO(temp2);
       aQSO.Reserve := actEdit;
 
-      { Stats.Logs[aQSO.QSO.Band].AddQue(aQSO);
-        Stats.Logs[aQSO.QSO.Band].ProcessQue; }
       FStats.MasterLog.AddQue(aQSO);
       FStats.MasterLog.ProcessQue;
 
@@ -666,9 +571,15 @@ begin
       Application.ProcessMessages();
       FQueLock.Enter();
       str := FCommandQue[0];
+
       if not(ChatOnly) then begin
          AddConsole(str);
+
+         if FTakeLog then begin
+            AddToChatLog(str);
+         end;
       end;
+
       ProcessCommand(str);
       FCommandQue.Delete(0);
       FQueLock.Leave();
@@ -699,8 +610,13 @@ end;
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
 procedure TServerForm.SrvSocketError(Sender: TObject);
+var
+   S: string;
+   t: string;
 begin
-//
+   t := FormatDateTime('hh:nn', SysUtils.Now);
+   S := t + ' SrvSocketError';
+   AddToChatLog(S);
 end;
 
 procedure TServerForm.SrvSocketException(Sender: TObject; SocExcept: ESocketException);
@@ -868,7 +784,6 @@ procedure TServerForm.Timer1Timer(Sender: TObject);
 begin
    Timer1.Enabled := False;
    try
-      // Idle;
       while ClientListBox.Items.Count > 400 do begin
          ClientListBox.Items.Delete(0);
       end;
