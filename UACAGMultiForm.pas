@@ -40,7 +40,6 @@ type
     { Public declarations }
     CityList : TCityList;
     function ReturnSummary(C : TCity) : string; virtual; //returns appropriate summary for each contest
-    procedure ResetBand(B : TBand); override;
     procedure Reset; override;
     procedure Add(aQSO : TQSO); override;
   end;
@@ -55,16 +54,6 @@ uses
 function TACAGMultiForm.ReturnSummary(C: TCity): string;
 begin
    Result := C.Summary;
-end;
-
-procedure TACAGMultiForm.ResetBand(B: TBand);
-var
-   i: Integer;
-begin
-   for i := 0 to CityList.List.Count - 1 do begin
-      TCity(CityList.List[i]).Worked[B] := False;
-      Grid.Cells[0, i] := ReturnSummary(TCity(CityList.List[i]));
-   end;
 end;
 
 procedure TACAGMultiForm.Reset;

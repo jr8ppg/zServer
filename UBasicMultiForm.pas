@@ -14,7 +14,6 @@ type
     { Private declarations }
   public
     { Public declarations }
-    procedure ResetBand(B : TBand); virtual; abstract;
     procedure Reset; virtual; abstract;
     procedure Add(aQSO : TQSO); virtual; abstract;
   end;

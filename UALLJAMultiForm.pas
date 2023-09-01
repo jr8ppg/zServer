@@ -29,7 +29,6 @@ type
     MultiArray : array[b19..HiBand, m101..m48] of boolean;
   public
     { Public declarations }
-    procedure ResetBand(B : TBand); override;
     procedure Reset; override;
     procedure Add(aQSO : TQSO); override;
     procedure UpdateCheckListBox;
@@ -76,18 +75,6 @@ begin
       str := FillRight(KenNames[K], 16) + str;
       ListBox.Items.Add(str);
    end;
-end;
-
-procedure TALLJAMultiForm.ResetBand(B: TBand);
-var
-   K: TKen;
-begin
-   for K := m101 to m48 do begin
-      MultiArray[B, K] := False;
-   end;
-
-   UpdateCheckListBox;
-   UpdateListBox;
 end;
 
 procedure TALLJAMultiForm.Reset;

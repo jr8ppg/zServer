@@ -41,7 +41,6 @@ type
   public
     { Public declarations }
     Zone: array[b19..HiBand, 1..MAXCQZONE] of boolean;
-    procedure ResetBand(B : TBand); override;
     procedure Reset; override;
     procedure Add(aQSO : TQSO); override;
     procedure SortDefault;
@@ -76,28 +75,6 @@ begin
    FWWZone.Release();
    FCountryList.Free();
    FPrefixList.Free();
-end;
-
-procedure TWWMultiForm.ResetBand(B: TBand);
-var
-   i: integer;
-begin
-   for i := 0 to FCountryList.Count - 1 do begin
-      TCountry(FCountryList.List[i]).Worked[B] := False;
-   end;
-
-   for i := 1 to MAXCQZONE do begin
-      Zone[B, i] := False;
-   end;
-
-   FWWZone.ResetBand(B);
-
-   case SortBy.ItemIndex of
-      0:
-         SortDefault;
-      1:
-         SortZone;
-   end;
 end;
 
 procedure TWWMultiForm.Reset;
