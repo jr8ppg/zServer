@@ -140,40 +140,62 @@ object ServerForm: TServerForm
     Top = 56
   end
   object MainMenu1: TMainMenu
+    AutoHotkeys = maManual
+    AutoLineReduction = maManual
     Left = 224
     Top = 8
     object File1: TMenuItem
       Caption = '&File'
       object Open1: TMenuItem
-        Caption = '&Open File'
+        Caption = #38283#12367
         OnClick = Open1Click
       end
       object MergeFile1: TMenuItem
-        Caption = '&Merge File'
+        Caption = #12510#12540#12472
         Enabled = False
         OnClick = MergeFile1Click
       end
-      object mLog: TMenuItem
-        Caption = 'Start &Log'
-        OnClick = mLogClick
+      object N6: TMenuItem
+        Caption = '-'
       end
       object Save1: TMenuItem
-        Caption = '&Save'
+        Caption = #20445#23384
         OnClick = Save1Click
       end
       object SaveAs1: TMenuItem
-        Caption = 'Save &As'
+        Caption = #21517#21069#12434#12388#12369#12390#20445#23384
         OnClick = SaveAs1Click
       end
+      object N3: TMenuItem
+        Caption = '-'
+      end
       object DeleteDupes1: TMenuItem
-        Caption = 'Delete Dupes'
+        Caption = #37325#35079#12487#12540#12479#12434#21066#38500
         OnClick = DeleteDupes1Click
       end
       object N2: TMenuItem
         Caption = '-'
       end
+      object menuTakeChatLog: TMenuItem
+        AutoCheck = True
+        Caption = #12481#12515#12483#12488#12525#12464#12434#35352#37682
+        Checked = True
+        GroupIndex = 1
+        OnClick = menuTakeChatLogClick
+      end
+      object menuTakeCommandLog: TMenuItem
+        AutoCheck = True
+        Caption = #12467#12510#12531#12489#12525#12464#12434#35352#37682
+        GroupIndex = 2
+        OnClick = menuTakeCommandLogClick
+      end
+      object N5: TMenuItem
+        Caption = '-'
+        GroupIndex = 2
+      end
       object Exit1: TMenuItem
-        Caption = 'E&xit'
+        Caption = #32066#20102
+        GroupIndex = 2
         OnClick = Exit1Click
       end
     end

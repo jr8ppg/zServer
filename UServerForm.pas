@@ -59,10 +59,14 @@ type
     MergeFile1: TMenuItem;
     OpenDialog: TOpenDialog;
     Connections1: TMenuItem;
-    mLog: TMenuItem;
+    menuTakeChatLog: TMenuItem;
     CurrentFrequencies1: TMenuItem;
     Graph1: TMenuItem;
     DeleteDupes1: TMenuItem;
+    N3: TMenuItem;
+    menuTakeCommandLog: TMenuItem;
+    N5: TMenuItem;
+    N6: TMenuItem;
     //procedure CreateParams(var Params: TCreateParams); override;
     procedure FormShow(Sender: TObject);
     procedure SrvSocketSessionAvailable(Sender: TObject; Error: Word);
@@ -84,7 +88,7 @@ type
     procedure Open1Click(Sender: TObject);
     procedure Connections1Click(Sender: TObject);
     procedure MergeFile1Click(Sender: TObject);
-    procedure mLogClick(Sender: TObject);
+    procedure menuTakeChatLogClick(Sender: TObject);
     procedure CurrentFrequencies1Click(Sender: TObject);
     procedure Graph1Click(Sender: TObject);
     procedure DeleteDupes1Click(Sender: TObject);
@@ -93,12 +97,15 @@ type
     procedure SrvSocketError(Sender: TObject);
     procedure SrvSocketException(Sender: TObject; SocExcept: ESocketException);
     procedure SrvSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
+    procedure menuTakeCommandLogClick(Sender: TObject);
   private
     { Declarations privates }
     FInitialized  : Boolean;
     FClientNumber : Integer;
-    FTakeLog : Boolean;
-    FLogFileName: string;
+    FTakeChatLog : Boolean;
+    FTakeCommandLog : Boolean;
+    FChatLogFileName: string;
+    FCommandLogFileName: string;
 
     FFreqList: TFreqList;
     FConnections: TConnections;
@@ -120,17 +127,20 @@ type
     procedure RestoreWindowsPos();
     procedure RestoreWindowStates;
     procedure RecordWindowStates;
-  public
-    ChatOnly : boolean;
-    procedure AddCommandQue(str: string);
+
     procedure AddToChatLog(str : string);
-    procedure SendAll(str : string);
-    procedure SendAllButFrom(str : string; NotThisCli : integer);
-    procedure SendOnly(str : string; CliNo : integer);
-    procedure ProcessCommand(S : string);
+    procedure AddToCommandLog(str: string);
     procedure Idle;
     procedure IdleEvent(Sender: TObject; var Done: Boolean);
     procedure AddConsole(S : string); // adds string to clientlistbox
+    procedure SendAll(str : string);
+    procedure SendAllButFrom(str : string; NotThisCli : integer);
+    procedure SendOnly(str : string; CliNo : integer);
+  public
+    ChatOnly : boolean;
+
+    procedure AddCommandQue(str: string);
+    procedure ProcessCommand(S : string);
     function GetQSObyID(id : integer) : TQSO;
     function IsBandUsed(b: TBand): Boolean;
     procedure MergeFile(FileName : string; BandSet : TBandSet);
@@ -170,7 +180,6 @@ var
 begin
    FClientList := TCliFormList.Create();
    FCommandQue := TStringList.Create;
-   FTakeLog := False;
    ChatOnly := True;
    FClientNumber := 0;
    FCurrentFileName := '';
@@ -189,7 +198,8 @@ begin
 
    Application.OnIdle := IdleEvent;
 
-   FLogFileName := StringReplace(Application.ExeName, '.exe', '_' + FormatDateTime('yyyymmdd', Now) + '.txt', [rfReplaceAll]);
+   FChatLogFileName := StringReplace(Application.ExeName, '.exe', '_chat_' + FormatDateTime('yyyymmdd', Now) + '.txt', [rfReplaceAll]);
+   FCommandLogFileName := StringReplace(Application.ExeName, '.exe', '_command_' + FormatDateTime('yyyymmdd', Now) + '.txt', [rfReplaceAll]);
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -203,6 +213,9 @@ begin
    end;
 
    FInitialized := True;
+
+   FTakeChatLog := menuTakeChatLog.Checked;
+   FTakeCommandLog := menuTakeCommandLog.Checked;
 
    F := TChooseContest.Create(Self);
    try
@@ -575,9 +588,7 @@ begin
       if not(ChatOnly) then begin
          AddConsole(str);
 
-         if FTakeLog then begin
-            AddToChatLog(str);
-         end;
+         AddToCommandLog(str);
       end;
 
       ProcessCommand(str);
@@ -738,12 +749,33 @@ procedure TServerForm.AddToChatLog(str: string);
 var
    F: TextFile;
 begin
-   if FTakeLog = False then begin
+   if FTakeChatLog = False then begin
       Exit;
    end;
 
-   AssignFile(F, FLogFileName);
-   if FileExists(FLogFileName) then begin
+   AssignFile(F, FChatLogFileName);
+   if FileExists(FChatLogFileName) then begin
+      Append(F);
+   end
+   else begin
+      Rewrite(F);
+   end;
+
+   WriteLn(F, str);
+
+   CloseFile(F);
+end;
+
+procedure TServerForm.AddToCommandLog(str: string);
+var
+   F: TextFile;
+begin
+   if FTakeCommandLog = False then begin
+      Exit;
+   end;
+
+   AssignFile(F, FCommandLogFileName);
+   if FileExists(FCommandLogFileName) then begin
       Append(F);
    end
    else begin
@@ -767,9 +799,7 @@ begin
 
    AddConsole(S);
 
-   if FTakeLog then begin
-      AddToChatLog(S);
-   end;
+   AddToChatLog(S);
 
    SendEdit.Clear;
    ActiveControl := SendEdit;
@@ -894,13 +924,14 @@ begin
    end;
 end;
 
-procedure TServerForm.mLogClick(Sender: TObject);
+procedure TServerForm.menuTakeChatLogClick(Sender: TObject);
 begin
-   FTakeLog := not(FTakeLog);
-   if FTakeLog then
-      mLog.Caption := 'Stop &Log'
-   else
-      mLog.Caption := 'Start &Log';
+   FTakeChatLog := menuTakeChatLog.Checked;
+end;
+
+procedure TServerForm.menuTakeCommandLogClick(Sender: TObject);
+begin
+   FTakeCommandLog := menuTakeCommandLog.Checked;
 end;
 
 procedure TServerForm.CurrentFrequencies1Click(Sender: TObject);
