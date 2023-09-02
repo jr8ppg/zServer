@@ -1,7 +1,7 @@
 object BasicStats: TBasicStats
   Left = 197
   Top = 196
-  Caption = 'BasicStats'
+  Caption = 'Score & Statistics'
   ClientHeight = 176
   ClientWidth = 339
   Color = clBtnFace
@@ -13,6 +13,8 @@ object BasicStats: TBasicStats
   OldCreateOrder = True
   Scaled = False
   OnCreate = FormCreate
+  OnResize = FormResize
+  OnShow = FormShow
   PixelsPerInch = 96
   TextHeight = 12
   object Grid: TStringGrid
@@ -20,27 +22,23 @@ object BasicStats: TBasicStats
     Top = 0
     Width = 339
     Height = 176
-    TabStop = False
     Align = alClient
-    BorderStyle = bsNone
-    Color = clBtnFace
-    ColCount = 7
-    DefaultColWidth = 56
-    DefaultRowHeight = 16
     DefaultDrawing = False
-    Enabled = False
     FixedCols = 0
+    RowCount = 15
     FixedRows = 0
     Font.Charset = DEFAULT_CHARSET
     Font.Color = clWindowText
-    Font.Height = -12
-    Font.Name = 'MS Sans Serif'
+    Font.Height = -15
+    Font.Name = #65325#65331' '#12468#12471#12483#12463
     Font.Style = []
-    GridLineWidth = 0
-    Options = [goFixedVertLine, goFixedHorzLine, goVertLine, goHorzLine]
+    Options = [goHorzLine]
     ParentFont = False
     ScrollBars = ssNone
     TabOrder = 0
     OnDrawCell = GridDrawCell
+    ExplicitTop = -26
+    ExplicitWidth = 281
+    ExplicitHeight = 202
   end
 end

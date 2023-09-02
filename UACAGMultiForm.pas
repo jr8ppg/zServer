@@ -78,10 +78,12 @@ begin
    aQSO.NewMulti1 := False;
    for i := 0 to CityList.List.Count - 1 do begin
       if TCity(CityList.List[i]).CityNumber = aQSO.Multi1 then begin
-         TCity(CityList.List[i]).Worked[aQSO.Band] := True;
-         aQSO.NewMulti1 := True;
-         Grid.Cells[0, i] := ReturnSummary(TCity(CityList.List[i]));
-         Exit;
+         if TCity(CityList.List[i]).Worked[aQSO.Band] = False then begin
+            TCity(CityList.List[i]).Worked[aQSO.Band] := True;
+            aQSO.NewMulti1 := True;
+            Grid.Cells[0, i] := ReturnSummary(TCity(CityList.List[i]));
+            Exit;
+         end;
       end;
    end;
 end;
