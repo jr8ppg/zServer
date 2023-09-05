@@ -31,9 +31,6 @@ type
     procedure CliSocketError(Sender: TObject);
     procedure CliSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
     procedure CliSocketSessionConnected(Sender: TObject; ErrCode: Word);
-    procedure OnClientSendLog(var msg: TMessage); message WM_USER_CLIENT_SENDLOG;
-    procedure OnClientGetQsoIDs(var msg: TMessage); message WM_USER_CLIENT_GETQSOIDS;
-    procedure OnClientGetLogQsoID(var msg: TMessage); message WM_USER_CLIENT_GETLOGQSOID;
   private
     FInitialized : Boolean;
     LineBuffer : TStringList;
@@ -41,7 +38,8 @@ type
     procedure AddServerConsole(msg: string);
     procedure SendLog();
     procedure GetQsoIDs();
-    procedure GetLogQsoID(p: PChar);
+    procedure GetLogQsoID(str: string);
+    procedure ProcessCommand(S: string);
   public
     ClientNumber : Integer;
     Bands : array[b19..HiBand] of boolean;
@@ -169,7 +167,10 @@ begin
             x := Pos(ZLinkHeader, CommTemp);
             if x > 0 then begin
                CommTemp := Copy(CommTemp, x, 255);
-               ServerForm.AddCommandQue(FillRight(IntToStr(ClientNumber), 3) + ' ' + CommTemp);
+
+               ProcessCommand(FillRight(IntToStr(ClientNumber), 3) + ' ' + CommTemp);
+
+//               ServerForm.AddCommandQue(FillRight(IntToStr(ClientNumber), 3) + ' ' + CommTemp);
             end;
             CommTemp := '';
          end
@@ -185,15 +186,33 @@ end;
 procedure TCliForm.CliSocketDataAvailable(Sender: TObject; Error: Word);
 var
    str: string;
+   SL: TStringList;
+   i: Integer;
 begin
+   SL := TStringList.Create();
+
    str := CliSocket.ReceiveStr;
-   if ServerForm.ChatOnly = False then begin
-      AddConsole(str);
+
+   SL.Text := str;
+
+   for i := 0 to Sl.Count - 1 do begin
+      str := Trim(SL[i]);
+      if str = '' then begin
+         Continue;
+      end;
+
+      str := str + LBCODE;
+
+      if ServerForm.ChatOnly = False then begin
+         AddConsole(str);
+      end;
+
+      LineBuffer.Add(str);
    end;
 
-   LineBuffer.Add(str);
-
    ParseLineBuffer;
+
+   SL.Free();
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -207,7 +226,7 @@ begin
         FormatDateTime('hh:nn', SysUtils.Now) + ' ' +
         msg;
 
-   ServerForm.ProcessCommand(S);
+   ProcessCommand(S);
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -292,29 +311,18 @@ end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
-procedure TCliForm.OnClientSendLog(var msg: TMessage);
-begin
-   SendLog();
-end;
-
-procedure TCliForm.OnClientGetQsoIDs(var msg: TMessage);
-begin
-   GetQsoIDs();
-end;
-
-procedure TCliForm.OnClientGetLogQsoID(var msg: TMessage);
-begin
-   GetLogQsoID(PChar(msg.LParam));
-end;
-
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-
 procedure TCliForm.SendLog();
 var
    i: Integer;
    S: string;
    C: Integer;
 begin
+   if ServerForm.MasterLog.TotalQSO = 0 then begin
+      S := '*** MasterLog is empty ***';
+      AddServerConsole(S);
+      Exit;
+   end;
+
    S := '*** BEGIN SENDLOG ***';
    AddServerConsole(S);
 
@@ -371,7 +379,7 @@ end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
-procedure TCliForm.GetLogQsoID(p: PChar);
+procedure TCliForm.GetLogQsoID(str: string);
 var
    i: Integer;
    qsoid: Integer;
@@ -380,7 +388,7 @@ var
    temp2: string;
    aQSO: TQSO;
 begin
-   temp := p;
+   temp := str;
 
    Delete(temp, 1, 12);
    i := Pos(' ', temp);
@@ -399,6 +407,209 @@ begin
    // ëSïîëóÇ¡ÇΩÇÁçƒåvéZÇ≥ÇπÇÈ
    S := ZLinkHeader + ' RENEW';
    SendStr(S + LBCODE);
+end;
+
+// *****************************************************************************
+
+procedure TCliForm.ProcessCommand(S: string);
+var
+   temp, temp2, sendbuf: string;
+   from: Integer;
+   aQSO: TQSO;
+   i: Integer;
+   B: TBand;
+   param_atom: ATOM;
+   SL: TStringList;
+begin
+   from := StrToIntDef(TrimRight(copy(S, 1, 3)), -1) - 1;
+   if from < 0 then begin
+      Exit;
+   end;
+
+   Delete(S, 1, 4);
+
+   Delete(S, 1, Length(ZLinkHeader) + 1);
+
+   temp := S;
+
+   if Pos('FREQ', temp) = 1 then begin
+      temp2 := copy(temp, 6, 255);
+      param_atom := AddAtom(PChar(temp2));
+      PostMessage(ServerForm.Handle, WM_ZCMD_FREQDATA, from, param_atom);
+   end;
+
+   if Pos('GETCONSOLE', UpperCase(temp)) = 1 then begin
+      SL := ServerForm.GetConsole();
+      for i := 0 to SL.Count -1 do begin
+         SendStr(SL[i] + LBCODE);
+      end;
+      SL.Free();
+      Exit;
+   end;
+
+   if Pos('SENDRENEW', temp) = 1 then begin
+      sendbuf := ZLinkHeader + ' RENEW';
+      SendStr(sendbuf + LBCODE);
+      Exit;
+   end;
+
+   {
+     if Pos('FILELOADED', UpperCase(temp)) = 1 then
+     begin
+     sendbuf := ZLinkHeader + ' PROMPTUPDATE';
+     SendAll(sendbuf+LBCODE);    end;
+   }
+
+   if Pos('WHO', UpperCase(temp)) = 1 then begin
+      SL := ServerForm.GetWhoList();
+      for i := 0 to SL.Count -1 do begin
+         SendStr(SL[i] + LBCODE);
+      end;
+      SL.Free();
+      Exit;
+   end;
+
+   if Pos('OPERATOR', temp) = 1 then begin
+      Delete(temp, 1, 9);
+      param_atom := AddAtom(PChar(temp2));
+      PostMessage(ServerForm.Handle, WM_ZCMD_SETOPERATOR, from, param_atom);
+      Exit;
+   end;
+
+   if Pos('BAND ', temp) = 1 then begin
+      Delete(temp, 1, 5);
+
+      i := StrToIntDef(temp, 17);
+      if not(i in [0 .. ord(HiBand), ord(bUnknown)]) then begin
+         Exit;
+      end;
+
+      B := TBand(i);
+
+      if B = bUnknown then begin
+         Exit;
+      end;
+
+      PostMessage(ServerForm.Handle, WM_ZCMD_SETBAND, from, i);
+
+      if ServerForm.IsBandUsed2(from, B) = True then begin
+         sendbuf := ZLinkHeader + ' PUTMESSAGE ' + 'Band already in use!';
+         SendStr(sendbuf + LBCODE);
+      end;
+
+      Exit;
+   end;
+
+   if Pos('RESET', temp) = 1 then begin
+      Exit;
+   end;
+
+   if Pos('ENDLOG', temp) = 1 then // received when zLog finishes uploading
+   begin
+      Exit;
+   end;
+
+   if Pos('PUTMESSAGE', temp) = 1 then begin
+      temp2 := temp;
+      Delete(temp2, 1, 11);
+      AddConsole(temp2);
+   end;
+
+   if Pos('SPOT', temp) = 1 then begin
+   end;
+
+   if Pos('SENDLOG', temp) = 1 then // will send all qsos in server's log and renew command
+   begin
+      SendLog();
+      Exit;
+   end;
+
+   if Pos('GETQSOIDS', temp) = 1 then // will send all qso ids in server's log
+   begin
+      GetQsoIDs();
+      Exit;
+   end;
+
+   if Pos('GETLOGQSOID', temp) = 1 then // will send all qso ids in server's log
+   begin
+      GetLogQsoID(temp);
+      Exit;
+   end;
+
+   if Pos('SENDCURRENT', temp) = 1 then begin
+      Exit;
+   end;
+
+   if Pos('PUTQSO', temp) = 1 then begin
+      aQSO := TQSO.Create;
+      temp2 := temp;
+      Delete(temp2, 1, 7);
+      aQSO.TextToQSO(temp2); // delete "PUTQSO "
+
+      PostMessage(ServerForm.Handle, WM_ZCMD_PUTQSO, from, LPARAM(aQSO));
+   end;
+
+   if Pos('PUTLOG ', temp) = 1 then begin
+      aQSO := TQSO.Create;
+      temp2 := temp;
+      Delete(temp2, 1, 7);
+      aQSO.TextToQSO(temp2);
+
+      PostMessage(ServerForm.Handle, WM_ZCMD_PUTLOG, from, LPARAM(aQSO));
+   end;
+
+   if Pos('EXDELQSO', temp) = 1 then begin
+      aQSO := TQSO.Create;
+      temp2 := temp;
+      Delete(temp2, 1, 9);
+      aQSO.TextToQSO(temp2);
+
+      PostMessage(ServerForm.Handle, WM_ZCMD_EXDELQSO, from, LPARAM(aQSO));
+   end;
+
+   if Pos('DELQSO', temp) = 1 then begin
+      aQSO := TQSO.Create;
+      temp2 := temp;
+      Delete(temp2, 1, 7);
+      aQSO.TextToQSO(temp2);
+
+      PostMessage(ServerForm.Handle, WM_ZCMD_DELQSO, from, LPARAM(aQSO));
+   end;
+
+   if Pos('EDITQSOFROM', temp) = 1 then begin
+      Exit;
+   end;
+
+   if Pos('EDITQSOTO ', temp) = 1 then begin
+      aQSO := TQSO.Create;
+      temp2 := temp;
+      Delete(temp2, 1, 10);
+      aQSO.TextToQSO(temp2);
+      aQSO.Reserve := actEdit;
+
+      PostMessage(ServerForm.Handle, WM_ZCMD_EDITQSOTO, from, LPARAM(aQSO));
+   end;
+
+   if Pos('INSQSOAT ', temp) = 1 then begin
+      Exit;
+   end;
+
+   if Pos('RENEW', temp) = 1 then begin
+      PostMessage(ServerForm.Handle, WM_ZCMD_RENEW, from, 0);
+   end;
+
+   if Pos('INSQSO ', temp) = 1 then begin
+      aQSO := TQSO.Create;
+      temp2 := temp;
+      Delete(temp2, 1, 7);
+      aQSO.TextToQSO(temp2);
+      aQSO.Reserve := actInsert;
+
+      PostMessage(ServerForm.Handle, WM_ZCMD_INSQSO, from, LPARAM(aQSO));
+   end;
+
+   sendbuf := ZLinkHeader + ' ' + temp;
+   ServerForm.SendAllButFrom(sendbuf + LBCODE, from);
 end;
 
 { TCliFormList }

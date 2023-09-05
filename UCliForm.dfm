@@ -92,6 +92,7 @@ object CliForm: TCliForm
     LocalAddr = '0.0.0.0'
     LocalAddr6 = '::'
     LocalPort = '0'
+    MultiThreaded = True
     SocksLevel = '5'
     ExclusiveAddr = False
     ComponentOptions = []

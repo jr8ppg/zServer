@@ -7,9 +7,10 @@ Creation:     1 August 2021
 Version:      2.8
 WebSite:      https://www.zlog.org/
               https://github.com/jr8ppg/zServer
-Support:      Use the mailing list zlog-reiwa@cq-test.net
+Support:      Use the mailing list on zlog-reiwa@cq-test.net
+              Use the @zLog_support on X(twitter)
               See website for details below.
-              https://github.com/jr8ppg/zLog/wiki/%E3%83%A1%E3%82%A4%E3%83%AA%E3%83%B3%E3%82%B0%E3%83%AA%E3%82%B9%E3%83%88
+              https://zlog.org/
 Legal issues: Copyright 1997-2002 by Yohei Yokobayashi
               Portions created by JR8PPG are Copyright (C) 2020-2022 JR8PPG
               This software is released under the MIT License.
@@ -34,7 +35,6 @@ type
     SrvSocket: TWSocket;
     ClientListBox: TListBox;
     Panel1: TPanel;
-    Button1: TButton;
     Panel2: TPanel;
     MainMenu1: TMainMenu;
     File1: TMenuItem;
@@ -71,7 +71,6 @@ type
     procedure FormShow(Sender: TObject);
     procedure SrvSocketSessionAvailable(Sender: TObject; Error: Word);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
-    procedure Button1Click(Sender: TObject);
     procedure Exit1Click(Sender: TObject);
     procedure About1Click(Sender: TObject);
     procedure SendButtonClick(Sender: TObject);
@@ -116,9 +115,17 @@ type
 
     FCurrentFileName: string;
 
-    FCommandQue: TStringList;
-
     procedure OnClientClosed(var msg: TMessage); message WM_USER_CLIENT_CLOSED;
+    procedure OnFreqData(var msg: TMessage); message WM_ZCMD_FREQDATA;
+    procedure OnSetOperator(var msg: TMessage); message WM_ZCMD_SETOPERATOR;
+    procedure OnSetBand(var msg: TMessage); message WM_ZCMD_SETBAND;
+    procedure OnPutQSO(var msg: TMessage); message WM_ZCMD_PUTQSO;
+    procedure OnPutLog(var msg: TMessage); message WM_ZCMD_PUTLOG;
+    procedure OnExDelQSO(var msg: TMessage); message WM_ZCMD_EXDELQSO;
+    procedure OnDelQSO(var msg: TMessage); message WM_ZCMD_DELQSO;
+    procedure OnEditQsoTo(var msg: TMessage); message WM_ZCMD_EDITQSOTO;
+    procedure OnRenew(var msg: TMessage); message WM_ZCMD_RENEW;
+    procedure OnInsQso(var msg: TMessage); message WM_ZCMD_INSQSO;
     procedure StartServer;
     procedure LoadSettings();
     procedure SaveSettings();
@@ -130,19 +137,18 @@ type
 
     procedure AddToChatLog(str : string);
     procedure AddToCommandLog(str: string);
-    procedure Idle;
     procedure IdleEvent(Sender: TObject; var Done: Boolean);
     procedure AddConsole(S : string); // adds string to clientlistbox
     procedure SendAll(str : string);
-    procedure SendAllButFrom(str : string; NotThisCli : integer);
-    procedure SendOnly(str : string; CliNo : integer);
   public
     ChatOnly : boolean;
 
-    procedure AddCommandQue(str: string);
-    procedure ProcessCommand(S : string);
+    function GetConsole(): TStringList;
+    function GetWhoList(): TStringList;
     function GetQSObyID(id : integer) : TQSO;
     function IsBandUsed(b: TBand): Boolean;
+    function IsBandUsed2(from: Integer; b: TBand): Boolean;
+    procedure SendAllButFrom(str : string; NotThisCli : integer);
     procedure MergeFile(FileName : string; BandSet : TBandSet);
     procedure RecalcAll();
 
@@ -179,7 +185,6 @@ var
    ver: TJclFileVersionInfo;
 begin
    FClientList := TCliFormList.Create();
-   FCommandQue := TStringList.Create;
    ChatOnly := True;
    FClientNumber := 0;
    FCurrentFileName := '';
@@ -310,8 +315,6 @@ begin
       FClientList[i].Release();
    end;
    FClientList.Free();
-
-   FCommandQue.Free();
 end;
 
 {* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
@@ -346,262 +349,10 @@ begin
       ClientListBox.TopIndex := 0;
 end;
 
-// *****************************************************************************
-
-procedure TServerForm.ProcessCommand(S: string);
-var
-   temp, temp2, sendbuf: string;
-   from: Integer;
-   aQSO: TQSO;
-   i: Integer;
-   B: TBand;
-begin
-   from := StrToIntDef(TrimRight(copy(S, 1, 3)), -1) - 1;
-   if from < 0 then begin
-      Exit;
-   end;
-
-   Delete(S, 1, 4);
-
-   Delete(S, 1, Length(ZLinkHeader) + 1);
-
-   temp := S;
-
-   if Pos('FREQ', temp) = 1 then begin
-      temp2 := copy(temp, 6, 255);
-      FFreqList.ProcessFreqData(temp2);
-   end;
-
-   if Pos('GETCONSOLE', UpperCase(temp)) = 1 then begin
-      for i := 0 to ClientListBox.Items.Count - 1 do begin
-         sendbuf := ZLinkHeader + ' PUTMESSAGE ';
-         sendbuf := sendbuf + ClientListBox.Items[i];
-         SendOnly(sendbuf + LBCODE, from);
-      end;
-      Exit;
-   end;
-
-   if Pos('SENDRENEW', temp) = 1 then begin
-      sendbuf := ZLinkHeader + ' RENEW';
-      SendOnly(sendbuf + LBCODE, from);
-      Exit;
-   end;
-
-   {
-     if Pos('FILELOADED', UpperCase(temp)) = 1 then
-     begin
-     sendbuf := ZLinkHeader + ' PROMPTUPDATE';
-     SendAll(sendbuf+LBCODE);    end;
-   }
-
-   if Pos('WHO', UpperCase(temp)) = 1 then begin
-      for B := b19 to HiBand do
-         for i := 0 to FClientList.Count - 1 do begin
-            if FClientList[i].CurrentBand = B then begin
-               sendbuf := ZLinkHeader + ' PUTMESSAGE ';
-               sendbuf := sendbuf + FillRight(BandString[FClientList[i].CurrentBand], 9) + FClientList[i].CurrentOperator;
-               SendOnly(sendbuf + LBCODE, from);
-            end;
-         end;
-      Exit;
-   end;
-
-   if Pos('OPERATOR', temp) = 1 then begin
-      Delete(temp, 1, 9);
-      FClientList[from].CurrentOperator := temp;
-      FClientList[from].SetCaption;
-      FConnections.UpdateDisplay;
-      Exit;
-   end;
-
-   if Pos('BAND ', temp) = 1 then begin
-      Delete(temp, 1, 5);
-
-      i := StrToIntDef(temp, -1);
-      if not(i in [0 .. ord(HiBand), ord(bUnknown)]) then begin
-         Exit;
-      end;
-
-      B := TBand(i);
-
-      FClientList[from].CurrentBand := B;
-
-      if B <> bUnknown then begin
-         for i := 0 to FClientList.Count - 1 do begin
-            if (i <> from) and (FClientList[i].CurrentBand = B) then begin
-               sendbuf := ZLinkHeader + ' PUTMESSAGE ' + 'Band already in use!';
-               SendOnly(sendbuf + LBCODE, from);
-               // CliList[from].Close;
-            end;
-         end;
-      end;
-
-      FClientList[from].SetCaption;
-      FConnections.UpdateDisplay;
-      Exit;
-   end;
-
-   if Pos('RESET', temp) = 1 then begin
-      Exit;
-   end;
-
-   if Pos('ENDLOG', temp) = 1 then // received when zLog finishes uploading
-   begin
-      Exit;
-   end;
-
-   if Pos('PUTMESSAGE', temp) = 1 then begin
-      temp2 := temp;
-      Delete(temp2, 1, 11);
-      AddConsole(temp2);
-   end;
-
-   if Pos('SPOT', temp) = 1 then begin
-   end;
-
-   if Pos('SENDLOG', temp) = 1 then // will send all qsos in server's log and renew command
-   begin
-      if FStats.MasterLog.TotalQSO = 0 then begin
-         Exit;
-      end;
-
-      PostMessage(FClientList[from].Handle, WM_USER_CLIENT_SENDLOG, 0, 0);
-      Exit;
-   end;
-
-   if Pos('GETQSOIDS', temp) = 1 then // will send all qso ids in server's log
-   begin
-      PostMessage(FClientList[from].Handle, WM_USER_CLIENT_GETQSOIDS, 0, 0);
-      Exit;
-   end;
-
-   if Pos('GETLOGQSOID', temp) = 1 then // will send all qso ids in server's log
-   begin
-      PostMessage(FClientList[from].Handle, WM_USER_CLIENT_GETLOGQSOID, 0, LPARAM(PChar(temp)));
-      Exit;
-   end;
-
-   if Pos('SENDCURRENT', temp) = 1 then begin
-      Exit;
-   end;
-
-   if Pos('PUTQSO', temp) = 1 then begin
-      aQSO := TQSO.Create;
-      temp2 := temp;
-      Delete(temp2, 1, 7);
-      aQSO.TextToQSO(temp2); // delete "PUTQSO "
-      FStats.Add(aQSO);
-      if Assigned(FMultiForm) then begin
-         FMultiForm.Add(aQSO);
-      end;
-   end;
-
-   if Pos('PUTLOG ', temp) = 1 then begin
-      aQSO := TQSO.Create;
-      temp2 := temp;
-      Delete(temp2, 1, 7);
-      aQSO.TextToQSO(temp2);
-      FStats.AddNoUpdate(aQSO);
-      if Assigned(FMultiForm) then begin
-         FMultiForm.Add(aQSO);
-      end;
-   end;
-
-   if Pos('EXDELQSO', temp) = 1 then begin
-      aQSO := TQSO.Create;
-      temp2 := temp;
-      Delete(temp2, 1, 9);
-      aQSO.TextToQSO(temp2);
-      FStats.Delete(aQSO, False);
-      aQSO.Free;
-   end;
-
-   if Pos('DELQSO', temp) = 1 then begin
-      aQSO := TQSO.Create;
-      temp2 := temp;
-      Delete(temp2, 1, 7);
-      aQSO.TextToQSO(temp2);
-      FStats.Delete(aQSO);
-      RecalcAll;
-      FStats.UpdateStats;
-      aQSO.Free;
-   end;
-
-   if Pos('EDITQSOFROM', temp) = 1 then begin
-      Exit;
-   end;
-
-   if Pos('EDITQSOTO ', temp) = 1 then begin
-      aQSO := TQSO.Create;
-      temp2 := temp;
-      Delete(temp2, 1, 10);
-      aQSO.TextToQSO(temp2);
-      aQSO.Reserve := actEdit;
-
-      FStats.MasterLog.AddQue(aQSO);
-      FStats.MasterLog.ProcessQue;
-
-      RecalcAll;
-
-      FStats.UpdateStats;
-      aQSO.Free;
-   end;
-
-   if Pos('INSQSOAT ', temp) = 1 then begin
-      Exit;
-   end;
-
-   if Pos('RENEW', temp) = 1 then begin
-      RecalcAll;
-      FStats.UpdateStats;
-      FStats.Refresh();
-   end;
-
-   if Pos('INSQSO ', temp) = 1 then begin
-      aQSO := TQSO.Create;
-      temp2 := temp;
-      Delete(temp2, 1, 7);
-      aQSO.TextToQSO(temp2);
-      aQSO.Reserve := actInsert;
-      FStats.MasterLog.AddQue(aQSO);
-      FStats.MasterLog.ProcessQue;
-      RecalcAll;
-      FStats.UpdateStats;
-      aQSO.Free;
-   end;
-
-   sendbuf := ZLinkHeader + ' ' + temp;
-   SendAllButFrom(sendbuf + LBCODE, from);
-end;
-
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-
-procedure TServerForm.Idle;
-var
-   str: string;
-begin
-   while FCommandQue.Count > 0 do begin
-      Application.ProcessMessages();
-      FQueLock.Enter();
-      str := FCommandQue[0];
-
-      if not(ChatOnly) then begin
-         AddConsole(str);
-
-         AddToCommandLog(str);
-      end;
-
-      ProcessCommand(str);
-      FCommandQue.Delete(0);
-      FQueLock.Leave();
-   end;
-end;
-
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
 procedure TServerForm.IdleEvent(Sender: TObject; var Done: Boolean);
 begin
-   Idle;
    while ClientListBox.Items.Count > 400 do begin
       ClientListBox.Items.Delete(0);
    end;
@@ -688,6 +439,229 @@ begin
    end;
 end;
 
+// ****************************************************************************
+
+procedure TServerForm.OnFreqData(var msg: TMessage);
+var
+   S: string;
+   param_atom: ATOM;
+   szBuffer: array[0..1023] of Char;
+begin
+   ZeroMemory(@szBuffer, SizeOf(szBuffer));
+   param_atom := msg.LParam;
+   if GetAtomName(param_atom, @szBuffer, SizeOf(szBuffer)) = 0 then begin
+      Exit;
+   end;
+
+   S := StrPas(szBuffer);
+
+   FFreqList.ProcessFreqData(S);
+
+   DeleteAtom(param_atom);
+end;
+
+// ****************************************************************************
+
+procedure TServerForm.OnSetOperator(var msg: TMessage);
+var
+   S: string;
+   param_atom: ATOM;
+   from: Integer;
+   szBuffer: array[0..1023] of Char;
+begin
+   ZeroMemory(@szBuffer, SizeOf(szBuffer));
+   from := msg.WParam;
+   param_atom := msg.LParam;
+   if GetAtomName(param_atom, @szBuffer, SizeOf(szBuffer)) = 0 then begin
+      Exit;
+   end;
+
+   S := StrPas(szBuffer);
+
+   FClientList[from].CurrentOperator := S;
+   FClientList[from].SetCaption;
+   FConnections.UpdateDisplay;
+
+   DeleteAtom(param_atom);
+end;
+
+// ****************************************************************************
+
+procedure TServerForm.OnSetBand(var msg: TMessage);
+var
+   S: string;
+   from: Integer;
+   szBuffer: array[0..1023] of Char;
+   B: TBand;
+begin
+   ZeroMemory(@szBuffer, SizeOf(szBuffer));
+   from := msg.WParam;
+   B := TBand(msg.LParam);
+
+   S := StrPas(szBuffer);
+
+   FClientList[from].CurrentBand := B;
+
+   FClientList[from].SetCaption;
+   FConnections.UpdateDisplay;
+end;
+
+// ****************************************************************************
+
+procedure TServerForm.OnPutQSO(var msg: TMessage);
+var
+   from: Integer;
+   aQSO: TQSO;
+begin
+   from := msg.WParam;
+   aQSO := TQSO(msg.LParam);
+
+   FStats.Add(aQSO);
+   if Assigned(FMultiForm) then begin
+      FMultiForm.Add(aQSO);
+   end;
+end;
+
+// ****************************************************************************
+
+procedure TServerForm.OnPutLog(var msg: TMessage);
+var
+   from: Integer;
+   aQSO: TQSO;
+begin
+   from := msg.WParam;
+   aQSO := TQSO(msg.LParam);
+
+   FStats.AddNoUpdate(aQSO);
+   if Assigned(FMultiForm) then begin
+      FMultiForm.Add(aQSO);
+   end;
+end;
+
+// ****************************************************************************
+
+procedure TServerForm.OnExDelQSO(var msg: TMessage);
+var
+   from: Integer;
+   aQSO: TQSO;
+begin
+   from := msg.WParam;
+   aQSO := TQSO(msg.LParam);
+
+   FStats.Delete(aQSO, False);
+   aQSO.Free;
+end;
+
+// ****************************************************************************
+
+procedure TServerForm.OnDelQSO(var msg: TMessage);
+var
+   from: Integer;
+   aQSO: TQSO;
+begin
+   from := msg.WParam;
+   aQSO := TQSO(msg.LParam);
+
+   FStats.Delete(aQSO);
+   RecalcAll;
+   FStats.UpdateStats;
+   aQSO.Free;
+end;
+
+// ****************************************************************************
+
+procedure TServerForm.OnEditQsoTo(var msg: TMessage);
+var
+   from: Integer;
+   aQSO: TQSO;
+begin
+   from := msg.WParam;
+   aQSO := TQSO(msg.LParam);
+
+   FStats.MasterLog.AddQue(aQSO);
+   FStats.MasterLog.ProcessQue;
+
+   RecalcAll;
+
+   FStats.UpdateStats;
+   aQSO.Free;
+end;
+
+// ****************************************************************************
+
+procedure TServerForm.OnRenew(var msg: TMessage);
+var
+   from: Integer;
+begin
+   from := msg.WParam;
+
+   RecalcAll;
+   FStats.UpdateStats;
+   FStats.Refresh();
+end;
+
+// ****************************************************************************
+
+procedure TServerForm.OnInsQso(var msg: TMessage);
+var
+   from: Integer;
+   aQSO: TQSO;
+begin
+   from := msg.WParam;
+   aQSO := TQSO(msg.LParam);
+
+   FStats.MasterLog.AddQue(aQSO);
+   FStats.MasterLog.ProcessQue;
+   RecalcAll;
+   FStats.UpdateStats;
+   aQSO.Free;
+end;
+
+// ****************************************************************************
+
+function TServerForm.GetConsole(): TStringList;
+var
+   i: Integer;
+   SL: TStringList;
+   S: string;
+begin
+   SL := TStringList.Create();
+   try
+      for i := 0 to ClientListBox.Items.Count - 1 do begin
+         S := ZLinkHeader + ' PUTMESSAGE ';
+         S := ClientListBox.Items[i];
+         SL.Add(S);
+      end;
+   finally
+      Result := SL;
+   end;
+end;
+
+// ****************************************************************************
+
+function TServerForm.GetWhoList(): TStringList;
+var
+   i: Integer;
+   SL: TStringList;
+   S: string;
+   B: TBand;
+begin
+   SL := TStringList.Create();
+   try
+      for B := b19 to HiBand do begin
+         for i := 0 to FClientList.Count - 1 do begin
+            if FClientList[i].CurrentBand = B then begin
+               S := ZLinkHeader + ' PUTMESSAGE ';
+               S := S + FillRight(BandString[FClientList[i].CurrentBand], 9) + FClientList[i].CurrentOperator;
+               SL.Add(S);
+            end;
+         end;
+      end;
+   finally
+      Result := SL;
+   end;
+end;
+
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
 procedure TServerForm.SendAll(str: string);
@@ -711,16 +685,6 @@ begin
    end;
 end;
 
-procedure TServerForm.SendOnly(str: string; CliNo: Integer);
-begin
-   FClientList[CliNo].SendStr(str);
-end;
-
-procedure TServerForm.Button1Click(Sender: TObject);
-begin
-   FConnections.UpdateDisplay;
-end;
-
 procedure TServerForm.Exit1Click(Sender: TObject);
 begin
    Close;
@@ -736,13 +700,6 @@ begin
    finally
       F.Release();
    end;
-end;
-
-procedure TServerForm.AddCommandQue(str: string);
-begin
-   FQueLock.Enter();
-   FCommandQue.Add(str);
-   FQueLock.Leave();
 end;
 
 procedure TServerForm.AddToChatLog(str: string);
@@ -894,7 +851,7 @@ begin
       FStats.MasterLog.LoadFromFile(FCurrentFileName);
       RecalcAll();
       FStats.UpdateStats();
-      FCommandQue.Add('999 ' + ZLinkHeader + ' FILELOADED');
+      //FCommandQue.Add('999 ' + ZLinkHeader + ' FILELOADED');
    end;
 end;
 
@@ -990,6 +947,19 @@ end;
 function TServerForm.IsBandUsed(b: TBand): Boolean;
 begin
    Result := FStats.UsedBands[b];
+end;
+
+function TServerForm.IsBandUsed2(from: Integer; b: TBand): Boolean;
+var
+   i: Integer;
+begin
+   for i := 0 to FClientList.Count - 1 do begin
+      if (i <> from) and (FClientList[i].CurrentBand = b) then begin
+         Result := True;
+         Exit;
+      end;
+   end;
+   Result := False;
 end;
 
 procedure TServerForm.MergeFile(FileName : string; BandSet : TBandSet);

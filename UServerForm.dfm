@@ -50,22 +50,6 @@ object ServerForm: TServerForm
     DesignSize = (
       344
       30)
-    object Button1: TButton
-      Left = 152
-      Top = 8
-      Width = 75
-      Height = 17
-      Caption = 'Button1'
-      Font.Charset = SHIFTJIS_CHARSET
-      Font.Color = clWindowText
-      Font.Height = -12
-      Font.Name = 'MS Sans Serif'
-      Font.Style = []
-      ParentFont = False
-      TabOrder = 0
-      Visible = False
-      OnClick = Button1Click
-    end
     object Button2: TButton
       Left = 276
       Top = 4
@@ -73,7 +57,7 @@ object ServerForm: TServerForm
       Height = 22
       Anchors = [akTop, akRight]
       Caption = '&Clear'
-      TabOrder = 1
+      TabOrder = 0
       OnClick = Button2Click
     end
     object CheckBox2: TCheckBox
@@ -82,7 +66,7 @@ object ServerForm: TServerForm
       Width = 113
       Height = 17
       Caption = 'Monitor chat only'
-      TabOrder = 2
+      TabOrder = 1
       OnClick = CheckBox2Click
     end
   end

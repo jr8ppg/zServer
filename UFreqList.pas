@@ -95,13 +95,13 @@ begin
    ss := TrimRight(ss);
    B := TBand(StrToInt(ss));
    FreqArray[B] := S;
-   Update;
+   UpdateX;
 end;
 
 procedure TFreqList.FormShow(Sender: TObject);
 begin
    // inherited;
-   Update;
+   UpdateX;
 end;
 
 procedure TFreqList.FormCreate(Sender: TObject);
@@ -122,7 +122,7 @@ begin
       FreqArray[B] := '';
    end;
 
-   Update;
+   UpdateX;
 end;
 
 end.
