@@ -202,11 +202,6 @@ object ServerForm: TServerForm
         Caption = 'Current &Frequencies'
         OnClick = CurrentFrequencies1Click
       end
-      object Graph1: TMenuItem
-        Caption = 'Graph'
-        Visible = False
-        OnClick = Graph1Click
-      end
     end
     object Help1: TMenuItem
       Caption = '&Help'

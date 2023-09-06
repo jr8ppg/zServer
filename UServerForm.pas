@@ -61,7 +61,6 @@ type
     Connections1: TMenuItem;
     menuTakeChatLog: TMenuItem;
     CurrentFrequencies1: TMenuItem;
-    Graph1: TMenuItem;
     DeleteDupes1: TMenuItem;
     N3: TMenuItem;
     menuTakeCommandLog: TMenuItem;
@@ -89,7 +88,6 @@ type
     procedure MergeFile1Click(Sender: TObject);
     procedure menuTakeChatLogClick(Sender: TObject);
     procedure CurrentFrequencies1Click(Sender: TObject);
-    procedure Graph1Click(Sender: TObject);
     procedure DeleteDupes1Click(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure Windows1Click(Sender: TObject);
@@ -102,9 +100,7 @@ type
     FInitialized  : Boolean;
     FClientNumber : Integer;
     FTakeChatLog : Boolean;
-    FTakeCommandLog : Boolean;
     FChatLogFileName: string;
-    FCommandLogFileName: string;
 
     FFreqList: TFreqList;
     FConnections: TConnections;
@@ -136,7 +132,6 @@ type
     procedure RecordWindowStates;
 
     procedure AddToChatLog(str : string);
-    procedure AddToCommandLog(str: string);
     procedure IdleEvent(Sender: TObject; var Done: Boolean);
     procedure AddConsole(S : string); // adds string to clientlistbox
     procedure SendAll(str : string);
@@ -204,7 +199,6 @@ begin
    Application.OnIdle := IdleEvent;
 
    FChatLogFileName := StringReplace(Application.ExeName, '.exe', '_chat_' + FormatDateTime('yyyymmdd', Now) + '.txt', [rfReplaceAll]);
-   FCommandLogFileName := StringReplace(Application.ExeName, '.exe', '_command_' + FormatDateTime('yyyymmdd', Now) + '.txt', [rfReplaceAll]);
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -220,7 +214,6 @@ begin
    FInitialized := True;
 
    FTakeChatLog := menuTakeChatLog.Checked;
-   FTakeCommandLog := menuTakeCommandLog.Checked;
 
    F := TChooseContest.Create(Self);
    try
@@ -401,6 +394,7 @@ begin
    Form.CliSocket.HSocket := SrvSocket.Accept;
    Form.Caption := 'Client ' + IntToStr(FClientNumber);
    Form.ClientNumber := FClientNumber;
+   Form.TakeLog := menuTakeCommandLog.Checked;
    Form.Show;
    FClientList.Add(Form);
 end;
@@ -723,27 +717,6 @@ begin
    CloseFile(F);
 end;
 
-procedure TServerForm.AddToCommandLog(str: string);
-var
-   F: TextFile;
-begin
-   if FTakeCommandLog = False then begin
-      Exit;
-   end;
-
-   AssignFile(F, FCommandLogFileName);
-   if FileExists(FCommandLogFileName) then begin
-      Append(F);
-   end
-   else begin
-      Rewrite(F);
-   end;
-
-   WriteLn(F, str);
-
-   CloseFile(F);
-end;
-
 procedure TServerForm.SendButtonClick(Sender: TObject);
 var
    t, S: string;
@@ -887,18 +860,17 @@ begin
 end;
 
 procedure TServerForm.menuTakeCommandLogClick(Sender: TObject);
+var
+   i: Integer;
 begin
-   FTakeCommandLog := menuTakeCommandLog.Checked;
+   for i := 0 to FClientList.Count - 1 do begin
+      FClientList[i].TakeLog := menuTakeCommandLog.Checked;
+   end;
 end;
 
 procedure TServerForm.CurrentFrequencies1Click(Sender: TObject);
 begin
    FFreqList.Show;
-end;
-
-procedure TServerForm.Graph1Click(Sender: TObject);
-begin
-//   Graph.Show;
 end;
 
 procedure TServerForm.DeleteDupes1Click(Sender: TObject);

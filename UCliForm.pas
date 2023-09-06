@@ -35,13 +35,17 @@ type
     FInitialized : Boolean;
     LineBuffer : TStringList;
     CommTemp : string; //work string for parsing LineBuffer
+    FClientNumber: Integer;
+    FCommandLogFileName: string;
+    FTakeLog: Boolean;
     procedure AddServerConsole(msg: string);
     procedure SendLog();
     procedure GetQsoIDs();
     procedure GetLogQsoID(str: string);
     procedure ProcessCommand(S: string);
+    procedure AddToCommandLog(str: string);
+    procedure SetClientNumber(v: Integer);
   public
-    ClientNumber : Integer;
     Bands : array[b19..HiBand] of boolean;
     CurrentBand : TBand;
     CurrentOperator : string;
@@ -49,6 +53,9 @@ type
     procedure ParseLineBuffer;
     procedure SetCaption;
     procedure AddConsole(S : string);
+
+    property ClientNumber: Integer read FClientNumber write SetClientNumber;
+    property TakeLog: Boolean read FTakeLog write FTakeLog;
   end;
 
   TCliFormList = class(TObjectList<TCliForm>)
@@ -78,6 +85,8 @@ end;
 procedure TCliForm.FormCreate(Sender: TObject);
 begin
    FInitialized := False;
+   FCommandLogFileName := StringReplace(Application.ExeName, '.exe', '_#' + IntToHex(Integer(Self), 8) + '_' + FormatDateTime('yyyymmdd', Now) + '.txt', [rfReplaceAll]);
+   FTakeLog := False;
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -201,12 +210,13 @@ begin
          Continue;
       end;
 
-      str := str + LBCODE;
-
       if ServerForm.ChatOnly = False then begin
          AddConsole(str);
       end;
 
+      AddToCommandLog(str);
+
+      str := str + LBCODE;
       LineBuffer.Add(str);
    end;
 
@@ -611,6 +621,33 @@ begin
    sendbuf := ZLinkHeader + ' ' + temp;
    ServerForm.SendAllButFrom(sendbuf + LBCODE, from);
 end;
+
+procedure TCliForm.AddToCommandLog(str: string);
+var
+   F: TextFile;
+begin
+   if FTakeLog = False then begin
+      Exit;
+   end;
+
+   AssignFile(F, FCommandLogFileName);
+   if FileExists(FCommandLogFileName) then begin
+      Append(F);
+   end
+   else begin
+      Rewrite(F);
+   end;
+
+   WriteLn(F, str);
+
+   CloseFile(F);
+end;
+
+procedure TCliForm.SetClientNumber(v: Integer);
+begin
+   FClientNumber := v;
+end;
+
 
 { TCliFormList }
 
