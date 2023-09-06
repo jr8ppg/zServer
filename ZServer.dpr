@@ -48,6 +48,8 @@ begin
   end;
   hMutex := CreateMutex(nil, False, ZSERVER_MUTEX);
 
+  InitAtomTable(503);
+
   Application.Title := 'Z-Server';
   Application.CreateForm(TdmZLogGlobal, dmZLogGlobal);
   Application.CreateForm(TServerForm, ServerForm);
