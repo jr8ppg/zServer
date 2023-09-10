@@ -4,6 +4,7 @@ inherited WWMultiForm: TWWMultiForm
   Caption = 'Multipliers'
   ClientWidth = 333
   OnDestroy = FormDestroy
+  OnResize = FormResize
   OnShow = FormShow
   ExplicitWidth = 349
   PixelsPerInch = 96
@@ -18,8 +19,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel1: TRotateLabel
       Left = 252
       Top = 20
-      Width = 15
-      Height = 14
+      Width = 14
+      Height = 15
       Escapement = 90
       TextStyle = tsNone
       Caption = '1.9'
@@ -33,8 +34,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel2: TRotateLabel
       Left = 264
       Top = 20
-      Width = 15
-      Height = 14
+      Width = 14
+      Height = 15
       Escapement = 90
       TextStyle = tsNone
       Caption = '3.5'
@@ -48,8 +49,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel3: TRotateLabel
       Left = 276
       Top = 29
-      Width = 6
-      Height = 14
+      Width = 14
+      Height = 6
       Escapement = 90
       TextStyle = tsNone
       Caption = '7'
@@ -63,8 +64,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel4: TRotateLabel
       Left = 287
       Top = 23
-      Width = 12
-      Height = 14
+      Width = 14
+      Height = 12
       Escapement = 90
       TextStyle = tsNone
       Caption = '14'
@@ -78,8 +79,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel5: TRotateLabel
       Left = 299
       Top = 23
-      Width = 12
-      Height = 14
+      Width = 14
+      Height = 12
       Escapement = 90
       TextStyle = tsNone
       Caption = '21'
@@ -93,8 +94,8 @@ inherited WWMultiForm: TWWMultiForm
     object RotateLabel6: TRotateLabel
       Left = 311
       Top = 23
-      Width = 12
-      Height = 14
+      Width = 14
+      Height = 12
       Escapement = 90
       TextStyle = tsNone
       Caption = '28'
@@ -108,14 +109,15 @@ inherited WWMultiForm: TWWMultiForm
     object SortBy: TRadioGroup
       Left = 8
       Top = 3
-      Width = 121
-      Height = 30
+      Width = 209
+      Height = 32
       Caption = 'Sort by'
-      Columns = 2
+      Columns = 3
       ItemIndex = 0
       Items.Strings = (
         'Prefix'
-        'Zone')
+        'Zone'
+        'Continent')
       TabOrder = 0
       OnClick = SortByClick
     end
@@ -141,6 +143,7 @@ inherited WWMultiForm: TWWMultiForm
     ParentFont = False
     ScrollBars = ssVertical
     TabOrder = 1
+    OnTopLeftChanged = GridTopLeftChanged
   end
   object Panel1: TPanel
     Left = 0

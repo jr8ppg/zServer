@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs,
-  StdCtrls, Grids, ExtCtrls, JLLabel,
+  StdCtrls, Grids, ExtCtrls, StrUtils, JLLabel,
   UBasicMultiForm, UWWZone, UMultipliers,
   UzLogGlobal, UzLogConst, UzLogQSO;
 
@@ -32,19 +32,22 @@ type
     procedure cbStayOnTopClick(Sender: TObject);
     procedure Edit1KeyPress(Sender: TObject; var Key: Char);
     procedure FormDestroy(Sender: TObject);
+    procedure GridTopLeftChanged(Sender: TObject);
+    procedure FormResize(Sender: TObject);
   private
     { Private declarations }
     FWWZone: TWWZone;
     FCountryList: TCountryList;
     FPrefixList: TPrefixList;
     FGridReverse: array[0..500] of integer; {pointer from grid row to countrylist index}
-  public
-    { Public declarations }
-    Zone: array[b19..HiBand, 1..MAXCQZONE] of boolean;
-    procedure Reset; override;
-    procedure Add(aQSO : TQSO); override;
     procedure SortDefault;
     procedure SortZone;
+    procedure SortContinent;
+    procedure RefreshGrid;
+  public
+    { Public declarations }
+    procedure Reset; override;
+    procedure Add(aQSO : TQSO); override;
   end;
 
 implementation
@@ -77,15 +80,19 @@ begin
    FPrefixList.Free();
 end;
 
+procedure TWWMultiForm.FormResize(Sender: TObject);
+begin
+   inherited;
+   Grid.ColWidths[0] := Grid.Width;
+   RefreshGrid;
+end;
+
 procedure TWWMultiForm.Reset;
 var
    B: TBand;
    i: integer;
 begin
    FWWZone.Reset;
-   for B := b19 to HiBand do
-      for i := 1 to MAXCQZONE do
-         Zone[B, i] := False;
 
    if FCountryList.Count = 0 then
       exit;
@@ -96,57 +103,74 @@ begin
    end;
 
    case SortBy.ItemIndex of
-      0:
-         SortDefault;
-      1:
-         SortZone;
+      0: SortDefault;
+      1: SortZone;
+      2: SortContinent;
    end;
+
+   Grid.RowCount := FCountryList.Count;
 end;
 
 procedure TWWMultiForm.SortDefault;
 var
-   i, j: integer;
+   i: integer;
 begin
    if FCountryList.Count = 0 then
       exit;
-   j := Grid.TopRow;
-   Grid.RowCount := 0;
-   Grid.RowCount := FCountryList.Count;
 
    for i := 0 to FCountryList.Count - 1 do begin
-      Grid.Cells[0, i] := TCountry(FCountryList[i]).Summary;
       TCountry(FCountryList[i]).GridIndex := i;
       FGridReverse[i] := i;
    end;
-   Grid.TopRow := j;
 end;
 
 procedure TWWMultiForm.SortZone;
 var
-   i, j, x, _top: integer;
+   i, j, x: integer;
+   strZone: string;
 begin
-   if FCountryList.Count = 0 then
+   if FCountryList.Count = 0 then begin
       exit;
-   _top := Grid.TopRow;
+   end;
 
-   Grid.RowCount := 0;
-   Grid.RowCount := FCountryList.Count;
-
-   Grid.Cells[0, 0] := TCountry(FCountryList[0]).Summary; // unknown
-
+   FGridReverse[0] := 0;
    x := 1;
    for i := 1 to 40 do begin
+      strZone := RightStr('00' + IntToStr(i), 2);
       for j := 1 to FCountryList.Count - 1 do begin
-         if TCountry(FCountryList[j]).CQZone = IntToStr(i) then begin
-            Grid.Cells[0, x] := TCountry(FCountryList[j]).Summary;
+         if TCountry(FCountryList.List[j]).CQZone = strZone then begin
             TCountry(FCountryList.List[j]).GridIndex := x;
             FGridReverse[x] := j;
             inc(x);
          end;
       end;
    end;
+end;
 
-   Grid.TopRow := _top;
+procedure TWWMultiForm.SortContinent;
+var
+   i, j, x: integer;
+   cont : array[0..5] of string;
+begin
+   cont[0] := 'AS';
+   cont[1] := 'AF';
+   cont[2] := 'EU';
+   cont[3] := 'NA';
+   cont[4] := 'SA';
+   cont[5] := 'OC';
+   if FCountryList.Count = 0 then exit;
+   FGridReverse[0] := 0;
+   x := 1;
+
+   for i := 0 to 5 do begin
+      for j := 1 to FCountryList.Count - 1 do begin
+         if TCountry(FCountryList.List[j]).Continent = cont[i] then begin
+            TCountry(FCountryList.List[j]).GridIndex := x;
+            FGridReverse[x] := j;
+            inc(x);
+         end;
+      end;
+   end;
 end;
 
 procedure TWWMultiForm.Add(aQSO: TQSO);
@@ -177,16 +201,19 @@ begin
             exit;
          end;
    end;
+
+   RefreshGrid;
 end;
 
 procedure TWWMultiForm.SortByClick(Sender: TObject);
 begin
    case SortBy.ItemIndex of
-      0:
-         SortDefault;
-      1:
-         SortZone;
+      0 : SortDefault;
+      1 : SortZone;
+      2 : SortContinent;
    end;
+
+   RefreshGrid;
 end;
 
 procedure TWWMultiForm.FormShow(Sender: TObject);
@@ -210,6 +237,12 @@ begin
    end;
 end;
 
+procedure TWWMultiForm.GridTopLeftChanged(Sender: TObject);
+begin
+   inherited;
+   RefreshGrid;
+end;
+
 procedure TWWMultiForm.Button1Click(Sender: TObject);
 begin
    Close;
@@ -230,6 +263,28 @@ begin
    if Key = Chr($0D) then begin
       GoButtonClick(Self);
       Key := #0;
+   end;
+end;
+
+procedure TWWMultiForm.RefreshGrid;
+var
+   i , k : integer;
+   C: TCountry;
+begin
+   for i := Grid.TopRow to Grid.TopRow + Grid.VisibleRowCount - 1 do begin
+      if (i > Grid.RowCount - 1) then begin
+         exit;
+      end
+      else begin
+         k := FGridReverse[i];
+         C := TCountry(FCountryList.List[k]);
+         if (k >= 0) and (k < FCountryList.Count) then begin
+            Grid.Cells[0, i] := C.Summary;
+         end
+         else begin
+            Grid.Cells[0, i] := '';
+         end;
+      end;
    end;
 end;
 
