@@ -19,6 +19,7 @@ const
   WM_ZCMD_RENEW = (WM_USER + 208);
   WM_ZCMD_INSQSO = (WM_USER + 209);
   WM_ZCMD_SENDALL = (WM_USER + 210);
+  WM_ZCMD_ADDCONSOLE = (WM_USER + 211);
 
 implementation
 

@@ -481,7 +481,7 @@ begin
 
    if Pos('OPERATOR', temp) = 1 then begin
       Delete(temp, 1, 9);
-      param_atom := AddAtom(PChar(temp2));
+      param_atom := AddAtom(PChar(temp));
       PostMessage(ServerForm.Handle, WM_ZCMD_SETOPERATOR, from, param_atom);
       Exit;
    end;
@@ -495,10 +495,6 @@ begin
       end;
 
       B := TBand(i);
-
-      if B = bUnknown then begin
-         Exit;
-      end;
 
       PostMessage(ServerForm.Handle, WM_ZCMD_SETBAND, from, i);
 
@@ -522,7 +518,8 @@ begin
    if Pos('PUTMESSAGE', temp) = 1 then begin
       temp2 := temp;
       Delete(temp2, 1, 11);
-      AddConsole(temp2);
+      param_atom := AddAtom(PChar(temp2));
+      PostMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, from, param_atom);
    end;
 
    if Pos('SPOT', temp) = 1 then begin

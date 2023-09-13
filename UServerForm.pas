@@ -122,6 +122,7 @@ type
     procedure OnEditQsoTo(var msg: TMessage); message WM_ZCMD_EDITQSOTO;
     procedure OnRenew(var msg: TMessage); message WM_ZCMD_RENEW;
     procedure OnInsQso(var msg: TMessage); message WM_ZCMD_INSQSO;
+    procedure OnAddConsole(var msg: TMessage); message WM_ZCMD_ADDCONSOLE;
     procedure StartServer;
     procedure LoadSettings();
     procedure SaveSettings();
@@ -133,11 +134,11 @@ type
 
     procedure AddToChatLog(str : string);
     procedure IdleEvent(Sender: TObject; var Done: Boolean);
-    procedure AddConsole(S : string); // adds string to clientlistbox
     procedure SendAll(str : string);
   public
     ChatOnly : boolean;
 
+    procedure AddConsole(S : string); // adds string to clientlistbox
     function GetConsole(): TStringList;
     function GetWhoList(): TStringList;
     function GetQSObyID(id : integer) : TQSO;
@@ -609,6 +610,28 @@ begin
    RecalcAll;
    FStats.UpdateStats;
    aQSO.Free;
+end;
+
+// ****************************************************************************
+
+procedure TServerForm.OnAddConsole(var msg: TMessage);
+var
+   from: Integer;
+   S: string;
+   szBuffer: array[0..1023] of Char;
+   param_atom: ATOM;
+begin
+   from := msg.WParam;
+   param_atom := msg.LParam;
+   if GetAtomName(param_atom, @szBuffer, SizeOf(szBuffer)) = 0 then begin
+      Exit;
+   end;
+
+   S := StrPas(szBuffer);
+
+   AddConsole(S);
+
+   DeleteAtom(param_atom);
 end;
 
 // ****************************************************************************
