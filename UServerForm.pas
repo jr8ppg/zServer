@@ -622,14 +622,20 @@ var
    param_atom: ATOM;
 begin
    from := msg.WParam;
-   param_atom := msg.LParam;
+   param_atom := msg.LParamLo;
    if GetAtomName(param_atom, @szBuffer, SizeOf(szBuffer)) = 0 then begin
       Exit;
    end;
 
    S := StrPas(szBuffer);
 
-   AddConsole(S);
+   if msg.LParamHi = 0 then begin
+      AddConsole(S);
+   end;
+
+   if msg.LParamHi = 1 then begin
+      AddToChatLog(S);
+   end;
 
    DeleteAtom(param_atom);
 end;

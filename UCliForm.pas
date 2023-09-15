@@ -38,12 +38,13 @@ type
     FClientNumber: Integer;
     FCommandLogFileName: string;
     FTakeLog: Boolean;
-    procedure AddServerConsole(msg: string);
+    procedure AddServerConsole(S: string);
+    procedure AddChat(S: string);
     procedure SendLog();
     procedure GetQsoIDs();
     procedure GetLogQsoID(str: string);
     procedure ProcessCommand(S: string);
-    procedure AddToCommandLog(str: string);
+    procedure AddToCommandLog(direction: string; str: string);
     procedure SetClientNumber(v: Integer);
   public
     Bands : array[b19..HiBand] of boolean;
@@ -157,6 +158,8 @@ begin
    end;
 
    CliSocket.SendStr(str);
+
+   AddToCommandLog('S', str);
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -212,9 +215,10 @@ begin
 
       if ServerForm.ChatOnly = False then begin
          AddConsole(str);
+         AddServerConsole(str);
       end;
 
-      AddToCommandLog(str);
+      AddToCommandLog('R', str);
 
       str := str + LBCODE;
       LineBuffer.Add(str);
@@ -227,16 +231,26 @@ end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
-procedure TCliForm.AddServerConsole(msg: string);
+procedure TCliForm.AddServerConsole(S: string);
 var
-   S: string;
+   param_atom: ATOM;
 begin
-   S := FillRight(IntToStr(ClientNumber), 3) + ' ' +
-        ZLinkHeader + ' PUTMESSAGE ' +
-        FormatDateTime('hh:nn', SysUtils.Now) + ' ' +
-        msg;
+   S := FillRight(IntToStr(ClientNumber), 3) + ' ' + S;
 
-   ProcessCommand(S);
+   param_atom := AddAtom(PChar(S));
+   PostMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, ClientNumber, MAKELPARAM(param_atom,0));
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TCliForm.AddChat(S: string);
+var
+   param_atom: ATOM;
+begin
+//   S := FillRight(IntToStr(ClientNumber), 3) + ' ' + S;
+
+   param_atom := AddAtom(PChar(S));
+   PostMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, ClientNumber, MAKELPARAM(param_atom,1));
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -303,10 +317,11 @@ var
    t: string;
 begin
    t := FormatDateTime('hh:nn', SysUtils.Now);
-   S := ' ZServer> ' + SendEdit.Text;
+   S := t + ' ' + ' ZServer> ' + SendEdit.Text;
 
-   AddServerConsole(S);
-   AddConsole(t + ' ' + S);
+   AddChat(S);
+   AddConsole(S);
+   SendStr(ZLinkHeader + ' PUTMESSAGE ' + S + LBCODE);
 
    SendEdit.Clear;
    ActiveControl := SendEdit;
@@ -519,7 +534,7 @@ begin
       temp2 := temp;
       Delete(temp2, 1, 11);
       param_atom := AddAtom(PChar(temp2));
-      PostMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, from, param_atom);
+      PostMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, from, MAKELPARAM(param_atom, 1));
    end;
 
    if Pos('SPOT', temp) = 1 then begin
@@ -619,7 +634,7 @@ begin
    ServerForm.SendAllButFrom(sendbuf + LBCODE, from);
 end;
 
-procedure TCliForm.AddToCommandLog(str: string);
+procedure TCliForm.AddToCommandLog(direction: string; str: string);
 var
    F: TextFile;
 begin
@@ -635,7 +650,9 @@ begin
       Rewrite(F);
    end;
 
-   WriteLn(F, str);
+   str := StringReplace(str, LBCODE, '', [rfReplaceAll]);
+
+   WriteLn(F, direction + ' ' + str);
 
    CloseFile(F);
 end;
