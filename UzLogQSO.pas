@@ -289,6 +289,7 @@ type
     FDupeCheckList: TQSOListArray;
     FBandList: TQSOListArray;
     FAllPhone: Boolean;    // True: SSB, FM, AM are same
+    FIdList: TList<Integer>;
     procedure Delete(i : Integer);
     procedure ProcessDelete(beforeQSO: TQSO);
     procedure ProcessEdit(afterQSO: TQSO; fAdd: Boolean);
@@ -1438,6 +1439,8 @@ begin
       FBandList[B].Add(Q);
    end;
 
+   FIdList := TList<Integer>.Create();
+
    FSaved := True;
    FQueOK := True;
    FAcceptDifferentMode := False;
@@ -1461,6 +1464,7 @@ begin
 
    FQsoList.Free();
    FQueList.Free();
+   FIdList.Free();
 
    Inherited;
 end;
@@ -1530,7 +1534,17 @@ end;
 procedure TLog.Add(aQSO: TQSO);
 var
    xQSO: TQSO;
+   qsoid: Integer;
+   i: Integer;
 begin
+   qsoid := aQSO.Reserve3 div 100;
+   if FIdList.BinarySearch(qsoid, i) = True then begin
+      Exit;
+   end
+   else begin
+      FIdList.Insert(i, qsoid);
+   end;
+
    FQsoList.Add(aQSO);
 
    xQSO := TQSO.Create;
@@ -1705,6 +1719,7 @@ procedure TLog.Delete(i: Integer);
 var
    aQSO: TQSO;
    Index: Integer;
+   qsoid: Integer;
 begin
    if i > TotalQSO then begin
       Exit;
@@ -1719,6 +1734,11 @@ begin
 
    FQsoList.Delete(i);
 
+   qsoid := aQSO.Reserve3 div 100;
+   if FIdList.BinarySearch(qsoid, Index) = True then begin
+      FIdList.Delete(Index);
+   end;
+
    FSaved := False;
    RebuildDupeCheckList;
 
@@ -1728,6 +1748,7 @@ end;
 procedure TLog.DeleteQSO(aQSO: TQSO);
 var
    Index: Integer;
+   qsoid: Integer;
 begin
    zyloLogUpdated(evDeleteQSO, aQSO, nil);
 
@@ -1739,6 +1760,11 @@ begin
    Index := FQSOList.IndexOf(aQSO);
    if Index > -1 then begin
       FQsoList.Delete(Index);
+   end;
+
+   qsoid := aQSO.Reserve3 div 100;
+   if FIdList.BinarySearch(qsoid, Index) = True then begin
+      FIdList.Delete(Index);
    end;
 
    FSaved := False;
@@ -1776,10 +1802,18 @@ begin
 end;
 
 procedure TLog.Insert(i: Integer; aQSO: TQSO);
+var
+   qsoid: Integer;
+   newindex: Integer;
 begin
    FQsoList.Insert(i, aQSO);
    RebuildDupeCheckList;
    FSaved := False;
+
+   qsoid := aQSO.Reserve3 div 100;
+   if FIdList.BinarySearch(qsoid, newindex) = False then begin
+      FIdList.Insert(newindex, qsoid);
+   end;
 
    zyloLogUpdated(evInsertQSO, nil, aQSO);
 end;

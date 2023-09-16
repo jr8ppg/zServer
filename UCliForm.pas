@@ -234,8 +234,10 @@ end;
 procedure TCliForm.AddServerConsole(S: string);
 var
    param_atom: ATOM;
+   t: string;
 begin
-   S := FillRight(IntToStr(ClientNumber), 3) + ' ' + S;
+   t := FormatDateTime('hh:nn', SysUtils.Now);
+   S := t + ' ' + FillRight(IntToStr(ClientNumber), 3) + ' ' + S;
 
    param_atom := AddAtom(PChar(S));
    PostMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, ClientNumber, MAKELPARAM(param_atom,0));
@@ -383,17 +385,20 @@ end;
 
 procedure TCliForm.GetQsoIDs();
 var
-   i: Integer;
+   Index: Integer;
    S: string;
+   C: Integer;
 begin
-   i := 1;
-   while i <= ServerForm.MasterLog.TotalQSO do begin
+   Index := 1;
+   while Index <= ServerForm.MasterLog.TotalQSO do begin
+      C := 0;
       S := ZLinkHeader + ' QSOIDS ';
       repeat
-         S := S + IntToStr(ServerForm.MasterLog.QSOList[i].Reserve3);
+         S := S + IntToStr(ServerForm.MasterLog.QSOList[Index].Reserve3);
          S := S + ' ';
-         inc(i);
-      until (i mod 10 = 0) or (i > ServerForm.MasterLog.TotalQSO);
+         Inc(Index);
+         Inc(C);
+      until (C = 10) or (Index > ServerForm.MasterLog.TotalQSO);
 
       SendStr(S + LBCODE);
    end;
@@ -413,7 +418,7 @@ var
    temp2: string;
    aQSO: TQSO;
 begin
-   temp := str;
+   temp := str + ' ';
 
    Delete(temp, 1, 12);
    i := Pos(' ', temp);
