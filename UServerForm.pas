@@ -123,6 +123,7 @@ type
     procedure OnRenew(var msg: TMessage); message WM_ZCMD_RENEW;
     procedure OnInsQso(var msg: TMessage); message WM_ZCMD_INSQSO;
     procedure OnAddConsole(var msg: TMessage); message WM_ZCMD_ADDCONSOLE;
+    procedure OnSendAll(var msg: TMessage); message WM_ZCMD_SENDALL;
     procedure StartServer;
     procedure LoadSettings();
     procedure SaveSettings();
@@ -636,6 +637,29 @@ begin
    if msg.LParamHi = 1 then begin
       AddToChatLog(S);
    end;
+
+   DeleteAtom(param_atom);
+end;
+
+// ****************************************************************************
+
+procedure TServerForm.OnSendAll(var msg: TMessage);
+var
+   from: Integer;
+   S: string;
+   szBuffer: array[0..1023] of Char;
+   param_atom: ATOM;
+begin
+   from := msg.WParam;
+   param_atom := msg.LParamLo;
+   if GetAtomName(param_atom, @szBuffer, SizeOf(szBuffer)) = 0 then begin
+      Exit;
+   end;
+
+   S := StrPas(szBuffer);
+   S := ZLinkHeader + ' PUTMESSAGE ' + S;
+
+   SendAll(S);
 
    DeleteAtom(param_atom);
 end;

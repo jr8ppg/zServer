@@ -284,10 +284,17 @@ end;
 procedure TCliForm.CliSocketSessionClosed(Sender: TObject; Error: Word);
 var
    S: string;
+   param_atom: ATOM;
+   t: string;
 begin
-   S := MHzString[CurrentBand] + ' client disconnected from network.';
+   t := FormatDateTime('hh:nn', SysUtils.Now);
+   S := t + ' ' + FillRight(IntToStr(ClientNumber), 3) + ' ' + MHzString[CurrentBand] + ' client disconnected from network.';
 
-   AddServerConsole(S);
+   param_atom := AddAtom(PChar(S));
+   SendMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, ClientNumber, MAKELPARAM(param_atom,0));
+
+   param_atom := AddAtom(PChar(S + LBCODE));
+   SendMessage(ServerForm.Handle, WM_ZCMD_SENDALL, ClientNumber, MAKELPARAM(param_atom,0));
 
    Close;
 end;
