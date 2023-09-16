@@ -508,9 +508,16 @@ procedure TServerForm.OnPutQSO(var msg: TMessage);
 var
    from: Integer;
    aQSO: TQSO;
+   t: string;
 begin
+   t := FormatDateTime('hh:nn', SysUtils.Now);
    from := msg.WParam;
    aQSO := TQSO(msg.LParam);
+
+   if (FStats.MasterLog.CheckQSOID(aQSO.QsoId) = True) then begin
+      AddConsole(t + ' duplicate QSO detected! ==>' + aQSO.QSOinText);
+      Exit;
+   end;
 
    FStats.Add(aQSO);
    if Assigned(FMultiForm) then begin
@@ -524,9 +531,16 @@ procedure TServerForm.OnPutLog(var msg: TMessage);
 var
    from: Integer;
    aQSO: TQSO;
+   t: string;
 begin
+   t := FormatDateTime('hh:nn', SysUtils.Now);
    from := msg.WParam;
    aQSO := TQSO(msg.LParam);
+
+   if (FStats.MasterLog.CheckQSOID(aQSO.QsoId) = True) then begin
+      AddConsole(t + ' duplicate QSO detected! ==>' + aQSO.QSOinText);
+      Exit;
+   end;
 
    FStats.AddNoUpdate(aQSO);
    if Assigned(FMultiForm) then begin

@@ -87,6 +87,7 @@ object CliForm: TCliForm
     TabOrder = 2
   end
   object CliSocket: TWSocket
+    LineMode = True
     LineEnd = #13#10
     Proto = 'tcp'
     LocalAddr = '0.0.0.0'

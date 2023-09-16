@@ -5,10 +5,10 @@ interface
 uses
   WinTypes, WinProcs, Messages, SysUtils, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ExtCtrls, OverbyteIcsWndControl, OverbyteIcsWSocket,
-  Generics.Collections, Generics.Defaults,
+  Generics.Collections, Generics.Defaults, StrUtils,
   UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages;
 
-const LBCODE = #13{+#10};
+const LBCODE = #13#10;
 
 type
   TCliForm = class(TForm)
@@ -200,6 +200,7 @@ var
    str: string;
    SL: TStringList;
    i: Integer;
+   CH: Char;
 begin
    SL := TStringList.Create();
 
@@ -398,14 +399,18 @@ var
 begin
    Index := 1;
    while Index <= ServerForm.MasterLog.TotalQSO do begin
+      Application.ProcessMessages();
+
       C := 0;
       S := ZLinkHeader + ' QSOIDS ';
       repeat
-         S := S + IntToStr(ServerForm.MasterLog.QSOList[Index].Reserve3);
-         S := S + ' ';
+         if ServerForm.MasterLog.QSOList[Index].Reserve3 <> 0 then begin
+            S := S + IntToStr(ServerForm.MasterLog.QSOList[Index].Reserve3);
+            S := S + ' ';
+            Inc(C);
+         end;
          Inc(Index);
-         Inc(C);
-      until (C = 10) or (Index > ServerForm.MasterLog.TotalQSO);
+      until (C = 20) or (Index > ServerForm.MasterLog.TotalQSO);
 
       SendStr(S + LBCODE);
    end;
@@ -430,6 +435,8 @@ begin
    Delete(temp, 1, 12);
    i := Pos(' ', temp);
    while i > 1 do begin
+      Application.ProcessMessages();
+
       temp2 := copy(temp, 1, i - 1);
       Delete(temp, 1, i);
       qsoid := StrToInt(temp2);
