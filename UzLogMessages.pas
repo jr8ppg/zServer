@@ -20,6 +20,7 @@ const
   WM_ZCMD_INSQSO = (WM_USER + 209);
   WM_ZCMD_SENDALL = (WM_USER + 210);
   WM_ZCMD_ADDCONSOLE = (WM_USER + 211);
+  WM_ZCMD_UPDATE_DISPLAY = (WM_USER + 212);
 
 implementation
 

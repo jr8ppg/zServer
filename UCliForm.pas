@@ -38,6 +38,8 @@ type
     FClientNumber: Integer;
     FCommandLogFileName: string;
     FTakeLog: Boolean;
+    FCurrentBand : TBand;
+    FCurrentOperator : string;
     procedure AddServerConsole(S: string);
     procedure AddChat(S: string);
     procedure SendLog();
@@ -48,13 +50,13 @@ type
     procedure SetClientNumber(v: Integer);
   public
     Bands : array[b19..HiBand] of boolean;
-    CurrentBand : TBand;
-    CurrentOperator : string;
     procedure SendStr(str : string);
     procedure ParseLineBuffer;
     procedure SetCaption;
     procedure AddConsole(S : string);
 
+    property CurrentBand: TBand read FCurrentBand;
+    property CurrentOperator: string read FCurrentOperator;
     property ClientNumber: Integer read FClientNumber write SetClientNumber;
     property TakeLog: Boolean read FTakeLog write FTakeLog;
   end;
@@ -102,8 +104,8 @@ begin
       SendEdit.Text := '';
       ActiveControl := SendEdit;
       LineBuffer := TStringList.Create;
-      CurrentBand := b35;
-      CurrentOperator := '';
+      FCurrentBand := b35;
+      FCurrentOperator := '';
       for B := b19 to HiBand do
          Bands[B] := False;
    end;
@@ -140,10 +142,10 @@ procedure TCliForm.SetCaption;
 var
    S: string;
 begin
-   S := BandString[CurrentBand];
+   S := BandString[FCurrentBand];
 
-   if CurrentOperator <> '' then begin
-      S := S + ' by ' + CurrentOperator;
+   if FCurrentOperator <> '' then begin
+      S := S + ' by ' + FCurrentOperator;
    end;
 
    Caption := S;
@@ -200,7 +202,6 @@ var
    str: string;
    SL: TStringList;
    i: Integer;
-   CH: Char;
 begin
    SL := TStringList.Create();
 
@@ -289,7 +290,7 @@ var
    t: string;
 begin
    t := FormatDateTime('hh:nn', SysUtils.Now);
-   S := t + ' ' + FillRight(IntToStr(ClientNumber), 3) + ' ' + MHzString[CurrentBand] + ' client disconnected from network.';
+   S := t + ' ' + FillRight(IntToStr(ClientNumber), 3) + ' ' + MHzString[FCurrentBand] + ' client disconnected from network.';
 
    param_atom := AddAtom(PChar(S));
    SendMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, ClientNumber, MAKELPARAM(param_atom,0));
@@ -354,12 +355,16 @@ var
 begin
    if ServerForm.MasterLog.TotalQSO = 0 then begin
       S := '*** MasterLog is empty ***';
-      AddServerConsole(S);
+      if ServerForm.ChatOnly = False then begin
+         AddServerConsole(S);
+      end;
       Exit;
    end;
 
-   S := '*** BEGIN SENDLOG ***';
-   AddServerConsole(S);
+   if ServerForm.ChatOnly = False then begin
+      S := '*** BEGIN SENDLOG ***';
+      AddServerConsole(S);
+   end;
 
    C := 0;
    try
@@ -384,8 +389,10 @@ begin
       S := ZLinkHeader + ' RENEW' + LBCODE;
       SendStr(S);
    finally
-      S := '*** END SENDLOG = ' + IntToStr(C) + ' QSOs sent ***';
-      AddServerConsole(S);
+      if ServerForm.ChatOnly = False then begin
+         S := '*** END SENDLOG = ' + IntToStr(C) + ' QSOs sent ***';
+         AddServerConsole(S);
+      end;
    end;
 end;
 
@@ -515,8 +522,11 @@ begin
 
    if Pos('OPERATOR', temp) = 1 then begin
       Delete(temp, 1, 9);
-      param_atom := AddAtom(PChar(temp));
-      PostMessage(ServerForm.Handle, WM_ZCMD_SETOPERATOR, from, param_atom);
+
+      FCurrentOperator := temp;
+      SetCaption();
+
+      PostMessage(ServerForm.Handle, WM_ZCMD_UPDATE_DISPLAY, from, 0);
       Exit;
    end;
 
@@ -530,7 +540,10 @@ begin
 
       B := TBand(i);
 
-      PostMessage(ServerForm.Handle, WM_ZCMD_SETBAND, from, i);
+      FCurrentBand := B;
+      SetCaption();
+
+      PostMessage(ServerForm.Handle, WM_ZCMD_UPDATE_DISPLAY, from, 0);
 
       if ServerForm.IsBandUsed2(from, B) = True then begin
          sendbuf := ZLinkHeader + ' PUTMESSAGE ' + 'Band already in use!';

@@ -110,9 +110,9 @@ begin
    for i := 1 to MasterLog.TotalQSO do begin
       aQSO := MasterLog.QSOList[i];
 
-      if aQSO.Dupe then begin
-         Continue;
-      end;
+//      if aQSO.Dupe then begin
+//         Continue;
+//      end;
 
       if aQSO.Invalid then begin
          Continue;

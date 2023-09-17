@@ -1,5 +1,7 @@
 unit UzLogConst;
 
+{$DEFINE ZSERVER}
+
 interface
 
 uses
@@ -160,10 +162,17 @@ const
                                              '18','21','24','28','50','144',
                                              '430','1200','2400','5600','10G','Target','Unknown');
 
+  {$IFNDEF ZSERVER}
   BandString: array[b19..HiBand] of string = ('1.9 MHz','3.5 MHz','7 MHz','10 MHz',
                                              '14 MHz', '18 MHz','21 MHz','24 MHz','28 MHz',
                                              '50 MHz','144 MHz','430 MHz','1200 MHz','2400 MHz',
                                              '5600 MHz','10 GHz & up');
+  {$ELSE}
+  BandString: array[b19..bUnknown] of string = ('1.9 MHz','3.5 MHz','7 MHz','10 MHz',
+                                             '14 MHz', '18 MHz','21 MHz','24 MHz','28 MHz',
+                                             '50 MHz','144 MHz','430 MHz','1200 MHz','2400 MHz',
+                                             '5600 MHz','10 GHz & up', '', 'TELNET');
+  {$ENDIF}
 
   ADIFBandString : array[b19..HiBand] of string = ('160m','80m','40m','30m',
                                              '20m', '17m','15m','12m','10m',

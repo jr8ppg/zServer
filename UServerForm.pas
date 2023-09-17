@@ -113,8 +113,6 @@ type
 
     procedure OnClientClosed(var msg: TMessage); message WM_USER_CLIENT_CLOSED;
     procedure OnFreqData(var msg: TMessage); message WM_ZCMD_FREQDATA;
-    procedure OnSetOperator(var msg: TMessage); message WM_ZCMD_SETOPERATOR;
-    procedure OnSetBand(var msg: TMessage); message WM_ZCMD_SETBAND;
     procedure OnPutQSO(var msg: TMessage); message WM_ZCMD_PUTQSO;
     procedure OnPutLog(var msg: TMessage); message WM_ZCMD_PUTLOG;
     procedure OnExDelQSO(var msg: TMessage); message WM_ZCMD_EXDELQSO;
@@ -124,6 +122,7 @@ type
     procedure OnInsQso(var msg: TMessage); message WM_ZCMD_INSQSO;
     procedure OnAddConsole(var msg: TMessage); message WM_ZCMD_ADDCONSOLE;
     procedure OnSendAll(var msg: TMessage); message WM_ZCMD_SENDALL;
+    procedure OnUpdateDisplay(var msg: TMessage); message WM_ZCMD_UPDATE_DISPLAY;
     procedure StartServer;
     procedure LoadSettings();
     procedure SaveSettings();
@@ -433,6 +432,9 @@ begin
    for i := 0 to FClientList.Count - 1 do begin
       FClientList[i].ClientNumber := i + 1;
    end;
+
+   // コネクションリストを更新
+   FConnections.UpdateDisplay();
 end;
 
 // ****************************************************************************
@@ -454,52 +456,6 @@ begin
    FFreqList.ProcessFreqData(S);
 
    DeleteAtom(param_atom);
-end;
-
-// ****************************************************************************
-
-procedure TServerForm.OnSetOperator(var msg: TMessage);
-var
-   S: string;
-   param_atom: ATOM;
-   from: Integer;
-   szBuffer: array[0..1023] of Char;
-begin
-   ZeroMemory(@szBuffer, SizeOf(szBuffer));
-   from := msg.WParam;
-   param_atom := msg.LParam;
-   if GetAtomName(param_atom, @szBuffer, SizeOf(szBuffer)) = 0 then begin
-      Exit;
-   end;
-
-   S := StrPas(szBuffer);
-
-   FClientList[from].CurrentOperator := S;
-   FClientList[from].SetCaption;
-   FConnections.UpdateDisplay;
-
-   DeleteAtom(param_atom);
-end;
-
-// ****************************************************************************
-
-procedure TServerForm.OnSetBand(var msg: TMessage);
-var
-   S: string;
-   from: Integer;
-   szBuffer: array[0..1023] of Char;
-   B: TBand;
-begin
-   ZeroMemory(@szBuffer, SizeOf(szBuffer));
-   from := msg.WParam;
-   B := TBand(msg.LParam);
-
-   S := StrPas(szBuffer);
-
-   FClientList[from].CurrentBand := B;
-
-   FClientList[from].SetCaption;
-   FConnections.UpdateDisplay;
 end;
 
 // ****************************************************************************
@@ -649,6 +605,7 @@ begin
    end;
 
    if msg.LParamHi = 1 then begin
+      AddConsole(S);
       AddToChatLog(S);
    end;
 
@@ -671,11 +628,19 @@ begin
    end;
 
    S := StrPas(szBuffer);
-   S := ZLinkHeader + ' PUTMESSAGE ' + S;
 
-   SendAll(S);
+   SendAll(ZLinkHeader + ' PUTMESSAGE ' + S);
+
+   AddToChatLog(S);
 
    DeleteAtom(param_atom);
+end;
+
+// ****************************************************************************
+
+procedure TServerForm.OnUpdateDisplay(var msg: TMessage);
+begin
+   FConnections.UpdateDisplay;
 end;
 
 // ****************************************************************************
@@ -770,6 +735,9 @@ begin
    if FTakeChatLog = False then begin
       Exit;
    end;
+
+   str := StringReplace(str, #13, '', [rfReplaceAll]);
+   str := StringReplace(str, #10, '', [rfReplaceAll]);
 
    AssignFile(F, FChatLogFileName);
    if FileExists(FChatLogFileName) then begin
