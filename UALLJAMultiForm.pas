@@ -112,7 +112,6 @@ begin
    str := aQSO.NrRcvd;
    Delete(str, length(str), 1); // delete the last char
 
-   aQSO.NewMulti1 := False;
    try
       i := StrToInt(str);
    except
@@ -131,7 +130,6 @@ begin
 
    if MultiArray[aQSO.Band, M] = False then begin
       MultiArray[aQSO.Band, M] := True;
-      aQSO.NewMulti1 := True;
 
       str := '';
       for B := b19 to b50 do begin

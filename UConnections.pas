@@ -39,7 +39,7 @@ var
    str: string;
 begin
    ListBox.Items.Clear;
-   for B := b19 to HiBand do begin
+   for B := b19 to bUnknown do begin
       for i := 0 to ServerForm.ClientList.Count - 1 do begin
          if ServerForm.ClientList[i].CurrentBand = B then begin
             str := FillRight(BandString[ServerForm.ClientList[i].CurrentBand], 9) + ServerForm.ClientList[i].CurrentOperator;

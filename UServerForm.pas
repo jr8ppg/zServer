@@ -470,7 +470,7 @@ begin
    from := msg.WParam;
    aQSO := TQSO(msg.LParam);
 
-   if (FStats.MasterLog.CheckQSOID(aQSO.QsoId) = True) then begin
+   if (FStats.MasterLog.CheckQSOID(aQSO.Reserve3) = True) then begin
       AddConsole(t + ' duplicate QSO detected! ==>' + aQSO.QSOinText);
       Exit;
    end;
@@ -493,7 +493,7 @@ begin
    from := msg.WParam;
    aQSO := TQSO(msg.LParam);
 
-   if (FStats.MasterLog.CheckQSOID(aQSO.QsoId) = True) then begin
+   if (FStats.MasterLog.CheckQSOID(aQSO.Reserve3) = True) then begin
       AddConsole(t + ' duplicate QSO detected! ==>' + aQSO.QSOinText);
       Exit;
    end;
