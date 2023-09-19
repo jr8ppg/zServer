@@ -193,13 +193,14 @@ begin
    end;
 
    if aQSO.NewMulti2 then begin
-      for i := 0 to FCountryList.Count - 1 do
+      for i := 0 to FCountryList.Count - 1 do begin
          if TCountry(FCountryList.List[i]).Country = aQSO.Multi2 then begin
             C := TCountry(FCountryList.List[i]);
             C.Worked[aQSO.Band] := True;
             Grid.Cells[0, C.GridIndex] := C.Summary;
-            exit;
+            Break;
          end;
+      end;
    end;
 
    RefreshGrid;
