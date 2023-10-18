@@ -5,25 +5,24 @@ interface
 uses
   WinTypes, WinProcs, Messages, SysUtils, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, ExtCtrls, OverbyteIcsWndControl, OverbyteIcsWSocket,
-  Generics.Collections, Generics.Defaults, StrUtils,
+  Generics.Collections, Generics.Defaults, StrUtils,  WinSock,
   UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages;
 
 const LBCODE = #13#10;
 
 type
   TCliForm = class(TForm)
-    CliSocket: TWSocket;
     Panel1: TPanel;
     SendEdit: TEdit;
     SendButton: TButton;
     Panel2: TPanel;
     DisconnectButton: TButton;
     ListBox: TListBox;
+    CliSocket: TWSocket;
     procedure CreateParams(var Params: TCreateParams); override;
     procedure FormCreate(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
-    procedure CliSocketDataAvailable(Sender: TObject; Error: Word);
     procedure CliSocketSessionClosed(Sender: TObject; Error: Word);
     procedure SendButtonClick(Sender: TObject);
     procedure DisconnectButtonClick(Sender: TObject);
@@ -33,8 +32,6 @@ type
     procedure CliSocketSessionConnected(Sender: TObject; ErrCode: Word);
   private
     FInitialized : Boolean;
-    LineBuffer : TStringList;
-    CommTemp : string; //work string for parsing LineBuffer
     FClientNumber: Integer;
     FCommandLogFileName: string;
     FTakeLog: Boolean;
@@ -42,16 +39,11 @@ type
     FCurrentOperator : string;
     procedure AddServerConsole(S: string);
     procedure AddChat(S: string);
-    procedure SendLog();
-    procedure GetQsoIDs();
-    procedure GetLogQsoID(str: string);
-    procedure ProcessCommand(S: string);
     procedure AddToCommandLog(direction: string; str: string);
     procedure SetClientNumber(v: Integer);
   public
     Bands : array[b19..HiBand] of boolean;
     procedure SendStr(str : string);
-    procedure ParseLineBuffer;
     procedure SetCaption;
     procedure AddConsole(S : string);
 
@@ -67,6 +59,37 @@ type
     constructor Create(OwnsObjects: Boolean = False);
     destructor Destroy(); override;
   end;
+
+  TClientThread = class(TThread)
+  private
+    FClientSocket: TWSocket;
+    FClientHSocket: TSocket;
+    FClientForm: TCliForm;
+
+    FLineBuffer: TStringList;
+    FCommTemp : string; //work string for parsing LineBuffer
+
+    FClientNumber: Integer;
+    FCurrentBand : TBand;
+
+    procedure ServerWSocketDataAvailable(Sender: TObject; Error: Word);
+    procedure ServerWSocketSessionClosed(Sender: TObject; Error: Word);
+    procedure ParseLineBuffer();
+    procedure ProcessCommand(S: string);
+    procedure SendLog();
+    procedure GetQsoIDs();
+    procedure GetLogQsoID(str: string);
+  protected
+    procedure Execute(); override;
+  public
+    constructor Create(ClientHSocket: TSocket; AClientForm: TCliForm; AClientNumber: Integer);
+    destructor Destroy(); override;
+    procedure Release();
+
+    property ClientWSocket : TWSocket read FClientSocket write FClientSocket;
+  end;
+
+
 
 implementation
 
@@ -103,7 +126,6 @@ begin
       // DisplayMemo.Clear;
       SendEdit.Text := '';
       ActiveControl := SendEdit;
-      LineBuffer := TStringList.Create;
       FCurrentBand := b35;
       FCurrentOperator := '';
       for B := b19 to HiBand do
@@ -115,8 +137,6 @@ end;
 
 procedure TCliForm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
-   LineBuffer.Clear;
-   LineBuffer.Free;
    PostMessage(TForm(Owner).Handle, WM_USER_CLIENT_CLOSED, 0, LongInt(Self));
 end;
 
@@ -162,73 +182,6 @@ begin
    CliSocket.SendStr(str);
 
    AddToCommandLog('S', str);
-end;
-
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-
-procedure TCliForm.ParseLineBuffer;
-var
-   max, i, j, x: Integer;
-   str: string;
-begin
-   max := LineBuffer.Count - 1;
-   if max < 0 then
-      exit;
-   for i := 0 to max do begin
-      str := LineBuffer.Strings[0];
-      for j := 1 to Length(str) do begin
-         if str[j] = chr($0D) then begin
-            x := Pos(ZLinkHeader, CommTemp);
-            if x > 0 then begin
-               CommTemp := Copy(CommTemp, x, 255);
-
-               ProcessCommand(FillRight(IntToStr(ClientNumber), 3) + ' ' + CommTemp);
-
-//               ServerForm.AddCommandQue(FillRight(IntToStr(ClientNumber), 3) + ' ' + CommTemp);
-            end;
-            CommTemp := '';
-         end
-         else
-            CommTemp := CommTemp + str[j];
-      end;
-      LineBuffer.Delete(0);
-   end;
-end;
-
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-
-procedure TCliForm.CliSocketDataAvailable(Sender: TObject; Error: Word);
-var
-   str: string;
-   SL: TStringList;
-   i: Integer;
-begin
-   SL := TStringList.Create();
-
-   str := CliSocket.ReceiveStr;
-
-   SL.Text := str;
-
-   for i := 0 to Sl.Count - 1 do begin
-      str := Trim(SL[i]);
-      if str = '' then begin
-         Continue;
-      end;
-
-      if ServerForm.ChatOnly = False then begin
-         AddConsole(str);
-         AddServerConsole(str);
-      end;
-
-      AddToCommandLog('R', str);
-
-      str := str + LBCODE;
-      LineBuffer.Add(str);
-   end;
-
-   ParseLineBuffer;
-
-   SL.Free();
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -347,122 +300,180 @@ end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
-procedure TCliForm.SendLog();
+procedure TCliForm.AddToCommandLog(direction: string; str: string);
 var
-   i: Integer;
-   S: string;
-   C: Integer;
+   F: TextFile;
 begin
-   if ServerForm.MasterLog.TotalQSO = 0 then begin
-      S := '*** MasterLog is empty ***';
-      if ServerForm.ChatOnly = False then begin
-         AddServerConsole(S);
-      end;
+   if FTakeLog = False then begin
       Exit;
    end;
 
-   if ServerForm.ChatOnly = False then begin
-      S := '*** BEGIN SENDLOG ***';
-      AddServerConsole(S);
+   AssignFile(F, FCommandLogFileName);
+   if FileExists(FCommandLogFileName) then begin
+      Append(F);
+   end
+   else begin
+      Rewrite(F);
    end;
 
-   C := 0;
-   try
-      for i := 1 to ServerForm.MasterLog.TotalQSO do begin
-         Application.ProcessMessages();
+   str := StringReplace(str, LBCODE, '', [rfReplaceAll]);
 
-         if CliSocket.LastError <> 0 then begin
-            Exit;
-         end;
+   WriteLn(F, direction + ' ' + str);
 
-         S := ZLinkHeader + ' PUTLOG ' + ServerForm.MasterLog.QSOList[i].QSOinText + LBCODE;
-         SendStr(S);
-
-         Sleep(0);
-         Inc(C);
-      end;
-
-      if CliSocket.LastError <> 0 then begin
-         Exit;
-      end;
-
-      S := ZLinkHeader + ' RENEW' + LBCODE;
-      SendStr(S);
-   finally
-      if ServerForm.ChatOnly = False then begin
-         S := '*** END SENDLOG = ' + IntToStr(C) + ' QSOs sent ***';
-         AddServerConsole(S);
-      end;
-   end;
+   CloseFile(F);
 end;
 
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-
-procedure TCliForm.GetQsoIDs();
-var
-   Index: Integer;
-   S: string;
-   C: Integer;
+procedure TCliForm.SetClientNumber(v: Integer);
 begin
-   Index := 1;
-   while Index <= ServerForm.MasterLog.TotalQSO do begin
-      Application.ProcessMessages();
-
-      C := 0;
-      S := ZLinkHeader + ' QSOIDS ';
-      repeat
-         if ServerForm.MasterLog.QSOList[Index].Reserve3 <> 0 then begin
-            S := S + IntToStr(ServerForm.MasterLog.QSOList[Index].Reserve3);
-            S := S + ' ';
-            Inc(C);
-         end;
-         Inc(Index);
-      until (C = 20) or (Index > ServerForm.MasterLog.TotalQSO);
-
-      SendStr(S + LBCODE);
-   end;
-
-   S := ZLinkHeader + ' ENDQSOIDS';
-   SendStr(S + LBCODE);
+   FClientNumber := v;
 end;
 
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
-procedure TCliForm.GetLogQsoID(str: string);
+{ TCliFormList }
+
+constructor TCliFormList.Create(OwnsObjects: Boolean);
+begin
+   Inherited Create(OwnsObjects);
+end;
+
+destructor TCliFormList.Destroy();
+begin
+   Inherited;
+end;
+
+{ TClientThread }
+
+constructor TClientThread.Create(ClientHSocket: TSocket; AClientForm: TCliForm; AClientNumber: Integer);
+begin
+   FClientHSocket  := ClientHSocket;
+   FreeOnTerminate := True;
+   FClientForm := AClientForm;
+   FClientNumber := AClientNumber;
+   FCurrentBand := bUnknown;
+   FLineBuffer := TStringList.Create();
+   inherited Create(True);
+end;
+
+destructor TClientThread.Destroy();
+begin
+   if Assigned(FClientSocket) then begin
+      FClientSocket.Destroy;
+      FClientSocket := nil;
+   end;
+
+   FLineBuffer.Free();
+
+   inherited Destroy;
+end;
+
+procedure TClientThread.Release();
+begin
+   PostMessage(FClientSocket.Handle, WM_QUIT, 0, 0);
+end;
+
+procedure TClientThread.Execute();
+begin
+   FClientSocket                 := TWSocket.Create(nil);
+   FClientSocket.MultiThreaded   := True;
+   FClientSocket.HSocket         := FClientHSocket;
+   FClientSocket.OnDataAvailable := ServerWSocketDataAvailable;
+   FClientSocket.OnSessionClosed := ServerWSocketSessionClosed;
+
+   { Send the welcome message                                              }
+   //FClientSocket.SendStr('Hello !' + #13 + #10 + '> ');
+
+   { Message loop to handle TWSocket messages                              }
+   { The loop is exited when WM_QUIT message is received                   }
+   FClientSocket.MessageLoop;
+
+   { Returning from the Execute function effectively terminate the thread  }
+   ReturnValue := 0;
+end;
+
+procedure TClientThread.ServerWSocketSessionClosed(Sender: TObject; Error: Word);
 var
+   S: string;
+   param_atom: ATOM;
+   t: string;
+begin
+   t := FormatDateTime('hh:nn', SysUtils.Now);
+   S := t + ' ' + FillRight(IntToStr(FClientNumber), 3) + ' ' + MHzString[FCurrentBand] + ' client disconnected from network.';
+
+   param_atom := AddAtom(PChar(S));
+   SendMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, FClientNumber, MAKELPARAM(param_atom,0));
+
+   param_atom := AddAtom(PChar(S + LBCODE));
+   SendMessage(ServerForm.Handle, WM_ZCMD_SENDALL, FClientNumber, MAKELPARAM(param_atom,0));
+
+   PostMessage(FClientSocket.Handle, WM_QUIT, 0, 0);
+end;
+
+procedure TClientThread.ServerWSocketDataAvailable(Sender: TObject; Error: Word);
+var
+   str: string;
+   SL: TStringList;
    i: Integer;
-   qsoid: Integer;
-   S: string;
-   temp: string;
-   temp2: string;
-   aQSO: TQSO;
 begin
-   temp := str + ' ';
+   SL := TStringList.Create();
 
-   Delete(temp, 1, 12);
-   i := Pos(' ', temp);
-   while i > 1 do begin
-      Application.ProcessMessages();
+   str := FClientSocket.ReceiveStr();
 
-      temp2 := copy(temp, 1, i - 1);
-      Delete(temp, 1, i);
-      qsoid := StrToInt(temp2);
-      aQSO := ServerForm.GetQSObyID(qsoid);
-      if aQSO <> nil then begin
-         S := ZLinkHeader + ' PUTLOGEX ' + aQSO.QSOinText;
-         SendStr(S + LBCODE);
+   SL.Text := str;
+
+   for i := 0 to Sl.Count - 1 do begin
+      str := Trim(SL[i]);
+      if str = '' then begin
+         Continue;
       end;
-      i := Pos(' ', temp);
+
+      if ServerForm.ChatOnly = False then begin
+         AddConsole(str);
+         AddServerConsole(str);
+      end;
+
+//      AddToCommandLog('R', str);
+
+      str := str + LBCODE;
+      FLineBuffer.Add(str);
    end;
 
-   // ëSïîëóÇ¡ÇΩÇÁçƒåvéZÇ≥ÇπÇÈ
-   S := ZLinkHeader + ' RENEW';
-   SendStr(S + LBCODE);
+   ParseLineBuffer();
+
+   SL.Free();
+end;
+
+procedure TClientThread.ParseLineBuffer();
+var
+   max, i, j, x: Integer;
+   str: string;
+begin
+   max := FLineBuffer.Count - 1;
+   if max < 0 then
+      exit;
+   for i := 0 to max do begin
+      str := FLineBuffer.Strings[0];
+      for j := 1 to Length(str) do begin
+         if str[j] = chr($0D) then begin
+            x := Pos(ZLinkHeader, FCommTemp);
+            if x > 0 then begin
+               FCommTemp := Copy(FCommTemp, x, 255);
+
+               ProcessCommand(FillRight(IntToStr(FClientNumber), 3) + ' ' + FCommTemp);
+
+//               ServerForm.AddCommandQue(FillRight(IntToStr(ClientNumber), 3) + ' ' + CommTemp);
+            end;
+            FCommTemp := '';
+         end
+         else
+            FCommTemp := FCommTemp + str[j];
+      end;
+      FLineBuffer.Delete(0);
+   end;
 end;
 
 // *****************************************************************************
 
-procedure TCliForm.ProcessCommand(S: string);
+procedure TClientThread.ProcessCommand(S: string);
 var
    temp, temp2, sendbuf: string;
    from: Integer;
@@ -666,45 +677,117 @@ begin
    ServerForm.SendAllButFrom(sendbuf + LBCODE, from);
 end;
 
-procedure TCliForm.AddToCommandLog(direction: string; str: string);
+procedure TClientThread.SendLog();
 var
-   F: TextFile;
+   i: Integer;
+   S: string;
+   C: Integer;
 begin
-   if FTakeLog = False then begin
+   if ServerForm.MasterLog.TotalQSO = 0 then begin
+      S := '*** MasterLog is empty ***';
+      if ServerForm.ChatOnly = False then begin
+         AddServerConsole(S);
+      end;
       Exit;
    end;
 
-   AssignFile(F, FCommandLogFileName);
-   if FileExists(FCommandLogFileName) then begin
-      Append(F);
-   end
-   else begin
-      Rewrite(F);
+   if ServerForm.ChatOnly = False then begin
+      S := '*** BEGIN SENDLOG ***';
+      AddServerConsole(S);
    end;
 
-   str := StringReplace(str, LBCODE, '', [rfReplaceAll]);
+   C := 0;
+   try
+      for i := 1 to ServerForm.MasterLog.TotalQSO do begin
+         Application.ProcessMessages();
 
-   WriteLn(F, direction + ' ' + str);
+         if FClientSocket.LastError <> 0 then begin
+            Exit;
+         end;
 
-   CloseFile(F);
+         S := ZLinkHeader + ' PUTLOG ' + ServerForm.MasterLog.QSOList[i].QSOinText + LBCODE;
+         SendStr(S);
+
+         Sleep(0);
+         Inc(C);
+      end;
+
+      if FClientSocket.LastError <> 0 then begin
+         Exit;
+      end;
+
+      S := ZLinkHeader + ' RENEW' + LBCODE;
+      SendStr(S);
+   finally
+      if ServerForm.ChatOnly = False then begin
+         S := '*** END SENDLOG = ' + IntToStr(C) + ' QSOs sent ***';
+         AddServerConsole(S);
+      end;
+   end;
 end;
 
-procedure TCliForm.SetClientNumber(v: Integer);
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TClientThread.GetQsoIDs();
+var
+   Index: Integer;
+   S: string;
+   C: Integer;
 begin
-   FClientNumber := v;
+   Index := 1;
+   while Index <= ServerForm.MasterLog.TotalQSO do begin
+      Application.ProcessMessages();
+
+      C := 0;
+      S := ZLinkHeader + ' QSOIDS ';
+      repeat
+         if ServerForm.MasterLog.QSOList[Index].Reserve3 <> 0 then begin
+            S := S + IntToStr(ServerForm.MasterLog.QSOList[Index].Reserve3);
+            S := S + ' ';
+            Inc(C);
+         end;
+         Inc(Index);
+      until (C = 20) or (Index > ServerForm.MasterLog.TotalQSO);
+
+      SendStr(S + LBCODE);
+   end;
+
+   S := ZLinkHeader + ' ENDQSOIDS';
+   SendStr(S + LBCODE);
 end;
 
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
-{ TCliFormList }
-
-constructor TCliFormList.Create(OwnsObjects: Boolean);
+procedure TClientThread.GetLogQsoID(str: string);
+var
+   i: Integer;
+   qsoid: Integer;
+   S: string;
+   temp: string;
+   temp2: string;
+   aQSO: TQSO;
 begin
-   Inherited Create(OwnsObjects);
-end;
+   temp := str + ' ';
 
-destructor TCliFormList.Destroy();
-begin
-   Inherited;
+   Delete(temp, 1, 12);
+   i := Pos(' ', temp);
+   while i > 1 do begin
+      Application.ProcessMessages();
+
+      temp2 := copy(temp, 1, i - 1);
+      Delete(temp, 1, i);
+      qsoid := StrToInt(temp2);
+      aQSO := ServerForm.GetQSObyID(qsoid);
+      if aQSO <> nil then begin
+         S := ZLinkHeader + ' PUTLOGEX ' + aQSO.QSOinText;
+         SendStr(S + LBCODE);
+      end;
+      i := Pos(' ', temp);
+   end;
+
+   // ëSïîëóÇ¡ÇΩÇÁçƒåvéZÇ≥ÇπÇÈ
+   S := ZLinkHeader + ' RENEW';
+   SendStr(S + LBCODE);
 end;
 
 end.

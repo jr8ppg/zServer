@@ -98,7 +98,6 @@ object CliForm: TCliForm
     ExclusiveAddr = False
     ComponentOptions = []
     ListenBacklog = 15
-    OnDataAvailable = CliSocketDataAvailable
     OnSessionClosed = CliSocketSessionClosed
     OnSessionConnected = CliSocketSessionConnected
     OnError = CliSocketError
