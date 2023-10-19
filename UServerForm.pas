@@ -24,6 +24,7 @@ uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, IniFiles, Menus, ExtCtrls, System.UITypes,
   OverbyteIcsWndControl, OverbyteIcsWSocket, OverbyteIcsUtils, System.SyncObjs,
+  System.Generics.Collections, System.Generics.Defaults,
   UBasicStats, UBasicMultiForm, UCliForm, UFreqList, UConnections,
   UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages, JclFileUtils;
 
@@ -105,13 +106,12 @@ type
     FFreqList: TFreqList;
     FConnections: TConnections;
 
-    FClientList: TCliFormList;
+    FClientList: TList<TCliForm>;
+
     FStats: TBasicStats;
     FMultiForm: TBasicMultiForm;
 
     FCurrentFileName: string;
-
-    procedure ClientThreadTerminate(Sender: TObject);
 
     procedure OnClientClosed(var msg: TMessage); message WM_USER_CLIENT_CLOSED;
     procedure OnFreqData(var msg: TMessage); message WM_ZCMD_FREQDATA;
@@ -150,7 +150,7 @@ type
     procedure MergeFile(FileName : string; BandSet : TBandSet);
     procedure RecalcAll();
 
-    property ClientList: TCliFormList read FClientList;
+    property ClientList: TList<TCliForm> read FClientList;
     property MasterLog: TLog read GetMasterLog;
   end;
 
@@ -182,7 +182,8 @@ procedure TServerForm.FormCreate(Sender: TObject);
 var
    ver: TJclFileVersionInfo;
 begin
-   FClientList := TCliFormList.Create();
+   FClientList := TList<TCliForm>.Create();
+
    ChatOnly := True;
    FClientNumber := 0;
    FCurrentFileName := '';
@@ -390,45 +391,15 @@ end;
 procedure TServerForm.SrvSocketSessionAvailable(Sender: TObject; Error: Word);
 var
    Form: TCliForm;
-   ClientThread: TClientThread;
 begin
    FClientNumber := FClientList.Count + 1;
 
-   Form := TCliForm.Create(self);
+   Form := TCliForm.Create(Self);
    Form.Caption := 'Client ' + IntToStr(FClientNumber);
    Form.ClientNumber := FClientNumber;
-   Form.TakeLog := menuTakeCommandLog.Checked;
+   Form.Socket := SrvSocket.Accept;
    Form.Show;
    FClientList.Add(Form);
-
-   { Create a new thread to handle client request                          }
-   ClientThread := TClientThread.Create(SrvSocket.Accept, Form, FClientNumber);
-
-   { Assign the thread's OnTerminate event                                 }
-   ClientThread.OnTerminate := ClientThreadTerminate;
-
-   { Then start the client thread work                                     }
-   { because it was created in the blocked state                           }
-   ClientThread.Start();
-end;
-
-procedure TServerForm.ClientThreadTerminate(Sender: TObject);
-var
-   ClientThread  : TClientThread;
-   Buf           : String;
-   Index         : Integer;
-begin
-   { A thread has been terminated, remove it from our list and destroy     }
-   { the ClientWSocket we passed to the thread.                            }
-   for Index := 0 to ClientListBox.Items.Count - 1 do begin
-      Buf := ClientListBox.Items[Index];
-      ClientThread := TClientThread(htoin(PChar(Buf), Length(Buf)));
-      if ClientThread = TClientThread(Sender) then begin
-         { Remove the client from our listbox                            }
-         ClientListBox.Items.Delete(Index);
-         Break;
-      end;
-   end;
 end;
 
 procedure TServerForm.SrvSocketSocksError(Sender: TObject; Error: Integer; Msg: string);

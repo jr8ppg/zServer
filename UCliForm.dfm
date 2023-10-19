@@ -86,25 +86,4 @@ object CliForm: TCliForm
     ParentFont = False
     TabOrder = 2
   end
-  object CliSocket: TWSocket
-    LineMode = True
-    LineEnd = #13#10
-    Proto = 'tcp'
-    LocalAddr = '0.0.0.0'
-    LocalAddr6 = '::'
-    LocalPort = '0'
-    MultiThreaded = True
-    SocksLevel = '5'
-    ExclusiveAddr = False
-    ComponentOptions = []
-    ListenBacklog = 15
-    OnSessionClosed = CliSocketSessionClosed
-    OnSessionConnected = CliSocketSessionConnected
-    OnError = CliSocketError
-    OnSocksError = CliSocketSocksError
-    SocketErrs = wsErrTech
-    onException = CliSocketException
-    Left = 40
-    Top = 72
-  end
 end

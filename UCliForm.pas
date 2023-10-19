@@ -11,6 +11,8 @@ uses
 const LBCODE = #13#10;
 
 type
+  TClientThread = class;
+
   TCliForm = class(TForm)
     Panel1: TPanel;
     SendEdit: TEdit;
@@ -18,46 +20,37 @@ type
     Panel2: TPanel;
     DisconnectButton: TButton;
     ListBox: TListBox;
-    CliSocket: TWSocket;
     procedure CreateParams(var Params: TCreateParams); override;
     procedure FormCreate(Sender: TObject);
     procedure FormShow(Sender: TObject);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
-    procedure CliSocketSessionClosed(Sender: TObject; Error: Word);
     procedure SendButtonClick(Sender: TObject);
     procedure DisconnectButtonClick(Sender: TObject);
-    procedure CliSocketException(Sender: TObject; SocExcept: ESocketException);
-    procedure CliSocketError(Sender: TObject);
-    procedure CliSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
-    procedure CliSocketSessionConnected(Sender: TObject; ErrCode: Word);
+    procedure ClientThreadTerminate(Sender: TObject);
   private
     FInitialized : Boolean;
+    FServerSocket: TSocket;
     FClientNumber: Integer;
-    FCommandLogFileName: string;
-    FTakeLog: Boolean;
     FCurrentBand : TBand;
     FCurrentOperator : string;
-    procedure AddServerConsole(S: string);
+    FClientThread: TClientThread;
+    FTakeLog: Boolean;
     procedure AddChat(S: string);
-    procedure AddToCommandLog(direction: string; str: string);
+    procedure SetCurrentBand(v: TBand);
+    procedure SetCurrentOperator(v: string);
     procedure SetClientNumber(v: Integer);
+    procedure SetTakeLog(v: Boolean);
+    procedure SetCaption;
   public
     Bands : array[b19..HiBand] of boolean;
-    procedure SendStr(str : string);
-    procedure SetCaption;
     procedure AddConsole(S : string);
+    procedure SendStr(S: string);
 
-    property CurrentBand: TBand read FCurrentBand;
-    property CurrentOperator: string read FCurrentOperator;
+    property CurrentBand: TBand read FCurrentBand write SetCurrentBand;
+    property CurrentOperator: string read FCurrentOperator write SetCurrentOperator;
     property ClientNumber: Integer read FClientNumber write SetClientNumber;
-    property TakeLog: Boolean read FTakeLog write FTakeLog;
-  end;
-
-  TCliFormList = class(TObjectList<TCliForm>)
-  private
-  public
-    constructor Create(OwnsObjects: Boolean = False);
-    destructor Destroy(); override;
+    property Socket: TSocket read FServerSocket write FServerSocket;
+    property TakeLog: Boolean read FTakeLog write SetTakeLog;
   end;
 
   TClientThread = class(TThread)
@@ -72,13 +65,21 @@ type
     FClientNumber: Integer;
     FCurrentBand : TBand;
 
+    FCommandLogFileName: string;
+    FTakeLog: Boolean;
+
     procedure ServerWSocketDataAvailable(Sender: TObject; Error: Word);
     procedure ServerWSocketSessionClosed(Sender: TObject; Error: Word);
+    procedure CliSocketError(Sender: TObject);
+    procedure CliSocketException(Sender: TObject; SocExcept: ESocketException);
+    procedure CliSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
     procedure ParseLineBuffer();
     procedure ProcessCommand(S: string);
     procedure SendLog();
     procedure GetQsoIDs();
     procedure GetLogQsoID(str: string);
+    procedure AddServerConsole(S: string);
+    procedure AddToCommandLog(direction: string; str: string);
   protected
     procedure Execute(); override;
   public
@@ -86,7 +87,9 @@ type
     destructor Destroy(); override;
     procedure Release();
 
-    property ClientWSocket : TWSocket read FClientSocket write FClientSocket;
+    procedure SendStr(str: string);
+
+    property TakeLog: Boolean read FTakeLog write FTakeLog;
   end;
 
 
@@ -109,9 +112,11 @@ end;
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
 procedure TCliForm.FormCreate(Sender: TObject);
+var
+   ClientThread: TClientThread;
 begin
    FInitialized := False;
-   FCommandLogFileName := StringReplace(Application.ExeName, '.exe', '_#' + IntToHex(Integer(Self), 8) + '_' + FormatDateTime('yyyymmdd', Now) + '.txt', [rfReplaceAll]);
+   FServerSocket := 0;
    FTakeLog := False;
 end;
 
@@ -121,23 +126,45 @@ procedure TCliForm.FormShow(Sender: TObject);
 var
    B: TBand;
 begin
-   if not FInitialized then begin
-      FInitialized := TRUE;
-      // DisplayMemo.Clear;
-      SendEdit.Text := '';
-      ActiveControl := SendEdit;
-      FCurrentBand := b35;
-      FCurrentOperator := '';
-      for B := b19 to HiBand do
-         Bands[B] := False;
+   if FInitialized then begin
+      Exit;
    end;
+
+   FInitialized := TRUE;
+   // DisplayMemo.Clear;
+   SendEdit.Text := '';
+   ActiveControl := SendEdit;
+   FCurrentBand := b35;
+   FCurrentOperator := '';
+   for B := b19 to HiBand do begin
+      Bands[B] := False;
+   end;
+
+   { Create a new thread to handle client request                          }
+   FClientThread := TClientThread.Create(FServerSocket, Self, FClientNumber);
+   FClientThread.TakeLog := FTakeLog;
+
+   { Assign the thread's OnTerminate event                                 }
+   FClientThread.OnTerminate := ClientThreadTerminate;
+
+   { Then start the client thread work                                     }
+   { because it was created in the blocked state                           }
+   FClientThread.Start();
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
 procedure TCliForm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+   FClientThread.Release();
+   FClientThread.WaitFor();
+   FClientThread.Free();
    PostMessage(TForm(Owner).Handle, WM_USER_CLIENT_CLOSED, 0, LongInt(Self));
+end;
+
+procedure TCliForm.ClientThreadTerminate(Sender: TObject);
+begin
+   //
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -173,33 +200,6 @@ end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
-procedure TCliForm.SendStr(str: string);
-begin
-   if CliSocket.LastError <> 0 then begin
-      Exit;
-   end;
-
-   CliSocket.SendStr(str);
-
-   AddToCommandLog('S', str);
-end;
-
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-
-procedure TCliForm.AddServerConsole(S: string);
-var
-   param_atom: ATOM;
-   t: string;
-begin
-   t := FormatDateTime('hh:nn', SysUtils.Now);
-   S := t + ' ' + FillRight(IntToStr(ClientNumber), 3) + ' ' + S;
-
-   param_atom := AddAtom(PChar(S));
-   PostMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, ClientNumber, MAKELPARAM(param_atom,0));
-end;
-
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-
 procedure TCliForm.AddChat(S: string);
 var
    param_atom: ATOM;
@@ -208,69 +208,6 @@ begin
 
    param_atom := AddAtom(PChar(S));
    PostMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, ClientNumber, MAKELPARAM(param_atom,1));
-end;
-
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-
-procedure TCliForm.CliSocketError(Sender: TObject);
-var
-   S: string;
-begin
-   S := 'CliSocketError error code = ' + IntToStr(CliSocket.LastError);
-   AddServerConsole(S);
-
-   CliSocket.Close();
-end;
-
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-
-procedure TCliForm.CliSocketException(Sender: TObject; SocExcept: ESocketException);
-var
-   S: string;
-begin
-   S := '[' + SocExcept.IPStr + '] ' + IntToStr(SocExcept.ErrorCode) + ':' + SocExcept.ErrorMessage;
-   AddServerConsole(S);
-
-   CliSocket.Close();
-end;
-
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-
-procedure TCliForm.CliSocketSessionClosed(Sender: TObject; Error: Word);
-var
-   S: string;
-   param_atom: ATOM;
-   t: string;
-begin
-   t := FormatDateTime('hh:nn', SysUtils.Now);
-   S := t + ' ' + FillRight(IntToStr(ClientNumber), 3) + ' ' + MHzString[FCurrentBand] + ' client disconnected from network.';
-
-   param_atom := AddAtom(PChar(S));
-   SendMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, ClientNumber, MAKELPARAM(param_atom,0));
-
-   param_atom := AddAtom(PChar(S + LBCODE));
-   SendMessage(ServerForm.Handle, WM_ZCMD_SENDALL, ClientNumber, MAKELPARAM(param_atom,0));
-
-   Close;
-end;
-
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-
-procedure TCliForm.CliSocketSessionConnected(Sender: TObject; ErrCode: Word);
-begin
-//
-end;
-
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-
-procedure TCliForm.CliSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
-var
-   S: string;
-begin
-   S := 'CliSocketSocksError: ' + msg + '(' + IntToStr(Error) + ')';
-   AddServerConsole(S);
-
-   CliSocket.Close();
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -285,7 +222,7 @@ begin
 
    AddChat(S);
    AddConsole(S);
-   SendStr(ZLinkHeader + ' PUTMESSAGE ' + S + LBCODE);
+   FClientThread.SendStr(ZLinkHeader + ' PUTMESSAGE ' + S + LBCODE);
 
    SendEdit.Clear;
    ActiveControl := SendEdit;
@@ -298,29 +235,16 @@ begin
    Close;
 end;
 
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-
-procedure TCliForm.AddToCommandLog(direction: string; str: string);
-var
-   F: TextFile;
+procedure TCliForm.SetCurrentBand(v: TBand);
 begin
-   if FTakeLog = False then begin
-      Exit;
-   end;
+   FCurrentBand := v;
+   SetCaption();
+end;
 
-   AssignFile(F, FCommandLogFileName);
-   if FileExists(FCommandLogFileName) then begin
-      Append(F);
-   end
-   else begin
-      Rewrite(F);
-   end;
-
-   str := StringReplace(str, LBCODE, '', [rfReplaceAll]);
-
-   WriteLn(F, direction + ' ' + str);
-
-   CloseFile(F);
+procedure TCliForm.SetCurrentOperator(v: string);
+begin
+   FCurrentOperator := v;
+   SetCaption();
 end;
 
 procedure TCliForm.SetClientNumber(v: Integer);
@@ -328,17 +252,15 @@ begin
    FClientNumber := v;
 end;
 
-
-{ TCliFormList }
-
-constructor TCliFormList.Create(OwnsObjects: Boolean);
+procedure TCliForm.SetTakeLog(v: Boolean);
 begin
-   Inherited Create(OwnsObjects);
+   FTakeLog := v;
+   FClientThread.TakeLog := v;
 end;
 
-destructor TCliFormList.Destroy();
+procedure TCliForm.SendStr(S: string);
 begin
-   Inherited;
+   FClientThread.SendStr(S);
 end;
 
 { TClientThread }
@@ -351,6 +273,7 @@ begin
    FClientNumber := AClientNumber;
    FCurrentBand := bUnknown;
    FLineBuffer := TStringList.Create();
+   FTakeLog := False;
    inherited Create(True);
 end;
 
@@ -373,11 +296,17 @@ end;
 
 procedure TClientThread.Execute();
 begin
+   FCommandLogFileName := StringReplace(Application.ExeName, '.exe', '_#' + IntToHex(Integer(Self), 8) + '_' + FormatDateTime('yyyymmdd', Now) + '.txt', [rfReplaceAll]);
+
    FClientSocket                 := TWSocket.Create(nil);
    FClientSocket.MultiThreaded   := True;
    FClientSocket.HSocket         := FClientHSocket;
    FClientSocket.OnDataAvailable := ServerWSocketDataAvailable;
    FClientSocket.OnSessionClosed := ServerWSocketSessionClosed;
+   FClientSocket.OnError         := CliSocketError;
+   FClientSocket.onException     := CliSocketException;
+   FClientSocket.OnSocksError    := CliSocketSocksError;
+
 
    { Send the welcome message                                              }
    //FClientSocket.SendStr('Hello !' + #13 + #10 + '> ');
@@ -427,7 +356,7 @@ begin
       end;
 
       if ServerForm.ChatOnly = False then begin
-         AddConsole(str);
+         FClientForm.AddConsole(str);
          AddServerConsole(str);
       end;
 
@@ -534,8 +463,7 @@ begin
    if Pos('OPERATOR', temp) = 1 then begin
       Delete(temp, 1, 9);
 
-      FCurrentOperator := temp;
-      SetCaption();
+      FClientForm.CurrentOperator := temp;
 
       PostMessage(ServerForm.Handle, WM_ZCMD_UPDATE_DISPLAY, from, 0);
       Exit;
@@ -551,8 +479,7 @@ begin
 
       B := TBand(i);
 
-      FCurrentBand := B;
-      SetCaption();
+      FClientForm.CurrentBand := B;
 
       PostMessage(ServerForm.Handle, WM_ZCMD_UPDATE_DISPLAY, from, 0);
 
@@ -728,6 +655,42 @@ end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
+procedure TClientThread.CliSocketError(Sender: TObject);
+var
+   S: string;
+begin
+   S := 'CliSocketError error code = ' + IntToStr(FClientSocket.LastError);
+   AddServerConsole(S);
+
+   PostMessage(FClientSocket.Handle, WM_QUIT, 0, 0);
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TClientThread.CliSocketException(Sender: TObject; SocExcept: ESocketException);
+var
+   S: string;
+begin
+   S := '[' + SocExcept.IPStr + '] ' + IntToStr(SocExcept.ErrorCode) + ':' + SocExcept.ErrorMessage;
+   AddServerConsole(S);
+
+   PostMessage(FClientSocket.Handle, WM_QUIT, 0, 0);
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TClientThread.CliSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
+var
+   S: string;
+begin
+   S := 'CliSocketSocksError: ' + msg + '(' + IntToStr(Error) + ')';
+   AddServerConsole(S);
+
+   PostMessage(FClientSocket.Handle, WM_QUIT, 0, 0);
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
 procedure TClientThread.GetQsoIDs();
 var
    Index: Integer;
@@ -788,6 +751,55 @@ begin
    // ëSïîëóÇ¡ÇΩÇÁçƒåvéZÇ≥ÇπÇÈ
    S := ZLinkHeader + ' RENEW';
    SendStr(S + LBCODE);
+end;
+
+procedure TClientThread.SendStr(str: string);
+begin
+   if FClientSocket.LastError <> 0 then begin
+      Exit;
+   end;
+
+   FClientSocket.SendStr(str);
+
+   AddToCommandLog('S', str);
+end;
+
+
+procedure TClientThread.AddServerConsole(S: string);
+var
+   param_atom: ATOM;
+   t: string;
+begin
+   t := FormatDateTime('hh:nn', SysUtils.Now);
+   S := t + ' ' + FillRight(IntToStr(FClientNumber), 3) + ' ' + S;
+
+   param_atom := AddAtom(PChar(S));
+   PostMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, FClientNumber, MAKELPARAM(param_atom,0));
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TClientThread.AddToCommandLog(direction: string; str: string);
+var
+   F: TextFile;
+begin
+   if FTakeLog = False then begin
+      Exit;
+   end;
+
+   AssignFile(F, FCommandLogFileName);
+   if FileExists(FCommandLogFileName) then begin
+      Append(F);
+   end
+   else begin
+      Rewrite(F);
+   end;
+
+   str := StringReplace(str, LBCODE, '', [rfReplaceAll]);
+
+   WriteLn(F, direction + ' ' + str);
+
+   CloseFile(F);
 end;
 
 end.
