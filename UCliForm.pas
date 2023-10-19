@@ -112,8 +112,6 @@ end;
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
 procedure TCliForm.FormCreate(Sender: TObject);
-var
-   ClientThread: TClientThread;
 begin
    FInitialized := False;
    FServerSocket := 0;
@@ -157,8 +155,6 @@ end;
 procedure TCliForm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
    FClientThread.Release();
-   FClientThread.WaitFor();
-   FClientThread.Free();
    PostMessage(TForm(Owner).Handle, WM_USER_CLIENT_CLOSED, 0, LongInt(Self));
 end;
 
@@ -299,13 +295,17 @@ begin
    FCommandLogFileName := StringReplace(Application.ExeName, '.exe', '_#' + IntToHex(Integer(Self), 8) + '_' + FormatDateTime('yyyymmdd', Now) + '.txt', [rfReplaceAll]);
 
    FClientSocket                 := TWSocket.Create(nil);
+   FClientSocket.SocketErrs      := wsErrTech;
+   FClientSocket.SocksLevel      := '5';
    FClientSocket.MultiThreaded   := True;
-   FClientSocket.HSocket         := FClientHSocket;
+   FClientSocket.LineMode        := True;
+   FClientSocket.LineEnd         := #13#10;
    FClientSocket.OnDataAvailable := ServerWSocketDataAvailable;
    FClientSocket.OnSessionClosed := ServerWSocketSessionClosed;
    FClientSocket.OnError         := CliSocketError;
    FClientSocket.onException     := CliSocketException;
    FClientSocket.OnSocksError    := CliSocketSocksError;
+   FClientSocket.HSocket         := FClientHSocket;
 
 
    { Send the welcome message                                              }
@@ -334,7 +334,7 @@ begin
    param_atom := AddAtom(PChar(S + LBCODE));
    SendMessage(ServerForm.Handle, WM_ZCMD_SENDALL, FClientNumber, MAKELPARAM(param_atom,0));
 
-   PostMessage(FClientSocket.Handle, WM_QUIT, 0, 0);
+   PostMessage(FClientForm.Handle, WM_CLOSE, 0, 0);
 end;
 
 procedure TClientThread.ServerWSocketDataAvailable(Sender: TObject; Error: Word);
@@ -349,7 +349,7 @@ begin
 
    SL.Text := str;
 
-   for i := 0 to Sl.Count - 1 do begin
+   for i := 0 to SL.Count - 1 do begin
       str := Trim(SL[i]);
       if str = '' then begin
          Continue;
@@ -362,11 +362,15 @@ begin
 
 //      AddToCommandLog('R', str);
 
-      str := str + LBCODE;
-      FLineBuffer.Add(str);
+//      str := str + LBCODE;
+//      FLineBuffer.Add(str);
+
+      OutputDebugString(PChar(str));
+
+      ProcessCommand(FillRight(IntToStr(FClientNumber), 3) + ' ' + str);
    end;
 
-   ParseLineBuffer();
+   //ParseLineBuffer();
 
    SL.Free();
 end;
@@ -379,6 +383,7 @@ begin
    max := FLineBuffer.Count - 1;
    if max < 0 then
       exit;
+
    for i := 0 to max do begin
       str := FLineBuffer.Strings[0];
       for j := 1 to Length(str) do begin
@@ -626,7 +631,6 @@ begin
    C := 0;
    try
       for i := 1 to ServerForm.MasterLog.TotalQSO do begin
-         Application.ProcessMessages();
 
          if FClientSocket.LastError <> 0 then begin
             Exit;
@@ -699,7 +703,6 @@ var
 begin
    Index := 1;
    while Index <= ServerForm.MasterLog.TotalQSO do begin
-      Application.ProcessMessages();
 
       C := 0;
       S := ZLinkHeader + ' QSOIDS ';
@@ -735,7 +738,6 @@ begin
    Delete(temp, 1, 12);
    i := Pos(' ', temp);
    while i > 1 do begin
-      Application.ProcessMessages();
 
       temp2 := copy(temp, 1, i - 1);
       Delete(temp, 1, i);
