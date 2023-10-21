@@ -42,7 +42,6 @@ type
     procedure SetTakeLog(v: Boolean);
     procedure SetCaption;
   public
-    Bands : array[b19..HiBand] of boolean;
     procedure AddConsole(S : string);
     procedure SendStr(S: string);
 
@@ -75,9 +74,25 @@ type
     procedure CliSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
     procedure ParseLineBuffer();
     procedure ProcessCommand(S: string);
-    procedure SendLog();
-    procedure GetQsoIDs();
-    procedure GetLogQsoID(str: string);
+
+    procedure Process_Freq(S: string; from: Integer);
+    procedure Process_GetConsole();
+    procedure Process_SendRenew();
+    procedure Process_Who();
+    procedure Process_Operator(S: string; from: Integer);
+    procedure Process_Band(S: string; from: Integer);
+    procedure Process_PutMessage(S: string; from: Integer);
+    procedure Process_SendLog();
+    procedure Process_GetQsoIDs();
+    procedure Process_GetLogQsoID(str: string);
+    procedure Process_PutQso(S: string; from: Integer);
+    procedure Process_PutLog(S: string; from: Integer);
+    procedure Process_ExDelQso(S: string; from: Integer);
+    procedure Process_DelQso(S: string; from: Integer);
+    procedure Process_EditQsoTo(S: string; from: Integer);
+    procedure Process_Renew(S: string; from: Integer);
+    procedure Process_InsQso(S: string; from: Integer);
+
     procedure AddServerConsole(S: string);
     procedure AddToCommandLog(direction: string; str: string);
   protected
@@ -121,22 +136,16 @@ end;
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
 procedure TCliForm.FormShow(Sender: TObject);
-var
-   B: TBand;
 begin
    if FInitialized then begin
       Exit;
    end;
 
    FInitialized := TRUE;
-   // DisplayMemo.Clear;
    SendEdit.Text := '';
    ActiveControl := SendEdit;
    FCurrentBand := b35;
    FCurrentOperator := '';
-   for B := b19 to HiBand do begin
-      Bands[B] := False;
-   end;
 
    { Create a new thread to handle client request                          }
    FClientThread := TClientThread.Create(FServerSocket, Self, FClientNumber);
@@ -307,10 +316,6 @@ begin
    FClientSocket.OnSocksError    := CliSocketSocksError;
    FClientSocket.HSocket         := FClientHSocket;
 
-
-   { Send the welcome message                                              }
-   //FClientSocket.SendStr('Hello !' + #13 + #10 + '> ');
-
    { Message loop to handle TWSocket messages                              }
    { The loop is exited when WM_QUIT message is received                   }
    FClientSocket.MessageLoop;
@@ -360,17 +365,14 @@ begin
          AddServerConsole(str);
       end;
 
-//      AddToCommandLog('R', str);
+      AddToCommandLog('R', str);
 
-//      str := str + LBCODE;
-//      FLineBuffer.Add(str);
-
+      {$IFDEF DEBUG}
       OutputDebugString(PChar(str));
+      {$ENDIF}
 
       ProcessCommand(FillRight(IntToStr(FClientNumber), 3) + ' ' + str);
    end;
-
-   //ParseLineBuffer();
 
    SL.Free();
 end;
@@ -409,13 +411,8 @@ end;
 
 procedure TClientThread.ProcessCommand(S: string);
 var
-   temp, temp2, sendbuf: string;
    from: Integer;
-   aQSO: TQSO;
-   i: Integer;
-   B: TBand;
-   param_atom: ATOM;
-   SL: TStringList;
+   temp: string;
 begin
    from := StrToIntDef(TrimRight(copy(S, 1, 3)), -1) - 1;
    if from < 0 then begin
@@ -429,23 +426,16 @@ begin
    temp := S;
 
    if Pos('FREQ', temp) = 1 then begin
-      temp2 := copy(temp, 6, 255);
-      param_atom := AddAtom(PChar(temp2));
-      PostMessage(ServerForm.Handle, WM_ZCMD_FREQDATA, from, param_atom);
+      Process_Freq(temp, from);
    end;
 
    if Pos('GETCONSOLE', UpperCase(temp)) = 1 then begin
-      SL := ServerForm.GetConsole();
-      for i := 0 to SL.Count -1 do begin
-         SendStr(SL[i] + LBCODE);
-      end;
-      SL.Free();
+      Process_GetConsole();
       Exit;
    end;
 
    if Pos('SENDRENEW', temp) = 1 then begin
-      sendbuf := ZLinkHeader + ' RENEW';
-      SendStr(sendbuf + LBCODE);
+      Process_SendRenew();
       Exit;
    end;
 
@@ -457,42 +447,17 @@ begin
    }
 
    if Pos('WHO', UpperCase(temp)) = 1 then begin
-      SL := ServerForm.GetWhoList();
-      for i := 0 to SL.Count -1 do begin
-         SendStr(SL[i] + LBCODE);
-      end;
-      SL.Free();
+      Process_Who();
       Exit;
    end;
 
    if Pos('OPERATOR', temp) = 1 then begin
-      Delete(temp, 1, 9);
-
-      FClientForm.CurrentOperator := temp;
-
-      PostMessage(ServerForm.Handle, WM_ZCMD_UPDATE_DISPLAY, from, 0);
+      Process_Operator(temp, from);
       Exit;
    end;
 
    if Pos('BAND ', temp) = 1 then begin
-      Delete(temp, 1, 5);
-
-      i := StrToIntDef(temp, 17);
-      if not(i in [0 .. ord(HiBand), ord(bUnknown)]) then begin
-         Exit;
-      end;
-
-      B := TBand(i);
-
-      FClientForm.CurrentBand := B;
-
-      PostMessage(ServerForm.Handle, WM_ZCMD_UPDATE_DISPLAY, from, 0);
-
-      if ServerForm.IsBandUsed2(from, B) = True then begin
-         sendbuf := ZLinkHeader + ' PUTMESSAGE ' + 'Band already in use!';
-         SendStr(sendbuf + LBCODE);
-      end;
-
+      Process_Band(temp, from);
       Exit;
    end;
 
@@ -506,10 +471,7 @@ begin
    end;
 
    if Pos('PUTMESSAGE', temp) = 1 then begin
-      temp2 := temp;
-      Delete(temp2, 1, 11);
-      param_atom := AddAtom(PChar(temp2));
-      PostMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, from, MAKELPARAM(param_atom, 1));
+      Process_PutMessage(temp, from);
    end;
 
    if Pos('SPOT', temp) = 1 then begin
@@ -517,19 +479,19 @@ begin
 
    if Pos('SENDLOG', temp) = 1 then // will send all qsos in server's log and renew command
    begin
-      SendLog();
+      Process_SendLog();
       Exit;
    end;
 
    if Pos('GETQSOIDS', temp) = 1 then // will send all qso ids in server's log
    begin
-      GetQsoIDs();
+      Process_GetQsoIDs();
       Exit;
    end;
 
    if Pos('GETLOGQSOID', temp) = 1 then // will send all qso ids in server's log
    begin
-      GetLogQsoID(temp);
+      Process_GetLogQsoID(temp);
       Exit;
    end;
 
@@ -538,39 +500,19 @@ begin
    end;
 
    if Pos('PUTQSO', temp) = 1 then begin
-      aQSO := TQSO.Create;
-      temp2 := temp;
-      Delete(temp2, 1, 7);
-      aQSO.TextToQSO(temp2); // delete "PUTQSO "
-
-      PostMessage(ServerForm.Handle, WM_ZCMD_PUTQSO, from, LPARAM(aQSO));
+      Process_PutQso(temp, from);
    end;
 
    if Pos('PUTLOG ', temp) = 1 then begin
-      aQSO := TQSO.Create;
-      temp2 := temp;
-      Delete(temp2, 1, 7);
-      aQSO.TextToQSO(temp2);
-
-      PostMessage(ServerForm.Handle, WM_ZCMD_PUTLOG, from, LPARAM(aQSO));
+      Process_PutLog(temp, from);
    end;
 
    if Pos('EXDELQSO', temp) = 1 then begin
-      aQSO := TQSO.Create;
-      temp2 := temp;
-      Delete(temp2, 1, 9);
-      aQSO.TextToQSO(temp2);
-
-      PostMessage(ServerForm.Handle, WM_ZCMD_EXDELQSO, from, LPARAM(aQSO));
+      Process_ExDelQso(temp, from);
    end;
 
    if Pos('DELQSO', temp) = 1 then begin
-      aQSO := TQSO.Create;
-      temp2 := temp;
-      Delete(temp2, 1, 7);
-      aQSO.TextToQSO(temp2);
-
-      PostMessage(ServerForm.Handle, WM_ZCMD_DELQSO, from, LPARAM(aQSO));
+      Process_DelQso(temp, from);
    end;
 
    if Pos('EDITQSOFROM', temp) = 1 then begin
@@ -578,13 +520,7 @@ begin
    end;
 
    if Pos('EDITQSOTO ', temp) = 1 then begin
-      aQSO := TQSO.Create;
-      temp2 := temp;
-      Delete(temp2, 1, 10);
-      aQSO.TextToQSO(temp2);
-      aQSO.Reserve := actEdit;
-
-      PostMessage(ServerForm.Handle, WM_ZCMD_EDITQSOTO, from, LPARAM(aQSO));
+      Process_EditQsoTo(temp, from);
    end;
 
    if Pos('INSQSOAT ', temp) = 1 then begin
@@ -592,24 +528,108 @@ begin
    end;
 
    if Pos('RENEW', temp) = 1 then begin
-      PostMessage(ServerForm.Handle, WM_ZCMD_RENEW, from, 0);
+      Process_Renew(temp, from);
    end;
 
    if Pos('INSQSO ', temp) = 1 then begin
-      aQSO := TQSO.Create;
-      temp2 := temp;
-      Delete(temp2, 1, 7);
-      aQSO.TextToQSO(temp2);
-      aQSO.Reserve := actInsert;
-
-      PostMessage(ServerForm.Handle, WM_ZCMD_INSQSO, from, LPARAM(aQSO));
+      Process_InsQso(temp, from);
    end;
 
-   sendbuf := ZLinkHeader + ' ' + temp;
-   ServerForm.SendAllButFrom(sendbuf + LBCODE, from);
+   S := ZLinkHeader + ' ' + temp;
+   ServerForm.SendAllButFrom(S + LBCODE, from);
 end;
 
-procedure TClientThread.SendLog();
+procedure TClientThread.Process_Freq(S: string; from: Integer);
+var
+   temp2: string;
+   param_atom: ATOM;
+begin
+   temp2 := copy(S, 6, 255);
+   param_atom := AddAtom(PChar(temp2));
+   PostMessage(ServerForm.Handle, WM_ZCMD_FREQDATA, from, param_atom);
+end;
+
+procedure TClientThread.Process_GetConsole();
+var
+   SL: TStringList;
+   i: Integer;
+begin
+   SL := ServerForm.GetConsole();
+   try
+      for i := 0 to SL.Count -1 do begin
+         SendStr(SL[i] + LBCODE);
+      end;
+   finally
+      SL.Free();
+   end;
+end;
+
+procedure TClientThread.Process_SendRenew();
+var
+   S: string;
+begin
+   S := ZLinkHeader + ' RENEW';
+   SendStr(S + LBCODE);
+end;
+
+procedure TClientThread.Process_Who();
+var
+   SL: TStringList;
+   i: Integer;
+begin
+   SL := ServerForm.GetWhoList();
+   try
+      for i := 0 to SL.Count -1 do begin
+         SendStr(SL[i] + LBCODE);
+      end;
+   finally
+      SL.Free();
+   end;
+end;
+
+procedure TClientThread.Process_Operator(S: string; from: Integer);
+begin
+   Delete(S, 1, 9);
+
+   FClientForm.CurrentOperator := S;
+
+   PostMessage(ServerForm.Handle, WM_ZCMD_UPDATE_DISPLAY, from, 0);
+end;
+
+procedure TClientThread.Process_Band(S: string; from: Integer);
+var
+   i: Integer;
+   B: TBand;
+begin
+   Delete(S, 1, 5);
+
+   i := StrToIntDef(S, 17);
+   if not(i in [0 .. ord(HiBand), ord(bUnknown)]) then begin
+      Exit;
+   end;
+
+   B := TBand(i);
+
+   FClientForm.CurrentBand := B;
+
+   PostMessage(ServerForm.Handle, WM_ZCMD_UPDATE_DISPLAY, from, 0);
+
+   if ServerForm.IsBandUsed2(from, B) = True then begin
+      S := ZLinkHeader + ' PUTMESSAGE ' + 'Band already in use!';
+      SendStr(S + LBCODE);
+   end;
+end;
+
+procedure TClientThread.Process_PutMessage(S: string; from: Integer);
+var
+   param_atom: ATOM;
+begin
+   Delete(S, 1, 11);
+   param_atom := AddAtom(PChar(S));
+   PostMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, from, MAKELPARAM(param_atom, 1));
+end;
+
+procedure TClientThread.Process_SendLog();
 var
    i: Integer;
    S: string;
@@ -659,43 +679,7 @@ end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
-procedure TClientThread.CliSocketError(Sender: TObject);
-var
-   S: string;
-begin
-   S := 'CliSocketError error code = ' + IntToStr(FClientSocket.LastError);
-   AddServerConsole(S);
-
-   PostMessage(FClientSocket.Handle, WM_QUIT, 0, 0);
-end;
-
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-
-procedure TClientThread.CliSocketException(Sender: TObject; SocExcept: ESocketException);
-var
-   S: string;
-begin
-   S := '[' + SocExcept.IPStr + '] ' + IntToStr(SocExcept.ErrorCode) + ':' + SocExcept.ErrorMessage;
-   AddServerConsole(S);
-
-   PostMessage(FClientSocket.Handle, WM_QUIT, 0, 0);
-end;
-
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-
-procedure TClientThread.CliSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
-var
-   S: string;
-begin
-   S := 'CliSocketSocksError: ' + msg + '(' + IntToStr(Error) + ')';
-   AddServerConsole(S);
-
-   PostMessage(FClientSocket.Handle, WM_QUIT, 0, 0);
-end;
-
-{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
-
-procedure TClientThread.GetQsoIDs();
+procedure TClientThread.Process_GetQsoIDs();
 var
    Index: Integer;
    S: string;
@@ -724,7 +708,7 @@ end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
-procedure TClientThread.GetLogQsoID(str: string);
+procedure TClientThread.Process_GetLogQsoID(str: string);
 var
    i: Integer;
    qsoid: Integer;
@@ -753,6 +737,79 @@ begin
    // ‘S•”‘—‚Á‚½‚çÄŒvŽZ‚³‚¹‚é
    S := ZLinkHeader + ' RENEW';
    SendStr(S + LBCODE);
+end;
+
+procedure TClientThread.Process_PutQso(S: string; from: Integer);
+var
+   aQSO: TQSO;
+begin
+   aQSO := TQSO.Create;
+   Delete(S, 1, 7);
+   aQSO.TextToQSO(S); // delete "PUTQSO "
+
+   PostMessage(ServerForm.Handle, WM_ZCMD_PUTQSO, from, LPARAM(aQSO));
+end;
+
+procedure TClientThread.Process_PutLog(S: string; from: Integer);
+var
+   aQSO: TQSO;
+begin
+   aQSO := TQSO.Create;
+   Delete(S, 1, 7);
+   aQSO.TextToQSO(S);
+
+   PostMessage(ServerForm.Handle, WM_ZCMD_PUTLOG, from, LPARAM(aQSO));
+end;
+
+procedure TClientThread.Process_ExDelQso(S: string; from: Integer);
+var
+   aQSO: TQSO;
+begin
+   aQSO := TQSO.Create;
+   Delete(S, 1, 9);
+   aQSO.TextToQSO(S);
+
+   PostMessage(ServerForm.Handle, WM_ZCMD_EXDELQSO, from, LPARAM(aQSO));
+end;
+
+procedure TClientThread.Process_DelQso(S: string; from: Integer);
+var
+   aQSO: TQSO;
+begin
+   aQSO := TQSO.Create;
+   Delete(S, 1, 7);
+   aQSO.TextToQSO(S);
+
+   PostMessage(ServerForm.Handle, WM_ZCMD_DELQSO, from, LPARAM(aQSO));
+end;
+
+procedure TClientThread.Process_EditQsoTo(S: string; from: Integer);
+var
+   aQSO: TQSO;
+begin
+   aQSO := TQSO.Create;
+   Delete(S, 1, 10);
+   aQSO.TextToQSO(S);
+   aQSO.Reserve := actEdit;
+
+   PostMessage(ServerForm.Handle, WM_ZCMD_EDITQSOTO, from, LPARAM(aQSO));
+end;
+
+procedure TClientThread.Process_Renew(S: string; from: Integer);
+begin
+   PostMessage(ServerForm.Handle, WM_ZCMD_RENEW, from, 0);
+end;
+
+procedure TClientThread.Process_InsQso(S: string; from: Integer);
+var
+   aQSO: TQSO;
+begin
+   aQSO := TQSO.Create;
+   Delete(S, 1, 7);
+   aQSO.TextToQSO(S);
+   aQSO.Reserve := actInsert;
+
+   PostMessage(ServerForm.Handle, WM_ZCMD_INSQSO, from, LPARAM(aQSO));
 end;
 
 procedure TClientThread.SendStr(str: string);
@@ -802,6 +859,42 @@ begin
    WriteLn(F, direction + ' ' + str);
 
    CloseFile(F);
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TClientThread.CliSocketError(Sender: TObject);
+var
+   S: string;
+begin
+   S := 'CliSocketError error code = ' + IntToStr(FClientSocket.LastError);
+   AddServerConsole(S);
+
+   PostMessage(FClientSocket.Handle, WM_QUIT, 0, 0);
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TClientThread.CliSocketException(Sender: TObject; SocExcept: ESocketException);
+var
+   S: string;
+begin
+   S := '[' + SocExcept.IPStr + '] ' + IntToStr(SocExcept.ErrorCode) + ':' + SocExcept.ErrorMessage;
+   AddServerConsole(S);
+
+   PostMessage(FClientSocket.Handle, WM_QUIT, 0, 0);
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TClientThread.CliSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
+var
+   S: string;
+begin
+   S := 'CliSocketSocksError: ' + msg + '(' + IntToStr(Error) + ')';
+   AddServerConsole(S);
+
+   PostMessage(FClientSocket.Handle, WM_QUIT, 0, 0);
 end;
 
 end.
