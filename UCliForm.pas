@@ -67,6 +67,8 @@ type
     FCommandLogFileName: string;
     FTakeLog: Boolean;
 
+    FInMergeProc: Boolean;
+
     procedure ServerWSocketDataAvailable(Sender: TObject; Error: Word);
     procedure ServerWSocketSessionClosed(Sender: TObject; Error: Word);
     procedure CliSocketError(Sender: TObject);
@@ -279,6 +281,7 @@ begin
    FCurrentBand := bUnknown;
    FLineBuffer := TStringList.Create();
    FTakeLog := False;
+   FInMergeProc := False;
    inherited Create(True);
 end;
 
@@ -322,6 +325,10 @@ begin
 
    { Returning from the Execute function effectively terminate the thread  }
    ReturnValue := 0;
+
+   if FInMergeProc = True then begin
+      MasterLogLock.Release();
+   end;
 end;
 
 procedure TClientThread.ServerWSocketSessionClosed(Sender: TObject; Error: Word);
@@ -533,6 +540,16 @@ begin
 
    if Pos('INSQSO ', temp) = 1 then begin
       Process_InsQso(temp, from);
+   end;
+
+   if Pos('BEGINMERGE', temp) = 1 then begin
+      MasterLogLock.Enter();
+      FInMergeProc := True;
+   end;
+
+   if Pos('ENDMERGE', temp) = 1 then begin
+      FInMergeProc := False;
+      MasterLogLock.Release();
    end;
 
    S := ZLinkHeader + ' ' + temp;

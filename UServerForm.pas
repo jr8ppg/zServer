@@ -157,7 +157,7 @@ type
 var
   ServerForm: TServerForm;
 
-  FQueLock: TCriticalSection;
+  MasterLogLock: TCriticalSection;
 
 implementation
 
@@ -318,18 +318,10 @@ end;
 
 function TServerForm.GetQSObyID(id: Integer): TQSO;
 var
-   i, j: Integer;
-   aQSO: TQSO;
+   j: Integer;
 begin
-   Result := nil;
    j := id div 100;
-   for i := 1 to FStats.MasterLog.TotalQSO do begin
-      aQSO := FStats.MasterLog.QSOList[i];
-      if j = ((aQSO.Reserve3) div 100) then begin
-         Result := aQSO;
-         Exit;
-      end;
-   end;
+   Result := FStats.MasterLog.ObjectOf(j);
 end;
 
 procedure TServerForm.AddConsole(S: string);
@@ -1063,9 +1055,9 @@ begin
 end;
 
 initialization
-   FQueLock := TCriticalSection.Create();
+   MasterLogLock := TCriticalSection.Create();
 
 finalization
-   FQueLock.Free();
+   MasterLogLock.Free();
 
 end.
