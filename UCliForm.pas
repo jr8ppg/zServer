@@ -3,9 +3,11 @@ unit UCliForm;
 interface
 
 uses
-  WinTypes, WinProcs, Messages, SysUtils, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, ExtCtrls, OverbyteIcsWndControl, OverbyteIcsWSocket,
-  Generics.Collections, Generics.Defaults, StrUtils,  WinSock,
+  Winapi.Windows, Winapi.Messages, Winapi.WinSock,
+  System.SysUtils, System.Classes, System.SyncObjs, System.StrUtils,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
+  Generics.Collections, Generics.Defaults,
+  OverbyteIcsWndControl, OverbyteIcsWSocket,
   UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages;
 
 const LBCODE = #13#10;
@@ -224,7 +226,7 @@ var
    S: string;
    t: string;
 begin
-   t := FormatDateTime('hh:nn', SysUtils.Now);
+   t := FormatDateTime('hh:nn', Now);
    S := t + ' ' + ' ZServer> ' + SendEdit.Text;
 
    AddChat(S);
@@ -337,7 +339,7 @@ var
    param_atom: ATOM;
    t: string;
 begin
-   t := FormatDateTime('hh:nn', SysUtils.Now);
+   t := FormatDateTime('hh:nn', Now);
    S := t + ' ' + FillRight(IntToStr(FClientNumber), 3) + ' ' + MHzString[FCurrentBand] + ' client disconnected from network.';
 
    param_atom := AddAtom(PChar(S));
@@ -420,6 +422,7 @@ procedure TClientThread.ProcessCommand(S: string);
 var
    from: Integer;
    temp: string;
+   i: Integer;
 begin
    from := StrToIntDef(TrimRight(copy(S, 1, 3)), -1) - 1;
    if from < 0 then begin
@@ -543,13 +546,36 @@ begin
    end;
 
    if Pos('BEGINMERGE', temp) = 1 then begin
+      i := 0;
+      while(MasterLogLock.TryEnter() = False) do begin
+         if i >= 3000 then begin       // 30sec待つ
+            S := ZLinkHeader + ' BEGINMERGE-NG';
+            SendStr(S + LBCODE);
+            Exit;
+         end;
+
+         if (i mod 50) = 0 then begin  // 0.5secに１度メッセージ出力
+            S := Format('%.1f', [(i * 10) / 1000]);
+            FClientForm.AddConsole('*** マージ処理の開始待ち... ' + S + 'sec ***');
+         end;
+         Sleep(10);
+         Inc(i);
+      end;
+
+      FClientForm.AddConsole('*** マージ処理を開始します ***');
       MasterLogLock.Enter();
       FInMergeProc := True;
+
+      S := ZLinkHeader + ' BEGINMERGE-OK';
+      SendStr(S + LBCODE);
+      Exit;
    end;
 
    if Pos('ENDMERGE', temp) = 1 then begin
+      FClientForm.AddConsole('*** マージ処理を終了しました ***');
       FInMergeProc := False;
       MasterLogLock.Release();
+      Exit;
    end;
 
    S := ZLinkHeader + ' ' + temp;
@@ -846,7 +872,7 @@ var
    param_atom: ATOM;
    t: string;
 begin
-   t := FormatDateTime('hh:nn', SysUtils.Now);
+   t := FormatDateTime('hh:nn', Now);
    S := t + ' ' + FillRight(IntToStr(FClientNumber), 3) + ' ' + S;
 
    param_atom := AddAtom(PChar(S));
