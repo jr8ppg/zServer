@@ -59,10 +59,6 @@ type
     FClientSocket: TWSocket;
     FClientHSocket: TSocket;
     FClientForm: TCliForm;
-
-    FLineBuffer: TStringList;
-    FCommTemp : string; //work string for parsing LineBuffer
-
     FClientNumber: Integer;
     FCurrentBand : TBand;
 
@@ -71,12 +67,14 @@ type
 
     FInMergeProc: Boolean;
 
+    FCommandQue: TStringList;
+    FFileData: TStringList;
+    FInProcessing: Boolean;
     procedure ServerWSocketDataAvailable(Sender: TObject; Error: Word);
     procedure ServerWSocketSessionClosed(Sender: TObject; Error: Word);
     procedure CliSocketError(Sender: TObject);
     procedure CliSocketException(Sender: TObject; SocExcept: ESocketException);
     procedure CliSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
-    procedure ParseLineBuffer();
     procedure ProcessCommand(S: string);
 
     procedure Process_Freq(S: string; from: Integer);
@@ -97,6 +95,7 @@ type
     procedure Process_Renew(S: string; from: Integer);
     procedure Process_InsQso(S: string; from: Integer);
     procedure Process_GetFile(S: string; from: Integer);
+    procedure Process_PutFile(S: string; from: Integer);
 
     procedure AddServerConsole(S: string);
     procedure AddToCommandLog(direction: string; str: string);
@@ -111,8 +110,6 @@ type
 
     property TakeLog: Boolean read FTakeLog write FTakeLog;
   end;
-
-
 
 implementation
 
@@ -282,9 +279,10 @@ begin
    FClientForm := AClientForm;
    FClientNumber := AClientNumber;
    FCurrentBand := bUnknown;
-   FLineBuffer := TStringList.Create();
    FTakeLog := False;
    FInMergeProc := False;
+   FCommandQue := TStringList.Create();
+   FFileData := TStringList.Create();
    inherited Create(True);
 end;
 
@@ -295,8 +293,8 @@ begin
       FClientSocket := nil;
    end;
 
-   FLineBuffer.Free();
-
+   FFileData.Free();
+   FCommandQue.Free();
    inherited Destroy;
 end;
 
@@ -370,51 +368,18 @@ begin
          Continue;
       end;
 
-      if ServerForm.ChatOnly = False then begin
-         FClientForm.AddConsole(str);
-         AddServerConsole(str);
-      end;
-
-      AddToCommandLog('R', str);
-
       {$IFDEF DEBUG}
       OutputDebugString(PChar(str));
       {$ENDIF}
 
-      ProcessCommand(FillRight(IntToStr(FClientNumber), 3) + ' ' + str);
+      FCommandQue.Add(FillRight(IntToStr(FClientNumber), 3) + ' ' + str);
+   end;
+
+   if FInProcessing = False then begin
+      ProcessCommand('');
    end;
 
    SL.Free();
-end;
-
-procedure TClientThread.ParseLineBuffer();
-var
-   max, i, j, x: Integer;
-   str: string;
-begin
-   max := FLineBuffer.Count - 1;
-   if max < 0 then
-      exit;
-
-   for i := 0 to max do begin
-      str := FLineBuffer.Strings[0];
-      for j := 1 to Length(str) do begin
-         if str[j] = chr($0D) then begin
-            x := Pos(ZLinkHeader, FCommTemp);
-            if x > 0 then begin
-               FCommTemp := Copy(FCommTemp, x, 255);
-
-               ProcessCommand(FillRight(IntToStr(FClientNumber), 3) + ' ' + FCommTemp);
-
-//               ServerForm.AddCommandQue(FillRight(IntToStr(ClientNumber), 3) + ' ' + CommTemp);
-            end;
-            FCommTemp := '';
-         end
-         else
-            FCommTemp := FCommTemp + str[j];
-      end;
-      FLineBuffer.Delete(0);
-   end;
 end;
 
 // *****************************************************************************
@@ -424,167 +389,207 @@ var
    from: Integer;
    temp: string;
    i: Integer;
+   fCommand: Boolean;
 begin
-   from := StrToIntDef(TrimRight(copy(S, 1, 3)), -1) - 1;
-   if from < 0 then begin
-      Exit;
-   end;
+   FInProcessing := True;
+   try
+      while FCommandQue.Count > 0 do begin
+         S := FCommandQue.Strings[0];
+         FCommandQue.Delete(0);
 
-   Delete(S, 1, 4);
+         from := StrToIntDef(TrimRight(copy(S, 1, 3)), -1) - 1;
+         if from < 0 then begin
+            Exit;
+         end;
 
-   Delete(S, 1, Length(ZLinkHeader) + 1);
+         Delete(S, 1, 4);
+         Delete(S, 1, Length(ZLinkHeader) + 1);
 
-   temp := S;
+         fCommand := False;
+         temp := S;
 
-   if Pos('FREQ', temp) = 1 then begin
-      Process_Freq(temp, from);
-   end;
+         if Pos('FREQ', temp) = 1 then begin
+            Process_Freq(temp, from);
+            fCommand := True;
+         end;
 
-   if Pos('GETCONSOLE', UpperCase(temp)) = 1 then begin
-      Process_GetConsole();
-      Exit;
-   end;
+         if Pos('GETCONSOLE', UpperCase(temp)) = 1 then begin
+            Process_GetConsole();
+            Exit;
+         end;
 
-   if Pos('SENDRENEW', temp) = 1 then begin
-      Process_SendRenew();
-      Exit;
-   end;
+         if Pos('SENDRENEW', temp) = 1 then begin
+            Process_SendRenew();
+            Exit;
+         end;
 
-   {
-     if Pos('FILELOADED', UpperCase(temp)) = 1 then
-     begin
-     sendbuf := ZLinkHeader + ' PROMPTUPDATE';
-     SendAll(sendbuf+LBCODE);    end;
-   }
+         {
+           if Pos('FILELOADED', UpperCase(temp)) = 1 then
+           begin
+           sendbuf := ZLinkHeader + ' PROMPTUPDATE';
+           SendAll(sendbuf+LBCODE);    end;
+         }
 
-   if Pos('WHO', UpperCase(temp)) = 1 then begin
-      Process_Who();
-      Exit;
-   end;
+         if Pos('WHO', UpperCase(temp)) = 1 then begin
+            Process_Who();
+            Exit;
+         end;
 
-   if Pos('OPERATOR', temp) = 1 then begin
-      Process_Operator(temp, from);
-      Exit;
-   end;
+         if Pos('OPERATOR', temp) = 1 then begin
+            Process_Operator(temp, from);
+            Exit;
+         end;
 
-   if Pos('BAND ', temp) = 1 then begin
-      Process_Band(temp, from);
-      Exit;
-   end;
+         if Pos('BAND ', temp) = 1 then begin
+            Process_Band(temp, from);
+            Exit;
+         end;
 
-   if Pos('RESET', temp) = 1 then begin
-      Exit;
-   end;
+         if Pos('RESET', temp) = 1 then begin
+            Exit;
+         end;
 
-   if Pos('ENDLOG', temp) = 1 then // received when zLog finishes uploading
-   begin
-      Exit;
-   end;
+         if Pos('ENDLOG', temp) = 1 then // received when zLog finishes uploading
+         begin
+            Exit;
+         end;
 
-   if Pos('PUTMESSAGE', temp) = 1 then begin
-      Process_PutMessage(temp, from);
-   end;
+         if Pos('PUTMESSAGE', temp) = 1 then begin
+            Process_PutMessage(temp, from);
+            fCommand := True;
+         end;
 
-   if Pos('SPOT', temp) = 1 then begin
-   end;
+         if Pos('SPOT', temp) = 1 then begin
+            fCommand := True;
+         end;
 
-   if Pos('SENDLOG', temp) = 1 then // will send all qsos in server's log and renew command
-   begin
-      Process_SendLog();
-      Exit;
-   end;
+         if Pos('SENDLOG', temp) = 1 then // will send all qsos in server's log and renew command
+         begin
+            Process_SendLog();
+            Exit;
+         end;
 
-   if Pos('GETQSOIDS', temp) = 1 then // will send all qso ids in server's log
-   begin
-      Process_GetQsoIDs();
-      Exit;
-   end;
+         if Pos('GETQSOIDS', temp) = 1 then // will send all qso ids in server's log
+         begin
+            Process_GetQsoIDs();
+            Exit;
+         end;
 
-   if Pos('GETLOGQSOID', temp) = 1 then // will send all qso ids in server's log
-   begin
-      Process_GetLogQsoID(temp);
-      Exit;
-   end;
+         if Pos('GETLOGQSOID', temp) = 1 then // will send all qso ids in server's log
+         begin
+            Process_GetLogQsoID(temp);
+            Exit;
+         end;
 
-   if Pos('SENDCURRENT', temp) = 1 then begin
-      Exit;
-   end;
+         if Pos('SENDCURRENT', temp) = 1 then begin
+            Exit;
+         end;
 
-   if Pos('PUTQSO', temp) = 1 then begin
-      Process_PutQso(temp, from);
-   end;
+         if Pos('PUTQSO', temp) = 1 then begin
+            Process_PutQso(temp, from);
+            fCommand := True;
+         end;
 
-   if Pos('PUTLOG ', temp) = 1 then begin
-      Process_PutLog(temp, from);
-   end;
+         if Pos('PUTLOG ', temp) = 1 then begin
+            Process_PutLog(temp, from);
+            fCommand := True;
+         end;
 
-   if Pos('EXDELQSO', temp) = 1 then begin
-      Process_ExDelQso(temp, from);
-   end;
+         if Pos('EXDELQSO', temp) = 1 then begin
+            Process_ExDelQso(temp, from);
+            fCommand := True;
+         end;
 
-   if Pos('DELQSO', temp) = 1 then begin
-      Process_DelQso(temp, from);
-   end;
+         if Pos('DELQSO', temp) = 1 then begin
+            Process_DelQso(temp, from);
+            fCommand := True;
+         end;
 
-   if Pos('EDITQSOFROM', temp) = 1 then begin
-      Exit;
-   end;
+         if Pos('EDITQSOFROM', temp) = 1 then begin
+            Exit;
+         end;
 
-   if Pos('EDITQSOTO ', temp) = 1 then begin
-      Process_EditQsoTo(temp, from);
-   end;
+         if Pos('EDITQSOTO ', temp) = 1 then begin
+            Process_EditQsoTo(temp, from);
+            fCommand := True;
+         end;
 
-   if Pos('INSQSOAT ', temp) = 1 then begin
-      Exit;
-   end;
+         if Pos('INSQSOAT ', temp) = 1 then begin
+            Exit;
+         end;
 
-   if Pos('RENEW', temp) = 1 then begin
-      Process_Renew(temp, from);
-   end;
+         if Pos('RENEW', temp) = 1 then begin
+            Process_Renew(temp, from);
+            fCommand := True;
+         end;
 
-   if Pos('INSQSO ', temp) = 1 then begin
-      Process_InsQso(temp, from);
-   end;
+         if Pos('INSQSO ', temp) = 1 then begin
+            Process_InsQso(temp, from);
+            fCommand := True;
+         end;
 
-   if Pos('BEGINMERGE', temp) = 1 then begin
-      i := 0;
-      while(MasterLogLock.TryEnter() = False) do begin
-         if i >= 3000 then begin       // 30sec待つ
-            S := ZLinkHeader + ' BEGINMERGE-NG';
+         if Pos('BEGINMERGE', temp) = 1 then begin
+            i := 0;
+            while(MasterLogLock.TryEnter() = False) do begin
+               if i >= 3000 then begin       // 30sec待つ
+                  S := ZLinkHeader + ' BEGINMERGE-NG';
+                  SendStr(S + LBCODE);
+                  Exit;
+               end;
+
+               if (i mod 50) = 0 then begin  // 0.5secに１度メッセージ出力
+                  S := Format('%.1f', [(i * 10) / 1000]);
+                  FClientForm.AddConsole('*** マージ処理の開始待ち... ' + S + 'sec ***');
+               end;
+               Sleep(10);
+               Inc(i);
+            end;
+
+            FClientForm.AddConsole('*** マージ処理を開始します ***');
+            MasterLogLock.Enter();
+            FInMergeProc := True;
+
+            S := ZLinkHeader + ' BEGINMERGE-OK';
             SendStr(S + LBCODE);
             Exit;
          end;
 
-         if (i mod 50) = 0 then begin  // 0.5secに１度メッセージ出力
-            S := Format('%.1f', [(i * 10) / 1000]);
-            FClientForm.AddConsole('*** マージ処理の開始待ち... ' + S + 'sec ***');
+         if Pos('ENDMERGE', temp) = 1 then begin
+            FClientForm.AddConsole('*** マージ処理を終了しました ***');
+            FInMergeProc := False;
+            MasterLogLock.Release();
+            Exit;
          end;
-         Sleep(10);
-         Inc(i);
+
+         if Pos('GETFILE', temp) = 1 then begin
+            Process_GetFile(temp, from);
+            fCommand := True;
+         end;
+
+         if Pos('PUTFILE', temp) = 1 then begin
+            Process_PutFile(temp, from);
+            fCommand := True;
+         end;
+
+         if fCommand = False then begin
+            FFileData.Add(temp);
+         end
+         else begin
+            S := ZLinkHeader + ' ' + temp;
+
+            if ServerForm.ChatOnly = False then begin
+               FClientForm.AddConsole(S);
+               AddServerConsole(S);
+            end;
+
+            AddToCommandLog('R', S);
+
+            ServerForm.SendAllButFrom(S + LBCODE, from);
+         end;
       end;
-
-      FClientForm.AddConsole('*** マージ処理を開始します ***');
-      MasterLogLock.Enter();
-      FInMergeProc := True;
-
-      S := ZLinkHeader + ' BEGINMERGE-OK';
-      SendStr(S + LBCODE);
-      Exit;
+   finally
+      FInProcessing := False;
    end;
-
-   if Pos('ENDMERGE', temp) = 1 then begin
-      FClientForm.AddConsole('*** マージ処理を終了しました ***');
-      FInMergeProc := False;
-      MasterLogLock.Release();
-      Exit;
-   end;
-
-   if Pos('GETFILE', temp) = 1 then begin
-      Process_GetFile(temp, from);
-   end;
-
-   S := ZLinkHeader + ' ' + temp;
-   ServerForm.SendAllButFrom(S + LBCODE, from);
 end;
 
 procedure TClientThread.Process_Freq(S: string; from: Integer);
@@ -871,11 +876,9 @@ procedure TClientThread.Process_GetFile(S: string; from: Integer);
 var
    filename: string;
    mem: TMemoryStream;
-   text: string;
    base64: TBase64Encoding;
    sl: TStringList;
    i: Integer;
-   substr: string;
 begin
    if FClientSocket.LastError <> 0 then begin
       Exit;
@@ -905,6 +908,65 @@ begin
       end;
 
       FClientSocket.SendStr(sl.Text);
+   finally
+      mem.Free();
+      base64.Free();
+      sl.Free();
+   end;
+end;
+
+procedure TClientThread.Process_PutFile(S: string; from: Integer);
+var
+   mem: TMemoryStream;
+   base64: TBase64Encoding;
+   sl: TStringList;
+   i: Integer;
+   str: string;
+   file_name: string;
+   file_size: Integer;
+   line_count: Integer;
+   bytes: TBytes;
+   bakfile: string;
+begin
+   if FClientSocket.LastError <> 0 then begin
+      Exit;
+   end;
+
+   Delete(S, 1, 8);
+
+   base64 := TBase64Encoding.Create();
+   mem := TMemoryStream.Create();
+   sl := TStringList.Create();
+   sl.StrictDelimiter := True;
+   try
+      sl.CommaText := Trim(S) + ',,,';
+      file_name := sl[0];
+      file_size := StrToIntDef(sl[1], 0);
+      line_count := StrToIntDef(sl[2], 0);
+
+      sl.Clear();
+      for i := 0 to FFileData.Count - 1 do begin
+         str := FFileData[i];
+         sl.Add(str);
+      end;
+
+      bytes := base64.DecodeStringToBytes(sl.Text);
+
+      mem.Size := Length(bytes);
+      mem.Position := 0;
+      mem.WriteBuffer(bytes, Length(bytes));
+
+      file_name := ExtractFilePath(Application.ExeName) + '\zlog_files\' + file_name;
+      if FileExists(file_name) = True then begin
+         bakfile := ChangeFileExt(file_name, '.' + FormatDateTime('yyyymmddhhnnss', Now));
+         CopyFile(PChar(file_name), PChar(bakfile), False);
+      end;
+
+      mem.SaveToFile(file_name);
+
+      FFileData.Clear();
+
+      FClientSocket.SendStr(ZLinkHeader + ' PUTFILE-OK' + LBCODE);
    finally
       mem.Free();
       base64.Free();
