@@ -6,7 +6,7 @@ uses
   Winapi.Windows, Winapi.Messages, Winapi.WinSock,
   System.SysUtils, System.Classes, System.SyncObjs, System.StrUtils,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
-  Generics.Collections, Generics.Defaults,
+  Generics.Collections, Generics.Defaults, System.NetEncoding,
   OverbyteIcsWndControl, OverbyteIcsWSocket,
   UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages;
 
@@ -96,6 +96,7 @@ type
     procedure Process_EditQsoTo(S: string; from: Integer);
     procedure Process_Renew(S: string; from: Integer);
     procedure Process_InsQso(S: string; from: Integer);
+    procedure Process_GetFile(S: string; from: Integer);
 
     procedure AddServerConsole(S: string);
     procedure AddToCommandLog(direction: string; str: string);
@@ -578,6 +579,10 @@ begin
       Exit;
    end;
 
+   if Pos('GETFILE', temp) = 1 then begin
+      Process_GetFile(temp, from);
+   end;
+
    S := ZLinkHeader + ' ' + temp;
    ServerForm.SendAllButFrom(S + LBCODE, from);
 end;
@@ -853,6 +858,58 @@ begin
    aQSO.Reserve := actInsert;
 
    PostMessage(ServerForm.Handle, WM_ZCMD_INSQSO, from, LPARAM(aQSO));
+end;
+
+// REQUEST
+// 1234567812345678901234567890...
+// GETFILE file_name
+//
+// RESPONSE
+// file_size, line_count
+// file_data(base64) ...
+procedure TClientThread.Process_GetFile(S: string; from: Integer);
+var
+   filename: string;
+   mem: TMemoryStream;
+   text: string;
+   base64: TBase64Encoding;
+   sl: TStringList;
+   i: Integer;
+   substr: string;
+begin
+   if FClientSocket.LastError <> 0 then begin
+      Exit;
+   end;
+
+   Delete(S, 1, 8);
+
+   base64 := TBase64Encoding.Create();
+   mem := TMemoryStream.Create();
+   sl := TStringList.Create();
+   try
+      FClientSocket.SendStr(ZLinkHeader + ' GETFILE' + LBCODE);
+
+      filename := ExtractFilePath(Application.ExeName) + '\zlog_files\' + S;
+      if FileExists(filename) = False then begin
+         FClientSocket.SendStr(ZLinkHeader + ' ERROR,FILE NOT FOUND' + LBCODE);
+         Exit;
+      end;
+
+      mem.LoadFromFile(filename);
+      mem.Position := 0;
+      sl.Text := base64.EncodeBytesToString(mem.Memory, mem.Size);
+
+      sl.Insert(0, IntToStr(mem.Size) + ',' + IntToStr(sl.Count));
+      for i := 0 to sl.Count - 1 do begin
+         sl[i] := ZLinkHeader + ' ' + sl[i];
+      end;
+
+      FClientSocket.SendStr(sl.Text);
+   finally
+      mem.Free();
+      base64.Free();
+      sl.Free();
+   end;
 end;
 
 procedure TClientThread.SendStr(str: string);
