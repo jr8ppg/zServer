@@ -355,24 +355,25 @@ var
    str: string;
    SL: TStringList;
    i: Integer;
+   st: Integer;
+   line: string;
 begin
    SL := TStringList.Create();
 
    str := FClientSocket.ReceiveStr();
 
-   SL.Text := str;
-
-   for i := 0 to SL.Count - 1 do begin
-      str := Trim(SL[i]);
-      if str = '' then begin
-         Continue;
+   st := 1;
+   for i := 1 to Length(str) do begin
+      if str[i] = #10 then begin
+         line := TrimCRLF(Copy(str, st, i - st + 1));
+         FCommandQue.Add(FillRight(IntToStr(FClientNumber), 3) + ' ' + line);
+         st := i + 1;
       end;
+   end;
 
-      {$IFDEF DEBUG}
-      OutputDebugString(PChar(str));
-      {$ENDIF}
-
-      FCommandQue.Add(FillRight(IntToStr(FClientNumber), 3) + ' ' + str);
+   line := TrimCRLF(Copy(str, st));
+   if line <> '' then begin
+      FCommandQue.Add(FillRight(IntToStr(FClientNumber), 3) + ' ' + line);
    end;
 
    if FInProcessing = False then begin
@@ -389,7 +390,6 @@ var
    from: Integer;
    temp: string;
    i: Integer;
-   fCommand: Boolean;
 begin
    FInProcessing := True;
    try
@@ -405,12 +405,10 @@ begin
          Delete(S, 1, 4);
          Delete(S, 1, Length(ZLinkHeader) + 1);
 
-         fCommand := False;
          temp := S;
 
          if Pos('FREQ', temp) = 1 then begin
             Process_Freq(temp, from);
-            fCommand := True;
          end;
 
          if Pos('GETCONSOLE', UpperCase(temp)) = 1 then begin
@@ -456,11 +454,9 @@ begin
 
          if Pos('PUTMESSAGE', temp) = 1 then begin
             Process_PutMessage(temp, from);
-            fCommand := True;
          end;
 
          if Pos('SPOT', temp) = 1 then begin
-            fCommand := True;
          end;
 
          if Pos('SENDLOG', temp) = 1 then // will send all qsos in server's log and renew command
@@ -487,22 +483,18 @@ begin
 
          if Pos('PUTQSO', temp) = 1 then begin
             Process_PutQso(temp, from);
-            fCommand := True;
          end;
 
          if Pos('PUTLOG ', temp) = 1 then begin
             Process_PutLog(temp, from);
-            fCommand := True;
          end;
 
          if Pos('EXDELQSO', temp) = 1 then begin
             Process_ExDelQso(temp, from);
-            fCommand := True;
          end;
 
          if Pos('DELQSO', temp) = 1 then begin
             Process_DelQso(temp, from);
-            fCommand := True;
          end;
 
          if Pos('EDITQSOFROM', temp) = 1 then begin
@@ -511,7 +503,6 @@ begin
 
          if Pos('EDITQSOTO ', temp) = 1 then begin
             Process_EditQsoTo(temp, from);
-            fCommand := True;
          end;
 
          if Pos('INSQSOAT ', temp) = 1 then begin
@@ -520,12 +511,10 @@ begin
 
          if Pos('RENEW', temp) = 1 then begin
             Process_Renew(temp, from);
-            fCommand := True;
          end;
 
          if Pos('INSQSO ', temp) = 1 then begin
             Process_InsQso(temp, from);
-            fCommand := True;
          end;
 
          if Pos('BEGINMERGE', temp) = 1 then begin
@@ -563,29 +552,28 @@ begin
 
          if Pos('GETFILE', temp) = 1 then begin
             Process_GetFile(temp, from);
-            fCommand := True;
          end;
 
          if Pos('PUTFILE', temp) = 1 then begin
             Process_PutFile(temp, from);
-            fCommand := True;
          end;
 
-         if fCommand = False then begin
+         if Pos('FILEDATA', temp) = 1 then begin
+            Delete(temp, 1, 9);
             FFileData.Add(temp);
-         end
-         else begin
-            S := ZLinkHeader + ' ' + temp;
-
-            if ServerForm.ChatOnly = False then begin
-               FClientForm.AddConsole(S);
-               AddServerConsole(S);
-            end;
-
-            AddToCommandLog('R', S);
-
-            ServerForm.SendAllButFrom(S + LBCODE, from);
+            Continue;
          end;
+
+         S := ZLinkHeader + ' ' + temp;
+
+         if ServerForm.ChatOnly = False then begin
+            FClientForm.AddConsole(S);
+            AddServerConsole(S);
+         end;
+
+         AddToCommandLog('R', S);
+
+         ServerForm.SendAllButFrom(S + LBCODE, from);
       end;
    finally
       FInProcessing := False;
@@ -866,12 +854,12 @@ begin
 end;
 
 // REQUEST
-// 1234567812345678901234567890...
-// GETFILE file_name
+//   1234567812345678901234567890...
+//   GETFILE file_name
 //
 // RESPONSE
-// file_size, line_count
-// file_data(base64) ...
+//   FILEDATA file_data(base64) ...
+//   PUTFILE file_size, line_count
 procedure TClientThread.Process_GetFile(S: string; from: Integer);
 var
    filename: string;
@@ -879,6 +867,9 @@ var
    base64: TBase64Encoding;
    sl: TStringList;
    i: Integer;
+   c: Integer;
+   sendbuf: string;
+   str: string;
 begin
    if FClientSocket.LastError <> 0 then begin
       Exit;
@@ -890,8 +881,6 @@ begin
    mem := TMemoryStream.Create();
    sl := TStringList.Create();
    try
-      FClientSocket.SendStr(ZLinkHeader + ' GETFILE' + LBCODE);
-
       filename := ExtractFilePath(Application.ExeName) + '\zlog_files\' + S;
       if FileExists(filename) = False then begin
          FClientSocket.SendStr(ZLinkHeader + ' ERROR,FILE NOT FOUND' + LBCODE);
@@ -902,12 +891,26 @@ begin
       mem.Position := 0;
       sl.Text := base64.EncodeBytesToString(mem.Memory, mem.Size);
 
-      sl.Insert(0, IntToStr(mem.Size) + ',' + IntToStr(sl.Count));
+      sendbuf := '';
+      c := 0;
       for i := 0 to sl.Count - 1 do begin
-         sl[i] := ZLinkHeader + ' ' + sl[i];
+
+         if c >= 5000 then begin
+            FClientSocket.SendStr(sendbuf);
+
+            c := 0;
+            sendbuf := '';
+         end;
+
+         sendbuf := sendbuf + ZLinkHeader + ' FILEDATA ' + sl[i] + #13#10;
+         Inc(c);
       end;
 
-      FClientSocket.SendStr(sl.Text);
+      FClientSocket.SendStr(sendbuf);
+
+      filename := ExtractFileName(filename);
+      str := ZLinkHeader + ' PUTFILE ' + filename + ',' + IntToStr(mem.Size) + ',' + IntToStr(sl.Count);
+      FClientSocket.SendStr(str + LBCODE);
    finally
       mem.Free();
       base64.Free();
@@ -963,6 +966,10 @@ begin
       end;
 
       mem.SaveToFile(file_name);
+
+      {$IFDEF DEBUG}
+      FFileData.SaveToFile(ChangeFileExt(file_name, '.txt'));
+      {$ENDIF}
 
       FFileData.Clear();
 

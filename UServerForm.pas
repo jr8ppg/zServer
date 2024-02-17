@@ -26,7 +26,7 @@ uses
   OverbyteIcsWndControl, OverbyteIcsWSocket, OverbyteIcsUtils, System.SyncObjs,
   System.Generics.Collections, System.Generics.Defaults,
   UBasicStats, UBasicMultiForm, UCliForm, UFreqList, UConnections,
-  UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages, JclFileUtils;
+  UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages, JclFileUtils, Vcl.Buttons;
 
 const
   IniFileName = 'ZServer.ini';
@@ -67,6 +67,7 @@ type
     menuTakeCommandLog: TMenuItem;
     N5: TMenuItem;
     N6: TMenuItem;
+    buttonMergeLock: TSpeedButton;
     //procedure CreateParams(var Params: TCreateParams); override;
     procedure FormShow(Sender: TObject);
     procedure SrvSocketSessionAvailable(Sender: TObject; Error: Word);
@@ -96,6 +97,7 @@ type
     procedure SrvSocketException(Sender: TObject; SocExcept: ESocketException);
     procedure SrvSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
     procedure menuTakeCommandLogClick(Sender: TObject);
+    procedure buttonMergeLockClick(Sender: TObject);
   private
     { Declarations privates }
     FInitialized  : Boolean;
@@ -214,6 +216,10 @@ begin
    if FInitialized then begin
       Exit;
    end;
+
+   {$IFDEF DEBUG}
+   buttonMergeLock.Visible := True;
+   {$ENDIF}
 
    FInitialized := True;
 
@@ -767,6 +773,16 @@ end;
 procedure TServerForm.Button2Click(Sender: TObject);
 begin
    ClientListBox.Clear;
+end;
+
+procedure TServerForm.buttonMergeLockClick(Sender: TObject);
+begin
+   if TSpeedButton(Sender).Down = True then begin
+      MasterLogLock.Enter();
+   end
+   else begin
+      MasterLogLock.Leave();
+   end;
 end;
 
 procedure TServerForm.Timer1Timer(Sender: TObject);

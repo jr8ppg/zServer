@@ -86,6 +86,7 @@ function TextToBand(text: string): TBand;
 function TextToMode(text: string): TMode;
 
 function LoadFromResourceName(hinst: THandle; filename: string): TStringList;
+function TrimCRLF(SS : string) : string;
 
 var
   dmZLogGlobal: TdmZLogGlobal;
@@ -914,6 +915,22 @@ begin
       RS.Free();
       Result := SL;
    end;
+end;
+
+function TrimCRLF(SS : string) : string;
+var
+   S: string;
+begin
+   S := SS;
+   while (length(S) > 0) and ((S[1] = Chr($0A)) or (S[1] = Chr($0D))) do begin
+      Delete(S, 1, 1);
+   end;
+
+   while (length(S) > 0) and ((S[length(S)] = Chr($0A)) or (S[length(S)] = Chr($0D))) do begin
+      Delete(S, length(S), 1);
+   end;
+
+   Result := S;
 end;
 
 end.
