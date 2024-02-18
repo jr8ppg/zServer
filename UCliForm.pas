@@ -535,7 +535,6 @@ begin
             end;
 
             FClientForm.AddConsole('*** マージ処理を開始します ***');
-            MasterLogLock.Enter();
             FInMergeProc := True;
 
             S := ZLinkHeader + ' BEGINMERGE-OK';
@@ -883,7 +882,7 @@ begin
    try
       filename := ExtractFilePath(Application.ExeName) + '\zlog_files\' + S;
       if FileExists(filename) = False then begin
-         FClientSocket.SendStr(ZLinkHeader + ' ERROR,FILE NOT FOUND' + LBCODE);
+         FClientSocket.SendStr(ZLinkHeader + ' PUTFILE ERROR,FILE NOT FOUND' + LBCODE);
          Exit;
       end;
 
