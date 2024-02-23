@@ -88,5 +88,7 @@ object CliForm: TCliForm
     ItemHeight = 12
     ParentFont = False
     TabOrder = 2
+    ExplicitWidth = 344
+    ExplicitHeight = 101
   end
 end

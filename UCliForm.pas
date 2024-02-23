@@ -36,6 +36,7 @@ type
     FCurrentBand : TBand;
     FCurrentOperator : string;
     FClientThread: TClientThread;
+    FPcName: string;
     FTakeLog: Boolean;
     procedure AddChat(S: string);
     procedure SetCurrentBand(v: TBand);
@@ -43,12 +44,14 @@ type
     procedure SetClientNumber(v: Integer);
     procedure SetTakeLog(v: Boolean);
     procedure SetCaption;
+    procedure SetPcName(v: string);
   public
     procedure AddConsole(S : string);
     procedure SendStr(S: string);
 
     property CurrentBand: TBand read FCurrentBand write SetCurrentBand;
     property CurrentOperator: string read FCurrentOperator write SetCurrentOperator;
+    property PcName: string read FPcName write SetPcName;
     property ClientNumber: Integer read FClientNumber write SetClientNumber;
     property Socket: TSocket read FServerSocket write FServerSocket;
     property TakeLog: Boolean read FTakeLog write SetTakeLog;
@@ -83,6 +86,7 @@ type
     procedure Process_Who();
     procedure Process_Operator(S: string; from: Integer);
     procedure Process_Band(S: string; from: Integer);
+    procedure Process_PcName(S: string; from: Integer);
     procedure Process_PutMessage(S: string; from: Integer);
     procedure Process_SendLog();
     procedure Process_GetQsoIDs();
@@ -133,6 +137,7 @@ begin
    FInitialized := False;
    FServerSocket := 0;
    FTakeLog := False;
+   FPcName := '';
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -202,7 +207,19 @@ begin
       S := S + ' by ' + FCurrentOperator;
    end;
 
+   if FPcname <> '' then begin
+      S := S + ' on ' + FPcName;
+   end;
+
    Caption := S;
+end;
+
+{ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TCliForm.SetPcName(v: string);
+begin
+   FPcName := v;
+   SetCaption();
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -443,6 +460,11 @@ begin
             Exit;
          end;
 
+         if Pos('PCNAME', temp) = 1 then begin
+            Process_PcName(temp, from);
+            Exit;
+         end;
+
          if Pos('RESET', temp) = 1 then begin
             Exit;
          end;
@@ -659,6 +681,16 @@ begin
       SendStr(S + LBCODE);
    end;
 end;
+
+procedure TClientThread.Process_PcName(S: string; from: Integer);
+begin
+   Delete(S, 1, 7);
+
+   FClientForm.PcName := S;
+
+   PostMessage(ServerForm.Handle, WM_ZCMD_UPDATE_DISPLAY, from, 0);
+end;
+
 
 procedure TClientThread.Process_PutMessage(S: string; from: Integer);
 var
