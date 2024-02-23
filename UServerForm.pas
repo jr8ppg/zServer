@@ -23,9 +23,10 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, IniFiles, Menus, ExtCtrls, System.UITypes,
-  OverbyteIcsWndControl, OverbyteIcsWSocket, System.SyncObjs,
+  OverbyteIcsWndControl, OverbyteIcsWSocket, OverbyteIcsUtils, System.SyncObjs,
+  System.Generics.Collections, System.Generics.Defaults,
   UBasicStats, UBasicMultiForm, UCliForm, UFreqList, UConnections,
-  UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages, JclFileUtils;
+  UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages, JclFileUtils, Vcl.Buttons;
 
 const
   IniFileName = 'ZServer.ini';
@@ -66,6 +67,7 @@ type
     menuTakeCommandLog: TMenuItem;
     N5: TMenuItem;
     N6: TMenuItem;
+    buttonMergeLock: TSpeedButton;
     //procedure CreateParams(var Params: TCreateParams); override;
     procedure FormShow(Sender: TObject);
     procedure SrvSocketSessionAvailable(Sender: TObject; Error: Word);
@@ -95,6 +97,7 @@ type
     procedure SrvSocketException(Sender: TObject; SocExcept: ESocketException);
     procedure SrvSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
     procedure menuTakeCommandLogClick(Sender: TObject);
+    procedure buttonMergeLockClick(Sender: TObject);
   private
     { Declarations privates }
     FInitialized  : Boolean;
@@ -105,7 +108,8 @@ type
     FFreqList: TFreqList;
     FConnections: TConnections;
 
-    FClientList: TCliFormList;
+    FClientList: TList<TCliForm>;
+
     FStats: TBasicStats;
     FMultiForm: TBasicMultiForm;
 
@@ -148,14 +152,14 @@ type
     procedure MergeFile(FileName : string; BandSet : TBandSet);
     procedure RecalcAll();
 
-    property ClientList: TCliFormList read FClientList;
+    property ClientList: TList<TCliForm> read FClientList;
     property MasterLog: TLog read GetMasterLog;
   end;
 
 var
   ServerForm: TServerForm;
 
-  FQueLock: TCriticalSection;
+  MasterLogLock: TCriticalSection;
 
 implementation
 
@@ -180,7 +184,8 @@ procedure TServerForm.FormCreate(Sender: TObject);
 var
    ver: TJclFileVersionInfo;
 begin
-   FClientList := TCliFormList.Create();
+   FClientList := TList<TCliForm>.Create();
+
    ChatOnly := True;
    FClientNumber := 0;
    FCurrentFileName := '';
@@ -211,6 +216,10 @@ begin
    if FInitialized then begin
       Exit;
    end;
+
+   {$IFDEF DEBUG}
+   buttonMergeLock.Visible := True;
+   {$ENDIF}
 
    FInitialized := True;
 
@@ -315,18 +324,10 @@ end;
 
 function TServerForm.GetQSObyID(id: Integer): TQSO;
 var
-   i, j: Integer;
-   aQSO: TQSO;
+   j: Integer;
 begin
-   Result := nil;
    j := id div 100;
-   for i := 1 to FStats.MasterLog.TotalQSO do begin
-      aQSO := FStats.MasterLog.QSOList[i];
-      if j = ((aQSO.Reserve3) div 100) then begin
-         Result := aQSO;
-         Exit;
-      end;
-   end;
+   Result := FStats.MasterLog.ObjectOf(j);
 end;
 
 procedure TServerForm.AddConsole(S: string);
@@ -391,11 +392,10 @@ var
 begin
    FClientNumber := FClientList.Count + 1;
 
-   Form := TCliForm.Create(self);
-   Form.CliSocket.HSocket := SrvSocket.Accept;
+   Form := TCliForm.Create(Self);
    Form.Caption := 'Client ' + IntToStr(FClientNumber);
    Form.ClientNumber := FClientNumber;
-   Form.TakeLog := menuTakeCommandLog.Checked;
+   Form.Socket := SrvSocket.Accept;
    Form.Show;
    FClientList.Add(Form);
 end;
@@ -775,6 +775,16 @@ begin
    ClientListBox.Clear;
 end;
 
+procedure TServerForm.buttonMergeLockClick(Sender: TObject);
+begin
+   if TSpeedButton(Sender).Down = True then begin
+      MasterLogLock.Enter();
+   end
+   else begin
+      MasterLogLock.Leave();
+   end;
+end;
+
 procedure TServerForm.Timer1Timer(Sender: TObject);
 begin
    Timer1.Enabled := False;
@@ -1061,9 +1071,9 @@ begin
 end;
 
 initialization
-   FQueLock := TCriticalSection.Create();
+   MasterLogLock := TCriticalSection.Create();
 
 finalization
-   FQueLock.Free();
+   MasterLogLock.Free();
 
 end.

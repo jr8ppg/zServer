@@ -347,7 +347,7 @@ type
     FDupeCheckList: TQSOListArray;
     FBandList: TQSOListArray;
     FAllPhone: Boolean;    // True: SSB, FM, AM are same
-    FQsoIdDic: TDictionary<Integer, string>;
+    FQsoIdDic: TDictionary<Integer, TQSO>;
     FStartTime: TDateTime;
     FEndTime: TDateTime;
     FPeriod: Integer;
@@ -413,6 +413,7 @@ type
 
     function IndexOf(aQSO: TQSO): Integer; overload;
     function ObjectOf(callsign: string): TQSO; overload;
+    function ObjectOf(qsoid: Integer): TQSO; overload;
 
     function LoadFromFile(filename: string): Integer;
     function LoadFromFileEx(filename: string): Integer;
@@ -1621,7 +1622,7 @@ begin
    FCountHigherPoints := False;
    FDifferentModePointer := 0;
    FAllPhone := True;
-   FQsoIdDic := TDictionary<Integer, string>.Create(120000);
+   FQsoIdDic := TDictionary<Integer, TQSO>.Create(120000);
    FStartTime := 0;
 end;
 
@@ -1778,7 +1779,7 @@ begin
    FBandList[xQSO.Band].Add(aQSO);
 
    if FQsoIdDic.ContainsKey(xQSO.QsoId) = False then begin
-      FQsoIdDic.Add(xQSO.QsoId, xQSO.Callsign);
+      FQsoIdDic.Add(xQSO.QsoId, xQSO);
    end;
 
    FSaved := False;
@@ -2019,7 +2020,7 @@ begin
    FSaved := False;
 
    if FQsoIdDic.ContainsKey(aQSO.QsoId) = False then begin
-      FQsoIdDic.Add(aQSO.QsoId, aQSO.Callsign);
+      FQsoIdDic.Add(aQSO.QsoId, aQSO);
    end;
 
    zyloLogUpdated(evInsertQSO, nil, aQSO);
@@ -3130,6 +3131,18 @@ begin
    Result := nil;
 end;
 
+function TLog.ObjectOf(qsoid: Integer): TQSO;
+var
+   i: Integer;
+   aQSO: TQSO;
+begin
+   if FQsoIdDic.TryGetValue(qsoid, aQSO) = True then begin
+      Result := aQSO;
+   end
+   else begin
+      Result := nil;
+   end;
+end;
 
 function TLog.LoadFromFile(filename: string): Integer;
 var
@@ -3686,10 +3699,10 @@ end;
 
 function TLog.IsContainsSameQSO(Q: TQSO): Boolean;
 var
-   strCall: string;
+   aQSO: TQSO;
 begin
-   if FQsoIdDic.TryGetValue(Q.QsoId, strCall) = True then begin
-      if strCall = Q.Callsign then begin
+   if FQsoIdDic.TryGetValue(Q.QsoId, aQSO) = True then begin
+      if aQSO.Callsign = Q.Callsign then begin
          Result := True;
          Exit;
       end;

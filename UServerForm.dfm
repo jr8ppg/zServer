@@ -4,7 +4,7 @@ object ServerForm: TServerForm
   ActiveControl = SendButton
   Caption = 'ab'
   ClientHeight = 211
-  ClientWidth = 344
+  ClientWidth = 348
   Color = clBtnFace
   Constraints.MinHeight = 200
   Constraints.MinWidth = 360
@@ -14,19 +14,17 @@ object ServerForm: TServerForm
   Font.Name = #65325#65331' '#65328#12468#12471#12483#12463
   Font.Style = []
   Menu = MainMenu1
-  OldCreateOrder = True
   Position = poScreenCenter
   OnClose = FormClose
   OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
   OnDestroy = FormDestroy
   OnShow = FormShow
-  PixelsPerInch = 96
   TextHeight = 12
   object ClientListBox: TListBox
     Left = 0
     Top = 30
-    Width = 344
+    Width = 348
     Height = 151
     Align = alClient
     Font.Charset = DEFAULT_CHARSET
@@ -38,20 +36,34 @@ object ServerForm: TServerForm
     ItemHeight = 12
     ParentFont = False
     TabOrder = 0
+    ExplicitWidth = 344
+    ExplicitHeight = 150
   end
   object Panel1: TPanel
     Left = 0
     Top = 0
-    Width = 344
+    Width = 348
     Height = 30
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 1
+    ExplicitWidth = 344
     DesignSize = (
-      344
+      348
       30)
+    object buttonMergeLock: TSpeedButton
+      Left = 152
+      Top = 3
+      Width = 81
+      Height = 25
+      AllowAllUp = True
+      GroupIndex = 1
+      Caption = 'MERGE LOCK'
+      Visible = False
+      OnClick = buttonMergeLockClick
+    end
     object Button2: TButton
-      Left = 276
+      Left = 280
       Top = 4
       Width = 63
       Height = 22
@@ -59,6 +71,7 @@ object ServerForm: TServerForm
       Caption = '&Clear'
       TabOrder = 0
       OnClick = Button2Click
+      ExplicitLeft = 276
     end
     object CheckBox2: TCheckBox
       Left = 6
@@ -73,16 +86,18 @@ object ServerForm: TServerForm
   object Panel2: TPanel
     Left = 0
     Top = 181
-    Width = 344
+    Width = 348
     Height = 30
     Align = alBottom
     BevelOuter = bvNone
     TabOrder = 2
+    ExplicitTop = 180
+    ExplicitWidth = 344
     DesignSize = (
-      344
+      348
       30)
     object SendButton: TButton
-      Left = 276
+      Left = 280
       Top = 5
       Width = 63
       Height = 21
@@ -91,11 +106,12 @@ object ServerForm: TServerForm
       Default = True
       TabOrder = 0
       OnClick = SendButtonClick
+      ExplicitLeft = 276
     end
     object SendEdit: TEdit
       Left = 6
       Top = 6
-      Width = 265
+      Width = 269
       Height = 18
       TabStop = False
       Anchors = [akLeft, akTop, akRight]
@@ -103,6 +119,7 @@ object ServerForm: TServerForm
       AutoSize = False
       ImeName = 'MS-IME97 '#26085#26412#35486#20837#21147#65404#65405#65411#65425
       TabOrder = 1
+      ExplicitWidth = 265
     end
   end
   object SrvSocket: TWSocket
@@ -126,8 +143,8 @@ object ServerForm: TServerForm
   object MainMenu1: TMainMenu
     AutoHotkeys = maManual
     AutoLineReduction = maManual
-    Left = 224
-    Top = 8
+    Left = 240
+    Top = 40
     object File1: TMenuItem
       Caption = '&File'
       object Open1: TMenuItem
