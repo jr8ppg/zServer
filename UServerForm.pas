@@ -704,7 +704,7 @@ var
    i: Integer;
 begin
    for i := 0 to FClientList.Count - 1 do begin
-      if i = NotThisCli then begin
+      if FClientList[i].ClientNumber = NotThisCli then begin
          Continue;
       end;
       FClientList[i].SendStr(str);

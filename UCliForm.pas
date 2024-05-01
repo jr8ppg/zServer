@@ -112,6 +112,7 @@ type
 
     procedure SendStr(str: string);
 
+    property ClientNumber: Integer read FClientNumber write FClientNumber;
     property TakeLog: Boolean read FTakeLog write FTakeLog;
   end;
 
@@ -135,6 +136,7 @@ end;
 procedure TCliForm.FormCreate(Sender: TObject);
 begin
    FInitialized := False;
+   FClientThread := nil;
    FServerSocket := 0;
    FTakeLog := False;
    FPcName := '';
@@ -274,6 +276,9 @@ end;
 procedure TCliForm.SetClientNumber(v: Integer);
 begin
    FClientNumber := v;
+   if FClientThread <> nil then begin
+      FCLientThread.ClientNumber := v;
+   end;
 end;
 
 procedure TCliForm.SetTakeLog(v: Boolean);
@@ -594,7 +599,7 @@ begin
 
          AddToCommandLog('R', S);
 
-         ServerForm.SendAllButFrom(S + LBCODE, from);
+         ServerForm.SendAllButFrom(S + LBCODE, FClientNumber);
       end;
    finally
       FInProcessing := False;
@@ -724,7 +729,7 @@ begin
    try
       for i := 1 to ServerForm.MasterLog.TotalQSO do begin
 
-         if FClientSocket.LastError <> 0 then begin
+         if FClientSocket.State <> wsConnected then begin
             Exit;
          end;
 
@@ -735,7 +740,7 @@ begin
          Inc(C);
       end;
 
-      if FClientSocket.LastError <> 0 then begin
+      if FClientSocket.State <> wsConnected then begin
          Exit;
       end;
 
@@ -902,7 +907,7 @@ var
    sendbuf: string;
    str: string;
 begin
-   if FClientSocket.LastError <> 0 then begin
+   if FClientSocket.State <> wsConnected then begin
       Exit;
    end;
 
@@ -962,7 +967,7 @@ var
    bytes: TBytes;
    bakfile: string;
 begin
-   if FClientSocket.LastError <> 0 then begin
+   if FClientSocket.State <> wsConnected then begin
       Exit;
    end;
 
@@ -1014,7 +1019,7 @@ end;
 
 procedure TClientThread.SendStr(str: string);
 begin
-   if FClientSocket.LastError <> 0 then begin
+   if FClientSocket.State <> wsConnected then begin
       Exit;
    end;
 
