@@ -103,6 +103,8 @@ type
 
     procedure AddServerConsole(S: string);
     procedure AddToCommandLog(direction: string; str: string);
+
+    function GetZLogFilesPath(): string;
   protected
     procedure Execute(); override;
   public
@@ -917,7 +919,7 @@ begin
    mem := TMemoryStream.Create();
    sl := TStringList.Create();
    try
-      filename := ExtractFilePath(Application.ExeName) + '\zlog_files\' + S;
+      filename := GetZLogFilesPath() + S;
       if FileExists(filename) = False then begin
          FClientSocket.SendStr(ZLinkHeader + ' PUTFILE ERROR,FILE NOT FOUND' + LBCODE);
          Exit;
@@ -995,7 +997,7 @@ begin
       mem.Position := 0;
       mem.WriteBuffer(bytes, Length(bytes));
 
-      file_name := ExtractFilePath(Application.ExeName) + '\zlog_files\' + file_name;
+      file_name := GetZLogFilesPath() + file_name;
       if FileExists(file_name) = True then begin
          bakfile := ChangeFileExt(file_name, '.' + FormatDateTime('yyyymmddhhnnss', Now));
          CopyFile(PChar(file_name), PChar(bakfile), False);
@@ -1100,6 +1102,19 @@ begin
    AddServerConsole(S);
 
    PostMessage(FClientSocket.Handle, WM_QUIT, 0, 0);
+end;
+
+function TClientThread.GetZLogFilesPath(): string;
+var
+   path: string;
+begin
+   path := ExtractFilePath(Application.ExeName) + '\zlog_files\';
+
+   if DirectoryExists(path) = False then begin
+      ForceDirectories(path);
+   end;
+
+   Result := path;
 end;
 
 end.
