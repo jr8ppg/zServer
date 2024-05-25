@@ -105,15 +105,17 @@
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win32)'!=''">
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
-        <VerInfo_Keys>CompanyName=;FileDescription=Z-Server for Windows 令和 Edition;FileVersion=2.9.1.0;InternalName=;LegalCopyright=COPYRIGHT 1997-2005 by yokobayashi, 2019-2024 JR8PPG;LegalTrademarks=;OriginalFilename=ZServer.exe;ProductName=Z-Server for Windows 令和 Edition;ProductVersion=2.9.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName)</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=;FileDescription=Z-Server for Windows 令和 Edition;FileVersion=2.9.1.1;InternalName=;LegalCopyright=COPYRIGHT 1997-2005 by yokobayashi, 2019-2024 JR8PPG;LegalTrademarks=;OriginalFilename=ZServer.exe;ProductName=Z-Server for Windows 令和 Edition;ProductVersion=2.9.0.0;Comments=;ProgramID=com.embarcadero.$(MSBuildProjectName)</VerInfo_Keys>
         <DCC_MapFile>3</DCC_MapFile>
         <VerInfo_Release>1</VerInfo_Release>
+        <VerInfo_Build>1</VerInfo_Build>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
-        <VerInfo_Keys>CompanyName=;FileDescription=Z-Server for Windows 令和 Edition;FileVersion=2.9.1.0;InternalName=;LegalCopyright=COPYRIGHT 1997-2005 by yokobayashi, 2019-2024 JR8PPG;LegalTrademarks=;OriginalFilename=ZServer.exe;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=Z-Server for Windows 令和 Edition;ProductVersion=2.9.0.0;Comments=</VerInfo_Keys>
+        <VerInfo_Keys>CompanyName=;FileDescription=Z-Server for Windows 令和 Edition;FileVersion=2.9.1.1;InternalName=;LegalCopyright=COPYRIGHT 1997-2005 by yokobayashi, 2019-2024 JR8PPG;LegalTrademarks=;OriginalFilename=ZServer.exe;ProgramID=com.embarcadero.$(MSBuildProjectName);ProductName=Z-Server for Windows 令和 Edition;ProductVersion=2.9.0.0;Comments=</VerInfo_Keys>
         <DCC_MapFile>3</DCC_MapFile>
         <VerInfo_Release>1</VerInfo_Release>
+        <VerInfo_Build>1</VerInfo_Build>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_2)'!=''">
         <DCC_Define>DEBUG;$(DCC_Define)</DCC_Define>
