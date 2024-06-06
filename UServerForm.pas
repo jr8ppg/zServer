@@ -114,6 +114,7 @@ type
     FMultiForm: TBasicMultiForm;
 
     FCurrentFileName: string;
+    FLastPath: string;
 
     procedure OnClientClosed(var msg: TMessage); message WM_USER_CLIENT_CLOSED;
     procedure OnFreqData(var msg: TMessage); message WM_ZCMD_FREQDATA;
@@ -189,6 +190,7 @@ begin
    ChatOnly := True;
    FClientNumber := 0;
    FCurrentFileName := '';
+   FLastPath := '';
 
    ver := TJclFileVersionInfo.Create(Self.Handle);
    Caption := Application.Title + ' Version ' + ver.FileVersion;
@@ -833,28 +835,29 @@ procedure TServerForm.Save1Click(Sender: TObject);
 begin
    if FStats.Saved = False then begin
       if FCurrentFileName = '' then begin
+         SaveDialog.InitialDir := FLastPath;
          if SaveDialog.Execute then begin
             FCurrentFileName := SaveDialog.FileName;
-         end
-         else begin
-            Exit;
+            FStats.SaveLogs(FCurrentFileName);
+            FLastPath := ExtractFilePath(FCurrentFileName);
          end;
       end;
-
-      FStats.SaveLogs(FCurrentFileName);
    end;
 end;
 
 procedure TServerForm.SaveAs1Click(Sender: TObject);
 begin
+   SaveDialog.InitialDir := FLastPath;
    If SaveDialog.Execute then begin
       FCurrentFileName := SaveDialog.FileName;
       FStats.SaveLogs(FCurrentFileName);
+      FLastPath := ExtractFilePath(FCurrentFileName);
    end;
 end;
 
 procedure TServerForm.Open1Click(Sender: TObject);
 begin
+   OpenDialog.InitialDir := FLastPath;
    if OpenDialog.Execute then begin
       if MessageDlg('This will clear all data and reload from new file.', mtWarning, [mbOK, mbCancel], 0) <> mrOK then begin
          Exit;
@@ -869,7 +872,8 @@ begin
       FStats.MasterLog.LoadFromFile(FCurrentFileName);
       RecalcAll();
       FStats.UpdateStats();
-      //FCommandQue.Add('999 ' + ZLinkHeader + ' FILELOADED');
+
+      FLastPath := ExtractFilePath(FCurrentFileName);
    end;
 end;
 
@@ -884,15 +888,12 @@ var
 begin
    F := TMergeBand.Create(Self);
    try
+      OpenDialog.InitialDir := FLastPath;
       if OpenDialog.Execute then begin
-         { if MessageDlg('This will clear all data and reload from new file.',
-           mtWarning,
-           [mbOK, mbCancel],
-           0) = mrOK then }
-         // CurrentFileName := OpenDialog.FileName;
          F.FileName := OpenDialog.FileName;
          F.ShowModal;
-         // Stats.LoadFile(OpenDialog.FileName);
+
+         FLastPath := ExtractFilePath(FCurrentFileName);
       end;
    finally
       F.Release();
@@ -938,6 +939,11 @@ begin
       Width := IniFile.ReadInteger('Window', 'Width', Width);
       Height := IniFile.ReadInteger('Window', 'Height', Height);
       ChatOnly := IniFile.ReadBool('Options', 'ChatOnly', True);
+      FLastPath := IniFile.ReadString('Path', 'Last', '');
+      if FLastPath = '' then begin
+         FLastPath := ExtractFilePath(Application.ExeName);
+      end;
+      FLastPath := IncludeTrailingPathDelimiter(FLastPath);
    finally
       IniFile.Free;
    end;
@@ -956,6 +962,7 @@ begin
       IniFile.WriteInteger('Window', 'Width', Width);
       IniFile.WriteInteger('Window', 'Height', Height);
       IniFile.WriteBool('Options', 'ChatOnly', ChatOnly);
+      IniFile.WriteString('Path', 'Last', FLastPath);
    finally
       IniFile.Free;
    end;
