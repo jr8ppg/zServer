@@ -147,6 +147,7 @@ object ServerForm: TServerForm
     Top = 40
     object File1: TMenuItem
       Caption = '&File'
+      OnClick = File1Click
       object Open1: TMenuItem
         Caption = #38283#12367
         OnClick = Open1Click

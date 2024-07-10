@@ -98,6 +98,7 @@ type
     procedure SrvSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
     procedure menuTakeCommandLogClick(Sender: TObject);
     procedure buttonMergeLockClick(Sender: TObject);
+    procedure File1Click(Sender: TObject);
   private
     { Declarations privates }
     FInitialized  : Boolean;
@@ -296,6 +297,11 @@ begin
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
+
+procedure TServerForm.File1Click(Sender: TObject);
+begin
+   Save1.Enabled := not FStats.Saved;
+end;
 
 procedure TServerForm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
@@ -834,14 +840,17 @@ end;
 procedure TServerForm.Save1Click(Sender: TObject);
 begin
    if FStats.Saved = False then begin
+      // ファイル名が不明の場合は入力させる
       if FCurrentFileName = '' then begin
          SaveDialog.InitialDir := FLastPath;
          if SaveDialog.Execute then begin
             FCurrentFileName := SaveDialog.FileName;
-            FStats.SaveLogs(FCurrentFileName);
-            FLastPath := ExtractFilePath(FCurrentFileName);
          end;
       end;
+
+      // ファイルに保存
+      FStats.SaveLogs(FCurrentFileName);
+      FLastPath := ExtractFilePath(FCurrentFileName);
    end;
 end;
 
@@ -874,6 +883,11 @@ begin
       FStats.UpdateStats();
 
       FLastPath := ExtractFilePath(FCurrentFileName);
+
+      // 拡張子がZLOの場合は付け替える
+      if ExtractFileExt(FCurrentFileName) = '.ZLO' then begin
+         FCurrentFileName := ChangeFileExt(FCurrentFileName, '.ZLOX');
+      end;
    end;
 end;
 
