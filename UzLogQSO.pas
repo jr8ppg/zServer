@@ -87,7 +87,8 @@ type
     Forced: Boolean;       { 1 byte }
     QslState: Byte;        { 1 byte 0:None 1:Pse QSL 2:No QSL }
     Invalid: Boolean;      { 1 byte false:valid true:invalid }
-    Reserve4: string[101]; { 102 bytes }
+    Reserve4: string[70];  { 70 bytes }
+    Guid: string[32];      { 32 bytes }
     // 384bytes
   end;
 
@@ -118,6 +119,7 @@ type
     FPower2: Integer; { used by ARRL DX side only }
     FReserve2: Integer; { $FF when forcing to log }
     FReserve3: Integer; { QSO ID# }
+    FGuid: string;
     {TTSSSSRRCC   TT:TX#(00-21) SSSS:Serial counter
                                       RR:Random(00-99) CC:Edit counter 00 and up}
 
@@ -212,6 +214,7 @@ type
     property QslState: TQslState read FQslState write FQslState;
     property Invalid: Boolean read FInvalid write SetInvalid;
     property QsoId: Integer read GetQsoId;
+    property Guid: string read FGuid write FGuid;
 
     property SerialStr: string read GetSerialStr;
     property DateTimeStr: string read GetDateTimeStr;
@@ -1301,6 +1304,7 @@ begin
    Result.Forced     := FForced;
    Result.QslState   := Byte(FQslState);
    Result.Invalid    := FInvalid;
+   Result.Guid       := FGuid;
 end;
 
 procedure TQSO.SetFileRecordEx(src: TQSODataEx);
@@ -1344,6 +1348,7 @@ begin
    FForced     := src.Forced;
    FQslState   := TQslState(src.QslState);
    FInvalid    := src.Invalid;
+   FGuid       := src.Guid;
 end;
 
 { TQSOList }

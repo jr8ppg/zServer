@@ -5,6 +5,7 @@ program ZServer;
 uses
   Forms,
   Windows,
+  WinSock,
   UServerForm in 'UServerForm.pas' {ServerForm},
   UCliForm in 'UCliForm.pas' {CliForm},
   UAbout in 'UAbout.pas' {AboutBox},
@@ -39,6 +40,7 @@ const
 
 var
   hMutex: THandle;
+  WSAData: TWSAData;
 
 begin
   hMutex := OpenMutex(MUTEX_ALL_ACCESS, False, ZSERVER_MUTEX);
@@ -49,11 +51,13 @@ begin
   hMutex := CreateMutex(nil, False, ZSERVER_MUTEX);
 
   InitAtomTable(503);
+  WSAStartup($0101, WSAData);
 
   Application.Title := 'Z-Server';
   Application.CreateForm(TdmZLogGlobal, dmZLogGlobal);
   Application.CreateForm(TServerForm, ServerForm);
   Application.Run;
 
+  WSACleanup();
   ReleaseMutex( hMutex );
 end.

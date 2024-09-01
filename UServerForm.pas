@@ -24,12 +24,13 @@ uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
   Dialogs, StdCtrls, IniFiles, Menus, ExtCtrls, System.UITypes,
   OverbyteIcsWndControl, OverbyteIcsWSocket, OverbyteIcsUtils, System.SyncObjs,
-  System.Generics.Collections, System.Generics.Defaults,
+  System.Generics.Collections, System.Generics.Defaults, Winsock,
   UBasicStats, UBasicMultiForm, UCliForm, UFreqList, UConnections,
   UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages, JclFileUtils, Vcl.Buttons;
 
 const
   IniFileName = 'ZServer.ini';
+  MAXPACKETLEN = 2048;
 
 type
   TServerForm = class(TForm)
@@ -99,6 +100,8 @@ type
     procedure menuTakeCommandLogClick(Sender: TObject);
     procedure buttonMergeLockClick(Sender: TObject);
     procedure File1Click(Sender: TObject);
+  protected
+    procedure ReadBroadcastPacket( var Message: TMessage ); message WM_USER_N1MM_BROADCAST;
   private
     { Declarations privates }
     FInitialized  : Boolean;
@@ -116,6 +119,10 @@ type
 
     FCurrentFileName: string;
     FLastPath: string;
+
+    FUdpServer: TSocket;
+    FServerAddr: TSockAddrIn;
+    FClientAddr: TSockAddrIn;
 
     procedure OnClientClosed(var msg: TMessage); message WM_USER_CLIENT_CLOSED;
     procedure OnFreqData(var msg: TMessage); message WM_ZCMD_FREQDATA;
@@ -141,6 +148,8 @@ type
     procedure AddToChatLog(str : string);
     procedure IdleEvent(Sender: TObject; var Done: Boolean);
     procedure SendAll(str : string);
+
+    function GetXmlValue(xml: string; tag: string): string;
   public
     ChatOnly : boolean;
 
@@ -185,6 +194,8 @@ uses
 procedure TServerForm.FormCreate(Sender: TObject);
 var
    ver: TJclFileVersionInfo;
+   optval: Integer;
+   nResult: Integer;
 begin
    FClientList := TList<TCliForm>.Create();
 
@@ -208,6 +219,25 @@ begin
    Application.OnIdle := IdleEvent;
 
    FChatLogFileName := StringReplace(Application.ExeName, '.exe', '_chat_' + FormatDateTime('yyyymmdd', Now) + '.txt', [rfReplaceAll]);
+
+   // UDPソケットを準備
+   FUdpServer := Socket(AF_INET, SOCK_DGRAM, 0);
+   optval := 1;
+   SetSockOpt(FUdpServer, SOL_SOCKET, SO_REUSEADDR, @optval, SizeOf(Integer));
+
+   // アドレス情報
+   FServerAddr.sin_family := AF_INET;
+   FServerAddr.sin_addr.s_addr := htonl(INADDR_ANY);
+   FServerAddr.sin_port := htons(12060);
+
+   // ソケットにアドレス情報をバインド
+   Bind(FUdpServer, FServerAddr, SizeOf(TSockAddrIn) );
+
+   // 受信開始
+   nResult := WSAAsyncSelect(FUdpServer, Handle, WM_USER_N1MM_BROADCAST, FD_READ);
+   if nResult = SOCKET_ERROR then begin
+      ClientListBox.Items.Add('WSAAsyncSelect() errorcode=' + IntToStr(WSAGetLastError()));
+   end;
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -305,6 +335,7 @@ end;
 
 procedure TServerForm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
+   CloseSocket(FUdpServer);
    SrvSocket.Close;
    SaveSettings();
    if FInitialized then begin
@@ -1089,6 +1120,159 @@ begin
       dmZlogGlobal.WriteWindowState(FMultiForm);
    end;
    dmZlogGlobal.WriteWindowState(FFreqList);
+end;
+
+procedure TServerForm.ReadBroadcastPacket(var Message: TMessage);
+var
+   nResult: Integer;
+   nLen: Integer;
+   Buffer: array [0..MAXPACKETLEN-1] of AnsiChar;
+   info_utf8: UTF8String;
+   qso: TQSO;
+   S: string;
+   defrst: Integer;
+begin
+   // エラーがあったか確認
+   if WSAGetSelectError(Message.lParam) <> 0 then begin
+      ClientListBox.Items.Add('WSAGetSelectError() errorcode=' + IntToStr(WSAGetLastError()));
+      Exit;
+   end;
+
+   // 受信バッファクリア
+   ZeroMemory(@Buffer, SizeOf(Buffer));
+
+   // UDPから受信
+   nLen := SizeOf(TSockAddrIn);
+   nResult := RecvFrom(FUdpServer, Buffer, MAXPACKETLEN, 0, FClientAddr, nLen);
+   if nResult = SOCKET_ERROR then begin
+      ClientListBox.Items.Add('RecvFrom() errorcode=' + IntToStr(WSAGetLastError()));
+      Exit;
+   end;
+
+   // 受信データの処理
+   Buffer[nResult] := #0;
+
+   // XMLをパースする
+   info_utf8 := UTF8String(Buffer);
+
+   // contactinfo
+   //<?xml version="1.0" encoding="utf-8"?>
+   //<contactinfo>
+   //    <app>N1MM</app>
+   //    <contestname>CWOPS</contestname>
+   //    <contestnr>73</contestnr>
+   //    <timestamp>2020-01-17 16 :43:38</timestamp>
+   //    <mycall>W2XYZ</mycall>
+   //    <band>3.5</band>
+   //    <rxfreq>352519</rxfreq>
+   //    <txfreq>352519</txfreq>
+   //    <operator></operator>
+   //    <mode>CW</mode>
+   //    <call>WlAW</call>
+   //    <countryprefix>K</countryprefix>
+   //    <wpxprefix>Wl</wpxprefix>
+   //    <stationprefix>W2XYZ</stationprefix>
+   //    <continent>NA</continent>
+   //    <snt>599</snt>
+   //    <sntnr>5</sntnr>
+   //    <rcv>599</rcv>
+   //    <rcvnr>0</rcvnr>
+   //    <gridsquare></gridsquare>
+   //    <exchangel></exchangel>
+   //    <section></section>
+   //    <comment></comment>
+   //    <qth></qth>
+   //    <name></name>
+   //    <power></power>
+   //    <misctext></misctext>
+   //    <zone>0</zone>
+   //    <prec></prec>
+   //    <ck>0</ck>
+   //    <ismultiplierl>l</ismultiplierl>
+   //    <ismultiplier2>0</ismultiplier2>
+   //    <ismultiplier3>0</ismultiplier3>
+   //    <points>l</points>
+   //    <radionr>l</radionr>
+   //    <run1run2>1<run1run2>
+   //    <RoverLocation></RoverLocation>
+   //    <RadioInterfaced>l</RadioInterfaced>
+   //    <NetworkedCompNr>0</NetworkedCompNr>
+   //    <IsOriginal>False</IsOriginal>
+   //    <NetBiosName></NetBiosName>
+   //    <IsRunQSO>0</IsRunQSO>
+   //    <StationName>CONTEST-PC</StationName>
+   //    <ID>f9ff ac4f cd3e 479c a86e 137d f133 8531</ID>
+   //    <IsClaimedQso>1</IsClaimedQso>
+   //</contactinfo>
+   if Pos('<contactinfo>', info_utf8) > 0 then begin
+      // ZLINKのQSOデータに変換して再送信
+      qso := TQSO.Create();
+      qso.Callsign := GetXmlValue(info_utf8, 'call');
+
+      S := GetXmlValue(info_utf8, 'timestamp');   // <timestamp>2020-01-17 16:43:38</timestamp>
+      qso.Time := StrToDate(S);
+
+      qso.Band := StrToBandDef(GetXmlValue(info_utf8, 'band'), bUnknown);
+      qso.Mode := StrToModeDef(GetXmlValue(info_utf8, 'mode'), mCW);
+
+      if qso.Mode in [mCW, mRTTY] then begin
+         defrst := 599;
+      end
+      else begin
+         defrst := 59;
+      end;
+
+      qso.NrSent := GetXmlValue(info_utf8, 'sntnr');
+      qso.NrRcvd := GetXmlValue(info_utf8, 'rcvnr');
+
+      qso.RSTSent := StrToIntDef(GetXmlValue(info_utf8, 'snt'), defrst);
+      qso.RSTRcvd := StrToIntDef(GetXmlValue(info_utf8, 'rcv'), defrst);
+
+      qso.TX := StrToIntDef(GetXmlValue(info_utf8, 'run1run2'), 1);
+
+      if GetXmlValue(info_utf8, 'IsRunQSO') = '1' then begin
+         qso.CQ := True;
+      end
+      else begin
+         qso.CQ := False;
+      end;
+
+      // QSOIDを発番する必要あり
+      qso.Reserve3 := 99999;
+
+      // N1MMのIDも保存したい
+      qso.guid := GetXmlValue(info_utf8, 'ID');
+
+      PostMessage(Handle, WM_ZCMD_PUTQSO, 0, LPARAM(qso));
+   end;
+
+end;
+
+//
+// XML風なので簡易にデータを取得する。
+//
+// 00000000011111111
+// 12345678901234567
+// <call>WlAW</call>
+//
+// in= 1 + 6 = 7
+// out = 11 - 7 = 4
+//
+function TServerForm.GetXmlValue(xml: string; tag: string): string;
+var
+   tag_in: string;
+   tag_out: string;
+   Index_in: Integer;
+   Index_out: Integer;
+begin
+   tag_in := '<' + tag + '>';
+   tag_out := '</' + tag + '>';
+
+   Index_in := Pos(tag_in, xml) + Length(tag_in);
+
+   Index_out := Pos(tag_out, xml);
+
+   Result := Copy(xml, Index_in, Index_out - Index_in + 1);
 end;
 
 initialization
