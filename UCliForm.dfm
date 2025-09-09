@@ -24,8 +24,6 @@ object CliForm: TCliForm
     Align = alBottom
     BevelOuter = bvNone
     TabOrder = 0
-    ExplicitTop = 131
-    ExplicitWidth = 344
     DesignSize = (
       348
       30)
@@ -39,7 +37,6 @@ object CliForm: TCliForm
       ImeName = 'MS-IME97 '#26085#26412#35486#20837#21147#65404#65405#65411#65425
       TabOrder = 0
       Text = 'SendEdit'
-      ExplicitWidth = 264
     end
     object SendButton: TButton
       Left = 279
@@ -51,7 +48,6 @@ object CliForm: TCliForm
       Default = True
       TabOrder = 1
       OnClick = SendButtonClick
-      ExplicitLeft = 275
     end
   end
   object Panel2: TPanel
@@ -62,7 +58,6 @@ object CliForm: TCliForm
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 1
-    ExplicitWidth = 344
     object DisconnectButton: TButton
       Left = 6
       Top = 4

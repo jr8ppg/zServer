@@ -36,8 +36,6 @@ object ServerForm: TServerForm
     ItemHeight = 12
     ParentFont = False
     TabOrder = 0
-    ExplicitWidth = 344
-    ExplicitHeight = 150
   end
   object Panel1: TPanel
     Left = 0
@@ -47,7 +45,6 @@ object ServerForm: TServerForm
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 1
-    ExplicitWidth = 344
     DesignSize = (
       348
       30)
@@ -71,7 +68,6 @@ object ServerForm: TServerForm
       Caption = '&Clear'
       TabOrder = 0
       OnClick = Button2Click
-      ExplicitLeft = 276
     end
     object CheckBox2: TCheckBox
       Left = 6
@@ -91,8 +87,6 @@ object ServerForm: TServerForm
     Align = alBottom
     BevelOuter = bvNone
     TabOrder = 2
-    ExplicitTop = 180
-    ExplicitWidth = 344
     DesignSize = (
       348
       30)
@@ -106,7 +100,6 @@ object ServerForm: TServerForm
       Default = True
       TabOrder = 0
       OnClick = SendButtonClick
-      ExplicitLeft = 276
     end
     object SendEdit: TEdit
       Left = 6
@@ -119,26 +112,7 @@ object ServerForm: TServerForm
       AutoSize = False
       ImeName = 'MS-IME97 '#26085#26412#35486#20837#21147#65404#65405#65411#65425
       TabOrder = 1
-      ExplicitWidth = 265
     end
-  end
-  object SrvSocket: TWSocket
-    LineEnd = #13#10
-    Proto = 'tcp'
-    LocalAddr = '0.0.0.0'
-    LocalAddr6 = '::'
-    LocalPort = '0'
-    SocksLevel = '5'
-    ExclusiveAddr = False
-    ComponentOptions = []
-    ListenBacklog = 15
-    OnSessionAvailable = SrvSocketSessionAvailable
-    OnError = SrvSocketError
-    OnSocksError = SrvSocketSocksError
-    SocketErrs = wsErrTech
-    onException = SrvSocketException
-    Left = 24
-    Top = 56
   end
   object MainMenu1: TMainMenu
     AutoHotkeys = maManual
@@ -255,5 +229,77 @@ object ServerForm: TServerForm
     Filter = 'zLog binary files (*.ZLO;*.ZLOX)|*.ZLO;*.ZLOX'
     Left = 144
     Top = 72
+  end
+  object SrvSslContext: TSslContext
+    SslDHParamLines.Strings = (
+      '-----BEGIN DH PARAMETERS-----'
+      'MIICCAKCAgEA45KZVdTCptcakXZb7jJvSuuOdMlUbl1tpncHbQcYbFhRbcFmmefp'
+      'bOmZsTowlWHQpoYRRTe6NEvYox8J+44i/X5cJkMTlIgMb0ZBty7t76U9f6qAId/O'
+      '6elE0gnk2ThER9nmBcUA0ZKgSXn0XCBu6j5lzZ0FS+bx9OVNhlzvIFBclRPXbI58'
+      '71dRoTjOjfO1SIzV69T3FoKJcqur58l8b+no/TOQzekMzz4XJTRDefqvePhj7ULP'
+      'Z/Zg7vtEh11h8gHR0/rlF378S05nRMq5hbbJeLxIbj9kxQunETSbwwy9qx0SyQgH'
+      'g+90+iUCrKCJ9Fb7WKqtQLkQuzJIkkXkXUyuxUuyBOeeP9XBUAOQu+eYnRPYSmTH'
+      'GkhyRbIRTPCDiBWDFOskdyGYYDrxiK7LYJQanqHlEFtjDv9t1XmyzDm0k7W9oP/J'
+      'p0ox1+WIpFgkfv6nvihqCPHtAP5wevqXNIQADhDk5EyrR3XWRFaySeKcmREM9tbc'
+      'bOvmsEp5MWCC81ZsnaPAcVpO66aOPojNiYQZUbmm70fJsr8BDzXGpcQ44+wmL4Ds'
+      'k3+ldVWAXEXs9s1vfl4nLNXefYl74cV8E5Mtki9hCjUrUQ4dzbmNA5fg1CyQM/v7'
+      'JuP6PBYFK7baFDjG1F5YJiO0uHo8sQx+SWdJnGsq8piI3w0ON9JhUvMCAQI='
+      '-----END DH PARAMETERS-----')
+    SslVerifyPeer = False
+    SslVerifyDepth = 9
+    SslVerifyFlags = []
+    SslVerifyFlagsValue = 0
+    SslCheckHostFlags = []
+    SslCheckHostFlagsValue = 0
+    SslSecLevel = sslSecLevel80bits
+    SslOptions = [sslOpt_NO_SSLv2, sslOpt_NO_SSLv3]
+    SslOptions2 = [sslOpt2_ALLOW_UNSAFE_LEGACY_RENEGOTIATION, SslOpt2_LEGACY_SERVER_CONNECT]
+    SslVerifyPeerModes = [SslVerifyMode_PEER]
+    SslVerifyPeerModesValue = 1
+    SslSessionCacheModes = []
+    SslCipherList = 'ALL'
+    SslCipherList13 = 
+      'TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_' +
+      'GCM_SHA256'
+    SslVersionMethod = sslBestVer
+    SslMinVersion = sslVerTLS1
+    SslMaxVersion = sslVerMax
+    SslECDHMethod = sslECDHNone
+    SslCryptoGroups = 'P-256:X25519:P-384:P-521'
+    SslCliSecurity = sslCliSecTls1
+    SslOcspStatus = False
+    UseSharedCAStore = False
+    SslSessionTimeout = 0
+    SslSessionCacheSize = 20480
+    AutoEnableBuiltinEngines = False
+    Left = 88
+    Top = 64
+  end
+  object SrvSocket: TSslWSocketServer
+    LineEnd = #13#10
+    Addr = '0.0.0.0'
+    Port = '443'
+    Proto = 'tcp'
+    LocalAddr = '0.0.0.0'
+    LocalAddr6 = '::'
+    LocalPort = '0'
+    SocksLevel = '5'
+    ExclusiveAddr = False
+    ComponentOptions = []
+    ListenBacklog = 15
+    SocketErrs = wsErrTech
+    OnClientConnect = SrvSocketClientConnect
+    MultiListenSockets = <>
+    SslContext = SrvSslContext
+    SslEnable = True
+    IcsHosts = <>
+    SslCliCertMethod = sslCliCertNone
+    SslCertAutoOrder = False
+    CertExpireDays = 30
+    NoSSL = False
+    OcspSrvStapling = False
+    Left = 32
+    Top = 64
+    Banner = ''
   end
 end

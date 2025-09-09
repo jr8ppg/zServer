@@ -7,13 +7,16 @@ uses
   System.SysUtils, System.Classes, System.SyncObjs, System.StrUtils,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls,
   Generics.Collections, Generics.Defaults, System.NetEncoding,
-  OverbyteIcsWndControl, OverbyteIcsWSocket,
+  OverbyteIcsWndControl, OverbyteIcsWSocket, OverbyteIcsTypes, OverbyteIcsWSocketS,
+  OverbyteIcsSslBase, OverbyteIcsSslSessionCache,
   UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages;
 
-const LBCODE = #13#10;
+const
+  LBCODE = #13#10;
 
 type
   TClientThread = class;
+  TLoginStep = ( lsNone = 0, lsReqUser, lsReqPassword, lsLogined );
 
   TCliForm = class(TForm)
     Panel1: TPanel;
@@ -31,13 +34,16 @@ type
     procedure ClientThreadTerminate(Sender: TObject);
   private
     FInitialized : Boolean;
-    FServerSocket: TSocket;
+    FClientSocket: TWSocketClient;
     FClientNumber: Integer;
     FCurrentBand : TBand;
     FCurrentOperator : string;
     FClientThread: TClientThread;
     FPcName: string;
     FTakeLog: Boolean;
+    FSecure: Boolean;
+    FLoginUser: string;
+    FLoginPass: string;
     procedure AddChat(S: string);
     procedure SetCurrentBand(v: TBand);
     procedure SetCurrentOperator(v: string);
@@ -53,14 +59,16 @@ type
     property CurrentOperator: string read FCurrentOperator write SetCurrentOperator;
     property PcName: string read FPcName write SetPcName;
     property ClientNumber: Integer read FClientNumber write SetClientNumber;
-    property Socket: TSocket read FServerSocket write FServerSocket;
+    property Socket: TWSocketClient read FClientSocket write FClientSocket;
     property TakeLog: Boolean read FTakeLog write SetTakeLog;
+    property Secure: Boolean read FSecure write FSecure;
+    property LoginUser: string read FLoginUser write FLoginUser;
+    property LoginPass: string read FLoginPass write FLoginPass;
   end;
 
   TClientThread = class(TThread)
   private
-    FClientSocket: TWSocket;
-    FClientHSocket: TSocket;
+    FClientSocket: TWSocketClient;
     FClientForm: TCliForm;
     FClientNumber: Integer;
     FCurrentBand : TBand;
@@ -73,6 +81,13 @@ type
     FCommandQue: TStringList;
     FFileData: TStringList;
     FInProcessing: Boolean;
+    FLoginStep: TLoginStep;
+    FInputLoginUser: string;
+    FInputLoginPass: string;
+    FLoginIncorrectCount: Integer;
+    FSecure: Boolean;
+    FLoginUser: string;
+    FLoginPass: string;
     procedure ServerWSocketDataAvailable(Sender: TObject; Error: Word);
     procedure ServerWSocketSessionClosed(Sender: TObject; Error: Word);
     procedure CliSocketError(Sender: TObject);
@@ -108,7 +123,7 @@ type
   protected
     procedure Execute(); override;
   public
-    constructor Create(ClientHSocket: TSocket; AClientForm: TCliForm; AClientNumber: Integer);
+    constructor Create(ClientSocket: TWSocketClient; AClientForm: TCliForm; AClientNumber: Integer);
     destructor Destroy(); override;
     procedure Release();
 
@@ -116,6 +131,9 @@ type
 
     property ClientNumber: Integer read FClientNumber write FClientNumber;
     property TakeLog: Boolean read FTakeLog write FTakeLog;
+    property Secure: Boolean read FSecure write FSecure;
+    property LoginUser: string read FLoginUser write FLoginUser;
+    property LoginPass: string read FLoginPass write FLoginPass;
   end;
 
 implementation
@@ -139,7 +157,7 @@ procedure TCliForm.FormCreate(Sender: TObject);
 begin
    FInitialized := False;
    FClientThread := nil;
-   FServerSocket := 0;
+   FClientSocket := nil;
    FTakeLog := False;
    FPcName := '';
 end;
@@ -159,8 +177,11 @@ begin
    FCurrentOperator := '';
 
    { Create a new thread to handle client request                          }
-   FClientThread := TClientThread.Create(FServerSocket, Self, FClientNumber);
+   FClientThread := TClientThread.Create(FClientSocket, Self, FClientNumber);
    FClientThread.TakeLog := FTakeLog;
+   FClientThread.Secure := FSecure;
+   FClientThread.LoginUser := FLoginUser;
+   FClientThread.LoginPass := FLoginPass;
 
    { Assign the thread's OnTerminate event                                 }
    FClientThread.OnTerminate := ClientThreadTerminate;
@@ -296,9 +317,9 @@ end;
 
 { TClientThread }
 
-constructor TClientThread.Create(ClientHSocket: TSocket; AClientForm: TCliForm; AClientNumber: Integer);
+constructor TClientThread.Create(ClientSocket: TWSocketClient; AClientForm: TCliForm; AClientNumber: Integer);
 begin
-   FClientHSocket  := ClientHSocket;
+   FClientSocket  := ClientSocket;
    FreeOnTerminate := True;
    FClientForm := AClientForm;
    FClientNumber := AClientNumber;
@@ -307,13 +328,15 @@ begin
    FInMergeProc := False;
    FCommandQue := TStringList.Create();
    FFileData := TStringList.Create();
+   FLoginStep := lsNone;
+   FSecure:= False;
    inherited Create(True);
 end;
 
 destructor TClientThread.Destroy();
 begin
    if Assigned(FClientSocket) then begin
-      FClientSocket.Destroy;
+      FClientSocket.Free();
       FClientSocket := nil;
    end;
 
@@ -324,25 +347,34 @@ end;
 
 procedure TClientThread.Release();
 begin
-   PostMessage(FClientSocket.Handle, WM_QUIT, 0, 0);
+   //PostMessage(FClientSocket.Handle, WM_QUIT, 0, 0);
 end;
 
 procedure TClientThread.Execute();
+var
+   SL: TStringList;
 begin
    FCommandLogFileName := StringReplace(Application.ExeName, '.exe', '_#' + IntToHex(Integer(Self), 8) + '_' + FormatDateTime('yyyymmdd', Now) + '.txt', [rfReplaceAll]);
 
-   FClientSocket                 := TWSocket.Create(nil);
-   FClientSocket.SocketErrs      := wsErrTech;
-   FClientSocket.SocksLevel      := '5';
-   FClientSocket.MultiThreaded   := True;
-   FClientSocket.LineMode        := True;
    FClientSocket.LineEnd         := #13#10;
    FClientSocket.OnDataAvailable := ServerWSocketDataAvailable;
    FClientSocket.OnSessionClosed := ServerWSocketSessionClosed;
    FClientSocket.OnError         := CliSocketError;
    FClientSocket.onException     := CliSocketException;
    FClientSocket.OnSocksError    := CliSocketSocksError;
-   FClientSocket.HSocket         := FClientHSocket;
+
+   if (FSecure = True) then begin
+      FClientForm.AddConsole('***接続受付(userid待ち)***');
+      FClientSocket.SendStr('Welcome to Z-Server' + #13#10);
+      FClientSocket.SendStr('Login:');
+      FLoginStep := lsReqUser;
+      FInputLoginUser := '';
+      FInputLoginPass := '';
+      FLoginIncorrectCount := 0;
+   end
+   else begin
+      FLoginStep := lsLogined;
+   end;
 
    { Message loop to handle TWSocket messages                              }
    { The loop is exited when WM_QUIT message is received                   }
@@ -362,6 +394,9 @@ var
    param_atom: ATOM;
    t: string;
 begin
+   FInputLoginUser := '';
+   FLoginStep := lsNone;
+
    t := FormatDateTime('hh:nn', Now);
    S := t + ' ' + FillRight(IntToStr(FClientNumber), 3) + ' ' + MHzString[FCurrentBand] + ' client disconnected from network.';
 
@@ -383,28 +418,59 @@ var
    line: string;
 begin
    SL := TStringList.Create();
+   try
+      str := FClientSocket.ReceiveStr();
 
-   str := FClientSocket.ReceiveStr();
-
-   st := 1;
-   for i := 1 to Length(str) do begin
-      if str[i] = #10 then begin
-         line := TrimCRLF(Copy(str, st, i - st + 1));
-         FCommandQue.Add(FillRight(IntToStr(FClientNumber), 3) + ' ' + line);
-         st := i + 1;
+      if ((FSecure = True) and (FLoginStep = lsReqUser)) then begin
+         FInputLoginUser := StringReplace(str, #13#10, '', [rfReplaceAll]);
+         FLoginStep := lsReqPassword;
+         FClientSocket.SendStr('Password:');
+         FClientForm.AddConsole('***ログイン応答(password待ち)***' + FInputLoginUser);
+         Exit;
       end;
-   end;
 
-   line := TrimCRLF(Copy(str, st));
-   if line <> '' then begin
-      FCommandQue.Add(FillRight(IntToStr(FClientNumber), 3) + ' ' + line);
-   end;
+      if ((FSecure = True) and (FLoginStep = lsReqPassword)) then begin
+         FInputLoginPass := StringReplace(str, #13#10, '', [rfReplaceAll]);
 
-   if FInProcessing = False then begin
-      ProcessCommand('');
-   end;
+         if ((FInputLoginUser = ServerForm.LoginUser) and (FInputLoginPass = ServerForm.LoginPass)) then begin
+            FClientForm.AddConsole('***ログインOK***');
+            FLoginStep := lsLogined;
+         end
+         else begin
+            FClientSocket.SendStr('Password:');
+            Inc(FLoginIncorrectCount);
+            FClientForm.AddConsole('***ログインNG***');
+            if FLoginIncorrectCount >= 3 then begin
+               FClientSocket.SendStr('bye...' + #13#10);
+               PostMessage(FClientForm.Handle, WM_CLOSE, 0, 0);
+            end;
+         end;
+         Exit;
+      end;
 
-   SL.Free();
+      if (FLoginStep = lsLogined) then begin
+         st := 1;
+         for i := 1 to Length(str) do begin
+            if str[i] = #10 then begin
+               line := TrimCRLF(Copy(str, st, i - st + 1));
+               FCommandQue.Add(FillRight(IntToStr(FClientNumber), 3) + ' ' + line);
+               st := i + 1;
+            end;
+         end;
+
+         line := TrimCRLF(Copy(str, st));
+         if line <> '' then begin
+            FCommandQue.Add(FillRight(IntToStr(FClientNumber), 3) + ' ' + line);
+         end;
+
+         if FInProcessing = False then begin
+            ProcessCommand('');
+         end;
+      end;
+
+   finally
+      SL.Free();
+   end;
 end;
 
 // *****************************************************************************

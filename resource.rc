@@ -3,4 +3,7 @@ IDF_XPO_DAT RCDATA "resource\\XPO.DAT"
 IDF_ARDX_DAT RCDATA "resource\\ARDX.DAT"
 IDF_ARRL10_DAT RCDATA "resource\\ARRL10.DAT"
 IDF_IOTA_DAT RCDATA "resource\\IOTA.DAT"
+IDF_SERVER_KEY RCDATA "secure\\server.key"
+IDF_SERVER_CSR RCDATA "secure\\server.csr"
+IDF_SERVER_CRT RCDATA "secure\\server.crt"
 

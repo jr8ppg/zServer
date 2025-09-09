@@ -26,14 +26,14 @@ uses
   OverbyteIcsWndControl, OverbyteIcsWSocket, OverbyteIcsUtils, System.SyncObjs,
   System.Generics.Collections, System.Generics.Defaults,
   UBasicStats, UBasicMultiForm, UCliForm, UFreqList, UConnections,
-  UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages, JclFileUtils, Vcl.Buttons;
+  UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages, JclFileUtils, Vcl.Buttons,
+  OverbyteIcsTypes, OverbyteIcsSslBase, OverbyteIcsWSocketS;
 
 const
   IniFileName = 'ZServer.ini';
 
 type
   TServerForm = class(TForm)
-    SrvSocket: TWSocket;
     ClientListBox: TListBox;
     Panel1: TPanel;
     Panel2: TPanel;
@@ -68,9 +68,11 @@ type
     N5: TMenuItem;
     N6: TMenuItem;
     buttonMergeLock: TSpeedButton;
+    SrvSslContext: TSslContext;
+    SrvSocket: TSslWSocketServer;
     //procedure CreateParams(var Params: TCreateParams); override;
     procedure FormShow(Sender: TObject);
-    procedure SrvSocketSessionAvailable(Sender: TObject; Error: Word);
+    procedure SrvSocketClientConnect(Sender: TObject; Client: TWSocketClient; Error: Word);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure Exit1Click(Sender: TObject);
     procedure About1Click(Sender: TObject);
@@ -117,6 +119,11 @@ type
     FCurrentFileName: string;
     FLastPath: string;
 
+    FPortNumber: string;
+    FSecure: Boolean;
+    FLoginUser: string;
+    FLoginPass: string;
+
     procedure OnClientClosed(var msg: TMessage); message WM_USER_CLIENT_CLOSED;
     procedure OnFreqData(var msg: TMessage); message WM_ZCMD_FREQDATA;
     procedure OnPutQSO(var msg: TMessage); message WM_ZCMD_PUTQSO;
@@ -154,6 +161,9 @@ type
     procedure MergeFile(FileName : string; BandSet : TBandSet);
     procedure RecalcAll();
 
+    property LoginUser: string read FLoginUser;
+    property LoginPass: string read FLoginPass;
+
     property ClientList: TList<TCliForm> read FClientList;
     property MasterLog: TLog read GetMasterLog;
   end;
@@ -185,7 +195,32 @@ uses
 procedure TServerForm.FormCreate(Sender: TObject);
 var
    ver: TJclFileVersionInfo;
+   SL: TSTringList;
 begin
+   LoadSettings();
+
+   // SSLコンテキストパラメータセット
+   SL := LoadFromResourceName(SysInit.HInstance, 'SERVER_CRT');
+   SrvSslContext.SslCertLines := SL;
+   SL.Free();
+
+   SL := LoadFromResourceName(SysInit.HInstance, 'SERVER_KEY');
+   SrvSslContext.SslPrivKeyLines := SL;
+   SL.Free();
+
+//   SrvSslContext.SslCertFile := 'server.crt';
+//   SrvSslContext.SslPrivKeyFile := 'server.key';
+
+   // ソケットにSSLコンテキストを割り当て
+   if FSecure = True then begin
+      SrvSocket.SslEnable := True;
+      SrvSocket.SslContext := SrvSslContext;
+   end
+   else begin
+      SrvSocket.SslEnable := False;
+      SrvSocket.SslContext := nil;
+   end;
+
    FClientList := TList<TCliForm>.Create();
 
    ChatOnly := True;
@@ -199,8 +234,6 @@ begin
 
    FFreqList := TFreqList.Create(Self);
    FConnections := TConnections.Create(Self);
-
-   LoadSettings();
 
    RestoreWindowsPos();
    CheckBox2.Checked := ChatOnly;
@@ -272,6 +305,11 @@ begin
       end;
 
       RestoreWindowStates;
+
+      if ((FSecure = True) and ((FLoginUser = '') or (FLoginPass = ''))) then begin
+         MessageBox(Handle, PChar('セキュアモードの場合は、ログイン名とパスワードの設定が必要です。'), PChar(Application.Title), MB_OK or MB_ICONEXCLAMATION);
+         Exit;
+      end;
 
       StartServer;
    finally
@@ -367,7 +405,7 @@ procedure TServerForm.StartServer;
 begin
    SrvSocket.Close;
    SrvSocket.Addr := '0.0.0.0';
-   SrvSocket.Port := 'telnet';
+   SrvSocket.Port := FPortNumber;
    SrvSocket.Proto := 'tcp';
    SrvSocket.Listen;
 end;
@@ -394,7 +432,7 @@ begin
    AddToChatLog(S);
 end;
 
-procedure TServerForm.SrvSocketSessionAvailable(Sender: TObject; Error: Word);
+procedure TServerForm.SrvSocketClientConnect(Sender: TObject; Client: TWSocketClient; Error: Word);
 var
    Form: TCliForm;
 begin
@@ -403,7 +441,10 @@ begin
    Form := TCliForm.Create(Self);
    Form.Caption := 'Client ' + IntToStr(FClientNumber);
    Form.ClientNumber := FClientNumber;
-   Form.Socket := SrvSocket.Accept;
+   Form.Socket := Client;
+   Form.Secure := FSecure;
+   Form.LoginUser := FLoginUser;
+   Form.LoginPass := FLoginPass;
    Form.Show;
    FClientList.Add(Form);
 end;
@@ -958,6 +999,11 @@ begin
          FLastPath := ExtractFilePath(Application.ExeName);
       end;
       FLastPath := IncludeTrailingPathDelimiter(FLastPath);
+
+      FPortNumber := IniFile.ReadString('Server', 'Port', 'telnet');
+      FSecure := IniFile.ReadBool('Server', 'Secure', True);
+      FLoginUser := IniFile.ReadString('Login', 'User', 'zloguser');
+      FLoginPass := IniFile.ReadString('Login', 'Password', '');
    finally
       IniFile.Free;
    end;
@@ -977,6 +1023,11 @@ begin
       IniFile.WriteInteger('Window', 'Height', Height);
       IniFile.WriteBool('Options', 'ChatOnly', ChatOnly);
       IniFile.WriteString('Path', 'Last', FLastPath);
+
+      IniFile.WriteString('Server', 'Port', FPortNumber);
+      IniFile.WriteBool('Server', 'Secure', FSecure);
+      IniFile.WriteString('Login', 'User', FLoginUser);
+      IniFile.WriteString('Login', 'Password', FLoginPass);
    finally
       IniFile.Free;
    end;
