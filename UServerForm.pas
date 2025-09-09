@@ -25,7 +25,7 @@ uses
   Dialogs, StdCtrls, IniFiles, Menus, ExtCtrls, System.UITypes,
   OverbyteIcsWndControl, OverbyteIcsWSocket, OverbyteIcsUtils, System.SyncObjs,
   System.Generics.Collections, System.Generics.Defaults,
-  UBasicStats, UBasicMultiForm, UCliForm, UFreqList, UConnections,
+  UBasicStats, UBasicMultiForm, UCliForm, UFreqList, UConnections, UOptions,
   UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages, JclFileUtils, Vcl.Buttons,
   OverbyteIcsTypes, OverbyteIcsSslBase, OverbyteIcsWSocketS;
 
@@ -70,6 +70,8 @@ type
     buttonMergeLock: TSpeedButton;
     SrvSslContext: TSslContext;
     SrvSocket: TSslWSocketServer;
+    N4: TMenuItem;
+    menuOptions: TMenuItem;
     //procedure CreateParams(var Params: TCreateParams); override;
     procedure FormShow(Sender: TObject);
     procedure SrvSocketClientConnect(Sender: TObject; Client: TWSocketClient; Error: Word);
@@ -101,11 +103,13 @@ type
     procedure menuTakeCommandLogClick(Sender: TObject);
     procedure buttonMergeLockClick(Sender: TObject);
     procedure File1Click(Sender: TObject);
+    procedure menuOptionsClick(Sender: TObject);
   private
     { Declarations privates }
     FInitialized  : Boolean;
     FClientNumber : Integer;
     FTakeChatLog : Boolean;
+    FTakeCommandLog : Boolean;
     FChatLogFileName: string;
 
     FFreqList: TFreqList;
@@ -136,7 +140,8 @@ type
     procedure OnAddConsole(var msg: TMessage); message WM_ZCMD_ADDCONSOLE;
     procedure OnSendAll(var msg: TMessage); message WM_ZCMD_SENDALL;
     procedure OnUpdateDisplay(var msg: TMessage); message WM_ZCMD_UPDATE_DISPLAY;
-    procedure StartServer;
+    procedure StartServer();
+    procedure StopServer();
     procedure LoadSettings();
     procedure SaveSettings();
     function GetMasterLog(): TLog;
@@ -148,6 +153,8 @@ type
     procedure AddToChatLog(str : string);
     procedure IdleEvent(Sender: TObject; var Done: Boolean);
     procedure SendAll(str : string);
+    procedure ApplyTakeCommandLog();
+    procedure SetCaption();
   public
     ChatOnly : boolean;
 
@@ -194,9 +201,10 @@ uses
 
 procedure TServerForm.FormCreate(Sender: TObject);
 var
-   ver: TJclFileVersionInfo;
    SL: TSTringList;
 begin
+   FClientList := TList<TCliForm>.Create();
+
    LoadSettings();
 
    // SSLコンテキストパラメータセット
@@ -211,26 +219,12 @@ begin
 //   SrvSslContext.SslCertFile := 'server.crt';
 //   SrvSslContext.SslPrivKeyFile := 'server.key';
 
-   // ソケットにSSLコンテキストを割り当て
-   if FSecure = True then begin
-      SrvSocket.SslEnable := True;
-      SrvSocket.SslContext := SrvSslContext;
-   end
-   else begin
-      SrvSocket.SslEnable := False;
-      SrvSocket.SslContext := nil;
-   end;
-
-   FClientList := TList<TCliForm>.Create();
-
    ChatOnly := True;
    FClientNumber := 0;
    FCurrentFileName := '';
    FLastPath := '';
 
-   ver := TJclFileVersionInfo.Create(Self.Handle);
-   Caption := Application.Title + ' Version ' + ver.FileVersion;
-   ver.Free();
+   SetCaption();
 
    FFreqList := TFreqList.Create(Self);
    FConnections := TConnections.Create(Self);
@@ -311,7 +305,7 @@ begin
          Exit;
       end;
 
-      StartServer;
+      StartServer();
    finally
       F.Release();
    end;
@@ -339,6 +333,8 @@ end;
 procedure TServerForm.File1Click(Sender: TObject);
 begin
    Save1.Enabled := not FStats.Saved;
+   menuTakeChatLog.Checked := FTakeChatLog;
+   menuTakeCommandLog.Checked := FTakeCommandLog;
 end;
 
 procedure TServerForm.FormClose(Sender: TObject; var Action: TCloseAction);
@@ -401,13 +397,29 @@ end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
-procedure TServerForm.StartServer;
+procedure TServerForm.StartServer();
 begin
    SrvSocket.Close;
+
+   // ソケットにSSLコンテキストを割り当て
+   if FSecure = True then begin
+      SrvSocket.SslEnable := True;
+      SrvSocket.SslContext := SrvSslContext;
+   end
+   else begin
+      SrvSocket.SslEnable := False;
+      SrvSocket.SslContext := nil;
+   end;
+
    SrvSocket.Addr := '0.0.0.0';
    SrvSocket.Port := FPortNumber;
    SrvSocket.Proto := 'tcp';
    SrvSocket.Listen;
+end;
+
+procedure TServerForm.StopServer();
+begin
+   SrvSocket.Close;
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -955,17 +967,62 @@ begin
    end;
 end;
 
+// チャットログを記録
 procedure TServerForm.menuTakeChatLogClick(Sender: TObject);
 begin
    FTakeChatLog := menuTakeChatLog.Checked;
 end;
 
+// コマンドログを記録
 procedure TServerForm.menuTakeCommandLogClick(Sender: TObject);
+begin
+   FTakeCommandLog := menuTakeCommandLog.Checked;
+   ApplyTakeCommandLog();
+end;
+
+// 設定
+procedure TServerForm.menuOptionsClick(Sender: TObject);
+var
+   f: TformOptions;
+begin
+   f := TformOptions.Create(Self);
+   try
+      StopServer();
+
+      f.Port := FPortNumber;
+      f.UseSecure := FSecure;
+      f.LoginID := FLoginUser;
+      f.LoginPassword := FLoginPass;
+      f.TakeChatLog := FTakeChatLog;
+      f.TakeCommandLog := FTakeCommandLog;
+
+      if f.ShowModal() <> mrOK then begin
+         Exit;
+      end;
+
+      FPortNumber := f.Port;
+      FSecure := f.UseSecure;
+      FLoginUser := f.LoginID;
+      FLoginPass := f.LoginPassword;
+      FTakeChatLog := f.TakeChatLog;
+      FTakeCommandLog := f.TakeCommandLog;
+
+      ApplyTakeCommandLog();
+
+      SaveSettings();
+      SetCaption();
+      StartServer();
+   finally
+      f.Release();
+   end;
+end;
+
+procedure TServerForm.ApplyTakeCommandLog();
 var
    i: Integer;
 begin
    for i := 0 to FClientList.Count - 1 do begin
-      FClientList[i].TakeLog := menuTakeCommandLog.Checked;
+      FClientList[i].TakeLog := FTakeCommandLog;
    end;
 end;
 
@@ -1004,6 +1061,10 @@ begin
       FSecure := IniFile.ReadBool('Server', 'Secure', True);
       FLoginUser := IniFile.ReadString('Login', 'User', 'zloguser');
       FLoginPass := IniFile.ReadString('Login', 'Password', '');
+      FTakeChatLog := IniFile.ReadBool('Options', 'TakeChatLog', True);
+      FTakeCommandLog := IniFile.ReadBool('Options', 'TakeCommandLog', False);
+
+      ApplyTakeCommandLog();
    finally
       IniFile.Free;
    end;
@@ -1028,6 +1089,8 @@ begin
       IniFile.WriteBool('Server', 'Secure', FSecure);
       IniFile.WriteString('Login', 'User', FLoginUser);
       IniFile.WriteString('Login', 'Password', FLoginPass);
+      IniFile.WriteBool('Options', 'TakeChatLog', FTakeChatLog);
+      IniFile.WriteBool('Options', 'TakeCommandLog', FTakeCommandLog);
    finally
       IniFile.Free;
    end;
@@ -1140,6 +1203,22 @@ begin
       dmZlogGlobal.WriteWindowState(FMultiForm);
    end;
    dmZlogGlobal.WriteWindowState(FFreqList);
+end;
+
+procedure TServerForm.SetCaption();
+var
+   ver: TJclFileVersionInfo;
+   S: string;
+begin
+   ver := TJclFileVersionInfo.Create(Self.Handle);
+   S := Application.Title + ' Version ' + ver.FileVersion;
+   ver.Free();
+
+   if FSecure = True then begin
+      S := S + ' [SECURE]';
+   end;
+
+   Caption := S;
 end;
 
 initialization

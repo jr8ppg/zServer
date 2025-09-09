@@ -351,8 +351,6 @@ begin
 end;
 
 procedure TClientThread.Execute();
-var
-   SL: TStringList;
 begin
    FCommandLogFileName := StringReplace(Application.ExeName, '.exe', '_#' + IntToHex(Integer(Self), 8) + '_' + FormatDateTime('yyyymmdd', Now) + '.txt', [rfReplaceAll]);
 

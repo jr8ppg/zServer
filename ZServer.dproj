@@ -79,6 +79,7 @@
         <VerInfo_MajorVer>2</VerInfo_MajorVer>
         <VerInfo_MinorVer>9</VerInfo_MinorVer>
         <VerInfo_Release>2</VerInfo_Release>
+        <DCC_Define>USE_SSL;$(DCC_Define)</DCC_Define>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win32)'!=''">
         <DCC_Namespace>System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;$(DCC_Namespace)</DCC_Namespace>
@@ -212,6 +213,10 @@
         </DCCReference>
         <DCCReference Include="UzLogExtension.pas"/>
         <DCCReference Include="UzLogMessages.pas"/>
+        <DCCReference Include="UOptions.pas">
+            <Form>formOptions</Form>
+            <FormType>dfm</FormType>
+        </DCCReference>
         <None Include="resource\ACAG.DAT"/>
         <None Include="resource\ARDX.DAT"/>
         <None Include="resource\ARRL10.DAT"/>

@@ -165,6 +165,15 @@ object ServerForm: TServerForm
         GroupIndex = 2
         OnClick = menuTakeCommandLogClick
       end
+      object N4: TMenuItem
+        Caption = '-'
+        GroupIndex = 2
+      end
+      object menuOptions: TMenuItem
+        Caption = #35373#23450
+        GroupIndex = 2
+        OnClick = menuOptionsClick
+      end
       object N5: TMenuItem
         Caption = '-'
         GroupIndex = 2
