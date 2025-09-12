@@ -985,9 +985,9 @@ procedure TServerForm.menuOptionsClick(Sender: TObject);
 var
    f: TformOptions;
 begin
+   StopServer();
    f := TformOptions.Create(Self);
    try
-      StopServer();
 
       f.Port := FPortNumber;
       f.UseSecure := FSecure;
@@ -1011,8 +1011,8 @@ begin
 
       SaveSettings();
       SetCaption();
-      StartServer();
    finally
+      StartServer();
       f.Release();
    end;
 end;
