@@ -13,6 +13,7 @@ object CliForm: TCliForm
   Font.Name = #65325#65331' '#65328#12468#12471#12483#12463
   Font.Style = []
   OnClose = FormClose
+  OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
   OnShow = FormShow
   TextHeight = 12

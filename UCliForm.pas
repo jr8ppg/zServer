@@ -28,6 +28,7 @@ type
     procedure CreateParams(var Params: TCreateParams); override;
     procedure FormCreate(Sender: TObject);
     procedure FormShow(Sender: TObject);
+    procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
     procedure FormClose(Sender: TObject; var Action: TCloseAction);
     procedure SendButtonClick(Sender: TObject);
     procedure DisconnectButtonClick(Sender: TObject);
@@ -126,6 +127,7 @@ type
     constructor Create(ClientSocket: TWSocketClient; AClientForm: TCliForm; AClientNumber: Integer);
     destructor Destroy(); override;
     procedure Release();
+    procedure Close();
 
     procedure SendStr(str: string);
 
@@ -197,6 +199,11 @@ procedure TCliForm.FormClose(Sender: TObject; var Action: TCloseAction);
 begin
    FClientThread.Release();
    PostMessage(TForm(Owner).Handle, WM_USER_CLIENT_CLOSED, 0, LongInt(Self));
+end;
+
+procedure TCliForm.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+begin
+   FClientThread.Close();
 end;
 
 procedure TCliForm.ClientThreadTerminate(Sender: TObject);
@@ -348,6 +355,13 @@ end;
 procedure TClientThread.Release();
 begin
    //PostMessage(FClientSocket.Handle, WM_QUIT, 0, 0);
+end;
+
+procedure TClientThread.Close();
+begin
+   if FClientSocket.State = wsConnected then begin
+      FClientSocket.Close();
+   end;
 end;
 
 procedure TClientThread.Execute();
