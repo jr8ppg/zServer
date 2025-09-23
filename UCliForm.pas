@@ -446,13 +446,14 @@ begin
 
          if ((FInputLoginUser = ServerForm.LoginUser) and (FInputLoginPass = ServerForm.LoginPass)) then begin
             FClientForm.AddConsole('***ログインOK***');
+            FClientSocket.SendStr('OK' + #13#10);
             FLoginStep := lsLogined;
          end
          else begin
             FClientSocket.SendStr('Password:');
             Inc(FLoginIncorrectCount);
             FClientForm.AddConsole('***ログインNG***');
-            if FLoginIncorrectCount >= 3 then begin
+            if FLoginIncorrectCount > 3 then begin
                FClientSocket.SendStr('bye...' + #13#10);
                PostMessage(FClientForm.Handle, WM_CLOSE, 0, 0);
             end;

@@ -7,7 +7,7 @@ interface
 uses
   System.SysUtils, System.Classes, StrUtils, IniFiles, Forms, Windows, Menus,
   System.DateUtils, Generics.Collections, Generics.Defaults,
-  UzLogConst;
+  UzLogConst, HelperLib, UzLogAdif;
 
 type
   TQSODataExHeader = packed record
@@ -87,7 +87,8 @@ type
     Forced: Boolean;       { 1 byte }
     QslState: Byte;        { 1 byte 0:None 1:Pse QSL 2:No QSL }
     Invalid: Boolean;      { 1 byte false:valid true:invalid }
-    Reserve4: string[101]; { 102 bytes }
+    RbnVerified: Boolean;  { 1 byte false:not verified true:verified }
+    Reserve4: string[100]; { 100 bytes }
     // 384bytes
   end;
 
@@ -127,10 +128,12 @@ type
     FForced: Boolean;
     FQslState: TQslState;
     FInvalid: Boolean;
+    FRbnVerified: Boolean;
 
     function GetMode2(): TMode;
     function GetPoints(): Integer;
     function GetQsoId(): Integer;
+    function GetArea(): string;
 
     function GetFileRecord(): TQSOData;
     procedure SetFileRecord(src: TQSOData);
@@ -153,6 +156,7 @@ type
     function GetRSTRcvdStr(): string;
     function GetFreqStr(): string;
     function GetFreqStr2(): string;
+    function GetFreqStr3(): string;
     function GetMemoStr(): string;
     procedure SetInvalid(v: Boolean);
   public
@@ -212,6 +216,8 @@ type
     property QslState: TQslState read FQslState write FQslState;
     property Invalid: Boolean read FInvalid write SetInvalid;
     property QsoId: Integer read GetQsoId;
+    property Area: string read GetArea;
+    property RbnVerified: Boolean read FRbnVerified write FRbnVerified;
 
     property SerialStr: string read GetSerialStr;
     property DateTimeStr: string read GetDateTimeStr;
@@ -229,6 +235,7 @@ type
     property RSTRcvdStr: string read GetRSTRcvdStr;
     property FreqStr: string read GetFreqStr;
     property FreqStr2: string read GetFreqStr2;
+    property FreqStr3: string read GetFreqStr3;
     property MemoStr: string read GetMemoStr;
 
     property FileRecord: TQSOData read GetFileRecord write SetFileRecord;
@@ -334,6 +341,7 @@ type
   end;
 
   TQSOListArray = array[b19..HiBand] of TQSOList;
+  TQSOListArrayByTx = array[0..(MAX_TX - 1)] of TQSOList;
 
   TLog = class(TObject)
   private
@@ -346,6 +354,7 @@ type
     FDifferentModePointer : Integer; //points to a qso on a different mode but not dupe
     FDupeCheckList: TQSOListArray;
     FBandList: TQSOListArray;
+    FTxList: TQSOListArrayByTx;
     FAllPhone: Boolean;    // True: SSB, FM, AM are same
     FQsoIdDic: TDictionary<Integer, TQSO>;
     FStartTime: TDateTime;
@@ -362,6 +371,10 @@ type
     function GetActualFreq(b: TBand; strFreq: string): string;
     function GetEndTime(): TDateTime;
     procedure SetPeriod(v: Integer);
+    {$IFNDEF ZSERVER}
+    function GetLastCallsign(): string;
+    function GetLastNumber(): string;
+    {$ENDIF}
   public
     constructor Create(memo : string);
     destructor Destroy; override;
@@ -383,13 +396,15 @@ type
 
     procedure SaveToFile(Filename : string);
     procedure SaveToFileEx(Filename: string);
-    procedure SaveToFilezLogDOSTXT(Filename : string);
-    procedure SaveToFilezLogCsv(Filename: string);
+    procedure SaveToFileAszLogDOSTXT(Filename : string);
+    procedure SaveToFileAszLogCsv(Filename: string);
     {$IFNDEF ZSERVER}
-    procedure SaveToFilezLogALL(Filename : string);
-    procedure SaveToFileByTX(Filename : string);
-    procedure SaveToFileByCabrillo(Filename: string; nTimeZoneOffset: Integer);
-    procedure SaveToFileByHamlog(Filename: string; nRemarks1Option: Integer; nRemarks2Option: Integer; strRemarks1: string; strRemarks2: string; nCodeOption: Integer; nNameOption: Integer; nTimeOption: Integer; strQslStateText: string);
+    procedure SaveToFileAszLogALL(Filename : string);
+    procedure SaveToFileAsTxtByTX(Filename : string);
+    procedure SaveToFileAsCabrillo(Filename: string; nTimeZoneOffset: Integer; slSummaryInfo: TStringList = nil);
+    procedure SaveToFileAsHamlog(Filename: string; nRemarks1Option: Integer; nRemarks2Option: Integer; strRemarks1: string; strRemarks2: string; nCodeOption: Integer; nNameOption: Integer; nTimeOption: Integer; strQslStateText: string; nFreqOption: Integer);
+    procedure SaveToFileAsHamSupport(Filename: string);
+    procedure SaveToFileAsAdif(Filename: string);
     {$ENDIF}
     function IsDupe(aQSO : TQSO) : Integer;
     function IsDupe2(aQSO : TQSO; index : Integer; var dupeindex : Integer) : Boolean;
@@ -417,10 +432,13 @@ type
 
     function LoadFromFile(filename: string): Integer;
     function LoadFromFileEx(filename: string): Integer;
-    function LoadFromFilezLogCsv(Filename: string): Integer;
+    {$IFNDEF ZSERVER}
+    function LoadFromFileAszLogCsv(Filename: string): Integer;
+    function LoadFromFileAsAdif(Filename: string): Integer;
 //    function MergeFile(filename: string): Integer;
 
     function IsWorked(strCallsign: string; band: TBand): Boolean;
+    {$ENDIF}
     function IsNewMulti(band: TBand; multi: string): Boolean;
     procedure RenewMulti();
     function IsContainsSameQSO(Q: TQSO): Boolean;
@@ -430,7 +448,12 @@ type
     {$IFNDEF ZSERVER}
     function IsOtherBandWorked(strCallsign: string; exclude_band: TBand; var workdmulti: string): Boolean;
     function EvaluateQSYCount(nStartIndex: Integer): Integer;
+
+    function GetLastSerial(aQSO: TQSO): Integer;
+    function GetCurrentSerial(aQSO: TQSO): Integer;
     {$ENDIF}
+
+    procedure Renumber();
 
     property Saved: Boolean read FSaved write FSaved;
     property AcceptDifferentMode: Boolean read FAcceptDifferentMode write FAcceptDifferentMode;
@@ -439,6 +462,7 @@ type
 
     property QsoList: TQSOList read FQsoList;
     property BandList: TQSOListArray read FBandList;
+    property TxList: TQSOListArrayByTx read FTxList;
 
     property ScoreCoeff: Extended read GetScoreCoeff write SetScoreCoeff;
 
@@ -447,6 +471,11 @@ type
     property StartTime: TDateTime read FStartTime write FStartTime;
     property EndTime: TDateTime read GetEndTime;
     property Period: Integer read FPeriod write SetPeriod;
+
+    {$IFNDEF ZSERVER}
+    property LastCallsign: string read GetLastCallsign;
+    property LastNumber: string read GetLastNumber;
+    {$ENDIF}
   end;
 
 implementation
@@ -454,7 +483,7 @@ implementation
 uses
   UzLogGlobal, UzLogExtension
   {$IFNDEF ZSERVER}
-  , Main
+  , UzLogContest, Main
   {$ENDIF};
 
 { TQSO }
@@ -499,6 +528,7 @@ begin
    FForced := False;
    FQslState := qsNone;
    FInvalid := False;
+   FRbnVerified := False;
 end;
 
 procedure TQSO.IncTime;
@@ -753,8 +783,15 @@ var
    fFreq: Extended;
    b2: TBand;
 begin
-   strFreq := GetFreqStr2();
+   strFreq := Self.Freq;
+
    if strFreq = '' then begin
+      Result := Self.BandStr;
+      Exit;
+   end;
+
+   fFreq := StrToFloatDef(strFreq, 0);
+   if fFreq = 0 then begin
       Result := Self.BandStr;
       Exit;
    end;
@@ -788,6 +825,35 @@ begin
    strFreq := Format('%.4f', [fFreq / 1000]);
 
    Result := strFreq;
+end;
+
+// 7117.6
+// 7.1176
+
+function TQSO.GetFreqStr3(): string;
+var
+   strFreq: string;
+   fFreq: Extended;
+   Index: Integer;
+   strMHz: string;
+   strkHz: string;
+begin
+   strFreq := Self.Freq;
+
+   fFreq := StrToFloatDef(strFreq, 0);
+   if fFreq = 0 then begin
+      Result := '';
+      Exit;
+   end;
+
+   strFreq := Format('%.4f', [fFreq / 1000]);
+
+   Index := Pos('.', strFreq);
+   strMHz := Copy(strFreq, 1, Index - 1);
+
+   strkHz := RightStr(Self.Freq, 5);
+
+   Result := strMHz + '.' + strkHz;
 end;
 
 function TQSO.GetMemoStr(): string;
@@ -1051,13 +1117,7 @@ begin
             end;
          end
          else begin
-            if aQSO.Mode = mSSB then begin
-               Result := True;
-            end
-            else if aQSO.Mode = mFM then begin
-               Result := True;
-            end
-            else if aQSO.Mode = mAM then begin
+            if aQSO.Mode = Self.FMode then begin
                Result := True;
             end;
          end;
@@ -1139,6 +1199,43 @@ begin
    Result := FReserve3 div 100;
 end;
 
+function TQSO.GetArea(): string;
+var
+   area: string;
+   Index: Integer;
+   S1: Char;
+   S2: Char;
+   S3: Char;
+begin
+   if IsDomestic(Callsign) = False then begin
+      Result := '';
+      Exit;
+   end;
+
+   Index := Pos('/', Callsign);
+   if Index > 0 then begin
+      area := Copy(Callsign, Index + 1);
+   end
+   else begin
+      S1 := Callsign[1];
+      S2 := Callsign[2];
+      S3 := Callsign[3];
+
+      if S1 = '7' then begin
+         if (S2 >= 'K') and (S2 <= 'N') then begin
+            if (S3 >= '1') and (S3 <= '4') then begin
+               Result := '1';
+               Exit;
+            end;
+         end;
+      end;
+
+      area := Copy(Callsign, 3, 1);
+   end;
+
+   Result := area;
+end;
+
 procedure TQSO.Assign(src: TQSO);
 begin
    FTime := src.FTime;
@@ -1171,6 +1268,7 @@ begin
    FForced := src.FForced;
    FQslState := src.FQslState;
    FInvalid := src.Invalid;
+   FRbnVerified := src.RbnVerified;
 end;
 
 function TQSO.GetFileRecord(): TQSOData;
@@ -1301,6 +1399,7 @@ begin
    Result.Forced     := FForced;
    Result.QslState   := Byte(FQslState);
    Result.Invalid    := FInvalid;
+   Result.RbnVerified := FRbnVerified;
 end;
 
 procedure TQSO.SetFileRecordEx(src: TQSODataEx);
@@ -1344,6 +1443,7 @@ begin
    FForced     := src.Forced;
    FQslState   := TQslState(src.QslState);
    FInvalid    := src.Invalid;
+   FRbnVerified := src.RbnVerified;
 end;
 
 { TQSOList }
@@ -1419,6 +1519,11 @@ var
    Index: Integer;
 begin
    merged := 0;
+
+   if UpperCase(ExtractFileExt(filename)) = '.ZLOX' then begin
+      Result := MergeFileEx(filename, fFullMatch);
+      Exit;
+   end;
 
    AssignFile(f, filename);
    Reset(f);
@@ -1591,6 +1696,7 @@ constructor TLog.Create(Memo: string);
 var
    Q: TQSO;
    B: TBand;
+   i: Integer;
 begin
    Inherited Create();
 
@@ -1604,6 +1710,10 @@ begin
       FBandList[B] := TQSOList.Create(False);
    end;
 
+   for i := Low(FTxList) to High(FTxList) do begin
+      FTxList[i] := TQSOList.Create(False);
+   end;
+
    Q := TQSO.Create;
    Q.Callsign := '';
    Q.Memo := Memo;
@@ -1614,6 +1724,10 @@ begin
 
    for B := b19 to HiBand do begin
       FBandList[B].Add(Q);
+   end;
+
+   for i := Low(FTxList) to High(FTxList) do begin
+      FTxList[i].Add(Q);
    end;
 
    FSaved := True;
@@ -1629,10 +1743,15 @@ end;
 destructor TLog.Destroy;
 var
    B: TBand;
+   i: Integer;
 begin
    for B := b19 to HiBand do begin
       FDupeCheckList[B].Free();
       FBandList[B].Free();
+   end;
+
+   for i := Low(FTxList) to High(FTxList) do begin
+      FTxList[i].Free();
    end;
 
    {$IFDEF DEBUG}
@@ -1777,6 +1896,7 @@ begin
    end;
 
    FBandList[xQSO.Band].Add(aQSO);
+   FTxList[xQSO.TX].Add(aQSO);
 
    if FQsoIdDic.ContainsKey(xQSO.QsoId) = False then begin
       FQsoIdDic.Add(xQSO.QsoId, xQSO);
@@ -1959,6 +2079,11 @@ begin
       FBandList[aQSO.Band].Delete(Index);
    end;
 
+   Index := FTxList[aQSO.TX].IndexOf(aQSO);
+   if Index > -1 then begin
+      FTxList[aQSO.TX].Delete(Index);
+   end;
+
    FQsoList.Delete(i);
 
    FSaved := False;
@@ -1976,6 +2101,11 @@ begin
    Index := FBandList[aQSO.Band].IndexOf(aQSO);
    if Index > -1 then begin
       FBandList[aQSO.Band].Delete(Index);
+   end;
+
+   Index := FTxList[aQSO.TX].IndexOf(aQSO);
+   if Index > -1 then begin
+      FTxList[aQSO.TX].Delete(Index);
    end;
 
    Index := FQSOList.IndexOf(aQSO);
@@ -2111,7 +2241,7 @@ begin
    FSaved := True;
 end;
 
-procedure TLog.SaveToFilezLogDOSTXT(Filename: string);
+procedure TLog.SaveToFileAszLogDOSTXT(Filename: string);
 var
    f: textfile;
    i, j, max: Integer;
@@ -2154,7 +2284,7 @@ begin
 end;
 
 {$IFNDEF ZSERVER}
-procedure TLog.SaveToFilezLogALL(Filename: string);
+procedure TLog.SaveToFileAszLogALL(Filename: string);
 var
    f: textfile;
    Header: string;
@@ -2175,11 +2305,11 @@ begin
 end;
 {$ENDIF}
 
-procedure TLog.SaveToFilezLogCsv(Filename: string);
+procedure TLog.SaveToFileAszLogCsv(Filename: string);
 const
    csvheader = '"Date","Time","TimeZone","CallSign","RSTSent","NrSent","RSTRcvd","NrRcvd","Serial","Mode",' +
                '"Band","Power","Multi1","Multi2","NewMulti1","NewMulti2","Points","Operator","Memo","CQ",' +
-               '"Dupe","Reserve","TX","Power2","Reserve2","Reserve3","Freq","QsyViolation","PCName","QslState","Invalid"';
+               '"Dupe","Reserve","TX","Power2","Reserve2","Reserve3","Freq","QsyViolation","PCName","Forced","QslState","Invalid","Area","RBN Verified"';
 var
    F: TextFile;
    i: Integer;
@@ -2197,7 +2327,10 @@ begin
 
       offsetmin := FQsoList[0].RSTsent;
 
-      WriteLn(F, csvheader);
+      // BOM
+      Write(F, #$EF + #$BB + #$BF);
+
+      WriteLn(F, UTF8String(csvheader));
 
       for i := 1 to FQSOList.Count - 1 do begin
          Q := FQSOList[i];
@@ -2220,37 +2353,37 @@ begin
          slCsv.Add(strText);
 
          // 4列目 コールサイン
-         slCsv.Add('"' + Q.Callsign + '"');
+         slCsv.Add2(Q.Callsign);
 
          // 5列目 相手局へ送ったRST
-         slCsv.Add('"' + Q.RSTSentStr + '"');
+         slCsv.Add2(Q.RSTSentStr);
 
          // 6列目 相手局へ送ったNumber
-         slCsv.Add('"' + Q.NrSent + '"');
+         slCsv.Add2(Q.NrSent);
 
          // 7列目 相手局からもらったレポート
-         slCsv.Add('"' + Q.RSTRcvdStr + '"');
+         slCsv.Add2(Q.RSTRcvdStr);
 
          // 8列目 相手局へ送ったNumber
-         slCsv.Add('"' + Q.NrRcvd + '"');
+         slCsv.Add2(Q.NrRcvd);
 
          // 9列目 シリアルNO
          slCsv.Add(Q.SerialStr);
 
          // 10列目 Mode
-         slCsv.Add('"' + Q.ModeStr + '"');
+         slCsv.Add2(Q.ModeStr);
 
          // 11列目 Band
-         slCsv.Add('"' + Q.BandStr + '"');
+         slCsv.Add2(Q.BandStr);
 
          // 1列目 Power
-         slCsv.Add('"' + Q.NewPowerStr + '"');
+         slCsv.Add2(Q.NewPowerStr);
 
          // 13列目 マルチ１
-         slCsv.Add('"' + Q.Multi1 + '"');
+         slCsv.Add2(Q.Multi1);
 
          // 14列目 マルチ１
-         slCsv.Add('"' + Q.Multi2 + '"');
+         slCsv.Add2(Q.Multi2);
 
          // 15列目 Newマルチ１
          slCsv.Add(BoolToStr(Q.NewMulti1, True));
@@ -2262,10 +2395,10 @@ begin
          slCsv.Add(IntToStr(Q.Points));
 
          // 18列目 Operator
-         slCsv.Add('"' + Q.Operator + '"');
+         slCsv.Add2(Q.Operator);
 
          // 19列目 memo
-         slCsv.Add('"' + Q.Memo + '"');
+         slCsv.Add2(Q.Memo);
 
          // 20列目 CQ
          slCsv.Add(BoolToStr(Q.CQ, True));
@@ -2289,13 +2422,13 @@ begin
          slCsv.Add(IntToStr(Q.Reserve3));
 
          // 27列目 Freq
-         slCsv.Add('"' + Q.Freq + '"');
+         slCsv.Add2(Q.Freq);
 
          // 28列目 QsyViolation
          slCsv.Add(BoolToStr(Q.QsyViolation, True));
 
          // 29列目 PCName
-         slCsv.Add('"' + Q.PCName + '"');
+         slCsv.Add2(Q.PCName);
 
          // 30列目 Forced
          slCsv.Add(BoolToStr(Q.Forced, True));
@@ -2306,7 +2439,13 @@ begin
          // 32列目 Invalid
          slCsv.Add(BoolToStr(Q.Invalid, True));
 
-         WriteLn(F, slCsv.DelimitedText);
+         // 33列目 Area
+         slCsv.Add(Q.Area);
+
+         // 34列目 RBN Verified
+         slCsv.Add(BoolToStr(Q.RbnVerified, True));
+
+         WriteLn(F, UTF8String(slCsv.DelimitedText));
       end;
 
       CloseFile(F);
@@ -2316,7 +2455,7 @@ begin
 end;
 
 {$IFNDEF ZSERVER}
-procedure TLog.SaveToFileByTX(Filename: string);
+procedure TLog.SaveToFileAsTxtByTX(Filename: string);
 var
    f: textfile;
    Header: string;
@@ -2417,6 +2556,107 @@ begin
    FEndTime := IncHour(FStartTime, FPeriod);
 end;
 
+{$IFNDEF ZSERVER}
+
+function TLog.GetLastCallsign(): string;
+var
+   txnr, i: Integer;
+begin
+   txnr := dmZLogGlobal.Settings._txnr;
+
+   for i := Log.TotalQSO downto 1 do begin
+      if Log.QsoList[i].TX = txnr then begin
+         Result := Log.QsoList[i].Callsign;
+         Exit;
+      end;
+   end;
+
+   Result := '';
+end;
+
+function TLog.GetLastNumber(): string;
+var
+   txnr, i: Integer;
+begin
+   txnr := dmZLogGlobal.Settings._txnr;
+
+   for i := Log.TotalQSO downto 1 do begin
+      if Log.QsoList[i].TX = txnr then begin
+         Result := Log.QsoList[i].NrSent;
+         Exit;
+      end;
+   end;
+
+   Result := '';
+end;
+
+function TLog.GetLastSerial(aQSO: TQSO): Integer;
+var
+   txnr, i: Integer;
+   Q: TQSO;
+begin
+   txnr := dmZLogGlobal.Settings._txnr;
+
+   case MyContest.SerialType of
+      stNone: begin
+         Result := 0;
+         Exit;
+      end;
+
+      stAll: begin
+         for i := Log.TotalQSO downto 1 do begin
+            Q := Log.QsoList[i];
+            if Q.TX = txnr then begin
+               Result := Q.Serial;
+               Exit;
+            end;
+         end;
+      end;
+
+      stBand: begin
+         for i := Log.TotalQSO downto 1 do begin
+            Q := Log.QsoList[i];
+            if (Q.band = aQSO.Band) and (Q.TX = txnr) then begin
+               Result := Q.Serial;
+               Exit;
+            end;
+         end;
+      end;
+
+      stMultiSingle: begin
+         for i := Log.TotalQSO downto 1 do begin
+            Q := Log.QsoList[i];
+            if (Q.TX = aQSO.TX) then begin
+               Result := Q.Serial;
+               Exit;
+            end;
+         end;
+      end;
+   end;
+
+   Result := 0;
+end;
+
+function TLog.GetCurrentSerial(aQSO: TQSO): Integer;
+var
+   initno: Integer;
+begin
+   if Log.TotalQSO = 0 then begin
+      if MyContest is TGeneralContest then begin
+         initno := TGeneralContest(MyContest).Config.SerialArray[aQSO.Band];
+      end
+      else begin
+         initno := 1;
+      end;
+      Result := initno;
+      Exit;
+   end;
+
+   Result := GetLastSerial(aQSO) + 1;
+end;
+
+{$ENDIF}
+
 // https://wwrof.org/cabrillo/
 // https://wwrof.org/cabrillo/cabrillo-qso-data/
 //                              --------info sent------- -------info rcvd--------
@@ -2426,7 +2666,7 @@ end;
 //QSO:  3799 PH 1999-03-06 0712 HC8N           59 700    N5KO           59 CA     0
 
 {$IFNDEF ZSERVER}
-procedure TLog.SaveToFileByCabrillo(Filename: string; nTimeZoneOffset: Integer);
+procedure TLog.SaveToFileAsCabrillo(Filename: string; nTimeZoneOffset: Integer; slSummaryInfo: TStringList);
 var
    F: TextFile;
    i: Integer;
@@ -2435,38 +2675,74 @@ var
    utc: TDateTime;
    offhour: Integer;
    offsetmin: Integer;
+
+   function FillRight(S: string; len: integer): string;
+   var
+      sjis: AnsiString;
+      len2: Integer;
+   begin
+      sjis := AnsiString(S);
+      len2 := Length(sjis);
+      if len2 < len then begin
+         sjis := sjis + AnsiString(DupeString(' ', len));
+         sjis := Copy(sjis, 1, len);
+      end;
+      Result := String(sjis);
+   end;
+
+   function FillLeft(S: string; len: integer): string;
+   var
+      sjis: AnsiString;
+      len2: Integer;
+   begin
+      sjis := AnsiString(S);
+      len2 := Length(sjis);
+      if len2 < len then begin
+         sjis := AnsiString(DupeString(' ', len)) + sjis;
+         sjis := Copy(sjis, Length(sjis) - len + 1, len);
+      end;
+      Result := String(sjis);
+   end;
 begin
    AssignFile(F, Filename);
    ReWrite(F);
 
    WriteLn(F, 'START-OF-LOG: 3.0');
-   WriteLn(F, 'CALLSIGN: ' + dmZLogGlobal.MyCall);
-   WriteLn(F, 'CONTEST: ');
-   WriteLn(F, 'CATEGORY-ASSISTED: ');
-   WriteLn(F, 'CATEGORY-BAND: ');
-   WriteLn(F, 'CATEGORY-MODE: ');
-   WriteLn(F, 'CATEGORY-OPERATOR: ');
-   WriteLn(F, 'CATEGORY-POWER: ');
-   WriteLn(F, 'CATEGORY-STATION: ');
-   WriteLn(F, 'CATEGORY-TIME: ');
-   WriteLn(F, 'CATEGORY-TRANSMITTER: ');
-   WriteLn(F, 'CATEGORY-OVERLAY: ');
-   WriteLn(F, 'CERTIFICATE: ');
-   WriteLn(F, 'CLAIMED-SCORE: ');
-   WriteLn(F, 'CLUB: ');
-   WriteLn(F, 'CREATED-BY: ');
-   WriteLn(F, 'EMAIL: ');
-   WriteLn(F, 'GRID-LOCATOR: ');
-   WriteLn(F, 'LOCATION: ');
-   WriteLn(F, 'NAME: ');
-   WriteLn(F, 'ADDRESS: ');
-   WriteLn(F, 'ADDRESS-CITY: ');
-   WriteLn(F, 'ADDRESS-STATE-PROVINCE: ');
-   WriteLn(F, 'ADDRESS-POSTALCODE: ');
-   WriteLn(F, 'ADDRESS-COUNTRY: ');
-   WriteLn(F, 'OPERATORS: ');
-   WriteLn(F, 'OFFTIME: ');
-   WriteLn(F, 'SOAPBOX: ');
+
+   if slSummaryInfo = nil then begin
+      WriteLn(F, 'CALLSIGN: ' + dmZLogGlobal.MyCall);
+      WriteLn(F, 'CONTEST: ');
+      WriteLn(F, 'CATEGORY-ASSISTED: ');
+      WriteLn(F, 'CATEGORY-BAND: ');
+      WriteLn(F, 'CATEGORY-MODE: ');
+      WriteLn(F, 'CATEGORY-OPERATOR: ');
+      WriteLn(F, 'CATEGORY-POWER: ');
+      WriteLn(F, 'CATEGORY-STATION: ');
+      WriteLn(F, 'CATEGORY-TIME: ');
+      WriteLn(F, 'CATEGORY-TRANSMITTER: ');
+      WriteLn(F, 'CATEGORY-OVERLAY: ');
+      WriteLn(F, 'CERTIFICATE: ');
+      WriteLn(F, 'CLAIMED-SCORE: ');
+      WriteLn(F, 'CLUB: ');
+      WriteLn(F, 'CREATED-BY: ');
+      WriteLn(F, 'EMAIL: ');
+      WriteLn(F, 'GRID-LOCATOR: ');
+      WriteLn(F, 'LOCATION: ');
+      WriteLn(F, 'NAME: ');
+      WriteLn(F, 'ADDRESS: ');
+      WriteLn(F, 'ADDRESS-CITY: ');
+      WriteLn(F, 'ADDRESS-STATE-PROVINCE: ');
+      WriteLn(F, 'ADDRESS-POSTALCODE: ');
+      WriteLn(F, 'ADDRESS-COUNTRY: ');
+      WriteLn(F, 'OPERATORS: ');
+      WriteLn(F, 'OFFTIME: ');
+      WriteLn(F, 'SOAPBOX: ');
+   end
+   else begin
+      for i := 0 to slSummaryInfo.Count - 1 do begin
+         WriteLn(F, slSummaryInfo.Strings[i]);
+      end;
+   end;
 
    offsetmin := FQsoList[0].RSTsent;
    if offsetmin = _USEUTC then begin
@@ -2573,11 +2849,12 @@ HAMLOG CSV仕様
 　でもそれ以外の場合もある
 }
 {$IFNDEF ZSERVER}
-procedure TLog.SaveToFileByHamlog(Filename: string; nRemarks1Option: Integer; nRemarks2Option: Integer;
+procedure TLog.SaveToFileAsHamlog(Filename: string; nRemarks1Option: Integer; nRemarks2Option: Integer;
                                  strRemarks1: string; strRemarks2: string;
                                  nCodeOption: Integer; nNameOption: Integer;
                                  nTimeOption: Integer;
-                                 strQslStateText: string);
+                                 strQslStateText: string;
+                                 nFreqOption: Integer);
 var
    F: TextFile;
    i: Integer;
@@ -2588,6 +2865,7 @@ var
    strQslState: array[qsNone..qsNoQsl] of string;
    strMulti: string;
    newoffsetmin: Integer;
+   qsotime: TDateTime;
    offsethour: Integer;
    S: string;
 
@@ -2636,8 +2914,8 @@ var
       S := StringReplace(S, '$NRRECV',  Q.NrRcvd, [rfReplaceALL]);
       S := StringReplace(S, '$MEMO',    Q.Memo, [rfReplaceALL]);
       S := StringReplace(S, '$CTNAME',  MyContest.Name, [rfReplaceALL]);
-      S := StringReplace(S, '$DATE',    FormatDateTime('yyyy/mm/dd', Q.Time), [rfReplaceALL]);
-      S := StringReplace(S, '$TIME',    FormatDateTime('HH:MM', Q.Time), [rfReplaceALL]);
+      S := StringReplace(S, '$DATE',    FormatDateTime('yyyy/mm/dd', qsotime), [rfReplaceALL]);
+      S := StringReplace(S, '$TIME',    FormatDateTime('HH:MM', qsotime), [rfReplaceALL]);
       S := StringReplace(S, '$FREQ',    Q.FreqStr, [rfReplaceALL]);
       S := StringReplace(S, '$BANDF',   Q.BandStr, [rfReplaceALL]);
       S := StringReplace(S, '$BANDW',   Q.BandStr2, [rfReplaceALL]);
@@ -2672,6 +2950,7 @@ begin
 
          strMulti := MyContest.MultiForm.ExtractMulti(Q);
 
+         qsotime := Q.Time;
          case nTimeOption of
             // そのまま出力
             0: begin
@@ -2681,7 +2960,7 @@ begin
             // JST統一
             1: begin
                if offsetmin = _USEUTC then begin
-                  Q.Time := IncHour(Q.Time, offsethour);
+                  qsotime := IncHour(qsotime, offsethour);
                end;
                newoffsetmin := offsetmin;
             end;
@@ -2689,7 +2968,7 @@ begin
             // UTC統一
             2: begin
                if offsetmin <> _USEUTC then begin
-                  Q.Time := IncHour(Q.Time, offsethour);
+                  qsotime := IncHour(qsotime, offsethour);
                end;
                newoffsetmin := _USEUTC;
             end;
@@ -2705,10 +2984,10 @@ begin
          slCsv.Add(Q.Callsign);
 
          //2列目　交信年月日（YY/MM/DD）　※「YYYY/MM/DD」でもOKだった記憶
-         slCsv.Add(FormatDateTime('yyyy/mm/dd', Q.Time));
+         slCsv.Add(FormatDateTime('yyyy/mm/dd', qsotime));
 
          //3列目　交信時分（HH:MM*）　※「*」にはJST…J・UTC…U
-         strText := FormatDateTime('HH:MM', Q.Time);
+         strText := FormatDateTime('HH:MM', qsotime);
          if newoffsetmin = _USEUTC then begin
             strText := strText + 'U';
          end
@@ -2723,18 +3002,26 @@ begin
          //5列目　相手局からもらったレポート
          slCsv.Add(Q.RSTRcvdStr);
 
-         //6列目　周波数
-         slCsv.Add(Q.FreqStr);
+         //6列目　周波数orバンド/バンド
+         if nFreqOption = 0 then begin
+            strText := Q.FreqStr2;
+            if strText = '' then begin
+               strText := Q.BandStr;
+            end;
+         end
+         else begin
+            strText := Q.BandStr;
+         end;
+         slCsv.Add(strText);
 
          //7列目　電波型式
          slCsv.Add(Q.ModeStr);
 
          //8列目　相手局の運用地コード
-         if nCodeOption = 1 then begin
-            slCsv.Add(strMulti);
-         end
-         else begin
-            slCsv.Add('');
+         case nCodeOption of
+            1: slCsv.Add(strMulti);
+            2: slCsv.Add(Q.NrRcvd);
+            else slCsv.Add('');
          end;
 
          //9列目　相手局の運用地グリッドロケータ
@@ -2812,6 +3099,395 @@ begin
       slCsv.Free();
    end;
 end;
+{$ENDIF}
+
+{$IFNDEF ZSERVER}
+
+// 1 Callsign
+// 2 Portable
+// 3 Time
+// 4 Time End
+// 5 RST Sent
+// 6 RST Received
+// 7 Who Called
+// 8 Grid Zone
+// 9 My Callsign
+// 10 My QTH
+// 11 Other QTH
+// 12 Other Name
+// 13 Band
+// 14 Frequency
+// 15 Mode
+// 16 QSL Card
+// 17 QSL Way
+// 18 QSL Flag
+// 19 Rig Model
+// 20 Antenna
+// 21 TXPower
+// 22 Latitude
+// 23 Longitude
+// 24 JCC/JGC
+// 25 Altitude above sea level
+// 26 Weather
+// 27 Other Information
+// 28 QSL Comment
+// 29 NR Sent
+// 30 NR Received
+
+procedure TLog.SaveToFileAsHamSupport(Filename: string);
+var
+   slLine: TStringList;
+   slFile: TStringList;
+   offsetmin: Integer;
+   offsethour: Integer;
+   i: Integer;
+   Q: TQSO;
+   strMulti: string;
+   strTime: string;
+   qsotime: TDateTime;
+   strPortable: string;
+   strCallsign: string;
+   deg: Extended;
+const
+   strQslState: array[qsNone..qsNoQsl] of string = ( 'なし', 'BURO', 'なし' );
+   strQslFlag: array[qsNone..qsNoQsl] of string = ( '', 'FALSE', '' );
+
+   procedure SplitCallsign(strOriginal: string; var strCallsign: string; var strPortable: string);
+   var
+      strRight, strLeft: string;
+      Index: Integer;
+   begin
+      Index := Pos('/', strOriginal);
+      if Index = -1 then begin
+         strCallsign := strOriginal;
+         strPortable := '';
+         Exit;
+      end;
+
+      strLeft := Copy(strOriginal, 1, Index - 1);
+      strRight := Copy(strOriginal, Index + 1);
+
+      if Length(strLeft) >= Length(strRight) then begin
+         strCallsign := strLeft;
+         strPortable := strRight;
+      end
+      else begin
+         strCallsign := strRight;
+         strPortable := strLeft;
+      end;
+
+      if (strPortable = '1') or
+         (strPortable = '2') or
+         (strPortable = '3') or
+         (strPortable = '4') or
+         (strPortable = '5') or
+         (strPortable = '6') or
+         (strPortable = '7') or
+         (strPortable = '8') or
+         (strPortable = '9') or
+         (strPortable = '0') or
+         (strPortable = 'P') or
+         (strPortable = 'MM') or
+         (strPortable = 'AM') or
+         (strPortable = 'SAT') then begin
+         // OK
+         Exit;
+      end
+      else begin
+         strCallsign := strOriginal;
+         strPortable := '';
+      end;
+   end;
+begin
+   slLine := TStringList.Create();
+   slLine.StrictDelimiter := True;
+   slLine.QuoteChar := #0;
+   slFile := TStringList.Create();
+   slFile.StrictDelimiter := True;
+
+   // CSVヘッダー
+   slLine.Clear();
+   slLine.Add2('Callsign');
+   slLine.Add2('Portable');
+   slLine.Add2('Time');
+   slLine.Add2('Time End');
+   slLine.Add2('RST Sent');
+   slLine.Add2('RST Received');
+   slLine.Add2('Who Called');
+   slLine.Add2('Grid Zone');
+   slLine.Add2('My Callsign');
+   slLine.Add2('My QTH');
+   slLine.Add2('Other QTH');
+   slLine.Add2('Other Name');
+   slLine.Add2('Band');
+   slLine.Add2('Frequency');
+   slLine.Add2('Mode');
+   slLine.Add2('QSL Card');
+   slLine.Add2('QSL Way');
+   slLine.Add2('QSL Flag');
+   slLine.Add2('Rig Model');
+   slLine.Add2('Antenna');
+   slLine.Add2('TXPower');
+   slLine.Add2('Latitude');
+   slLine.Add2('Longitude');
+   slLine.Add2('JCC/JCG');
+   slLine.Add2('Altitude above sea level');
+   slLine.Add2('Weather');
+   slLine.Add2('Other Information');
+   slLine.Add2('QSL Comment');
+   slLine.Add2('NR Sent');
+   slLine.Add2('NR Received');
+   slLine.Add2('Contest Name');
+   slLine.Add2('Contest Points');
+   slFile.Add(slLine.DelimitedText);
+
+   try
+
+      offsetmin := FQsoList[0].RSTsent;
+      if offsetmin = _USEUTC then begin
+         offsethour := 0;
+      end
+      else begin
+         offsethour := offsetmin div 60;
+      end;
+
+      for i := 1 to FQSOList.Count - 1 do begin
+         Q := FQSOList[i];
+
+         slLine.Clear();
+
+         SplitCallsign(Q.Callsign, strCallsign, strPortable);
+
+         // 1 Callsign
+         slLine.Add2(strCallsign);
+
+         // 2 Portable
+         slLine.Add2(strPortable);
+
+         // 3 Time YYYY-MM-DD HH:MI:SS +0000(UTC)
+         if offsetmin <> _USEUTC then begin
+            qsotime := IncHour(Q.Time, offsethour);
+         end
+         else begin
+            qsotime := Q.Time;
+         end;
+         strTime := FormatDateTime('yyyy-mm-dd hh:nn:ss +0000', qsotime);
+         slLine.Add2(strTime);
+
+         // 4 Time End
+         slLine.Add2(strTime);
+
+         // 5 RST Sent
+         slLine.Add2(Q.RSTSentStr);
+
+         // 6 RST Received
+         slLine.Add2(Q.RSTRcvdStr);
+
+         // 7 Who Called
+         if Q.CQ = True then begin
+            slLine.Add2('you_called_me');
+         end
+         else begin
+            slLine.Add2('me_called_you');
+         end;
+
+         // 8 Grid Zone
+         slLine.Add2('');
+
+         // 9 My Callsign
+         slLine.Add2(dmZLogGlobal.MyCall);
+
+         // 10 My QTH
+         slLine.Add2('');
+
+         // 11 Other QTH
+         slLine.Add2('');
+
+         // 12 Other Name
+         slLine.Add2('');
+
+         // 13 Band
+         slLine.Add2('');
+
+         // 14 Frequency
+         slLine.Add2(Q.FreqStr3);
+
+         // 15 Mode
+         slLine.Add2(Q.ModeStr);
+
+         // 16 QSL Card
+         slLine.Add2(strQslState[Q.QslState]);
+
+         // 17 QSL Way
+         slLine.Add2('');
+
+         // 18 QSL Flag
+         slLine.Add2(strQslFlag[Q.QslState]);
+
+         // 19 Rig Model
+         slLine.Add2('');
+
+         // 20 Antenna
+         slLine.Add2('');
+
+         // 21 TXPower
+         slLine.Add2('');
+
+         // 22 Latitude
+         slLine.Add2(dmZLogGlobal.Settings._mylatitude);
+
+         // 23 Longitude
+         if dmZLogGlobal.Settings._mylongitude <> '' then begin
+            deg := StrToFloatDef(dmZLogGlobal.Settings._mylongitude, 0) * -1;
+            slLine.Add2(FloatToStr(deg));
+         end
+         else begin
+            slLine.Add2('');
+         end;
+
+         // 24 JCC/JGC
+         if (Pos('$Q', MyContest.SentStr) > 0) or
+            (Pos('$V', MyContest.SentStr) > 0) then begin
+            strMulti := MyContest.MultiForm.ExtractMulti(Q);
+         end
+         else begin
+            strMulti := '';
+         end;
+         slLine.Add2(strMulti);
+
+         // 25 Altitude above sea level
+         slLine.Add2('');
+
+         // 26 Weather
+         slLine.Add2('');
+
+         // 27 Other Information
+         slLine.Add2(Q.Memo);
+
+         // 28 QSL Comment
+         slLine.Add2('');
+
+         // 29 NR Sent
+         slLine.Add2(Q.NrSent);
+
+         // 30 NR Received
+         slLine.Add2(Q.NrRcvd);
+
+         // 31 Contest Name
+         slLine.Add2(FQsoList[0].Memo);
+
+         // 32 Contest Points
+         slLine.Add2(IntToStr(Q.Points));
+
+         slFile.Add(slLine.DelimitedText);
+      end;
+
+      slFile.SaveToFile(Filename, TEncoding.UTF8);
+   finally
+      slLine.Free();
+      slFile.Free();
+   end;
+end;
+
+procedure TLog.SaveToFileAsAdif(Filename: string);
+var
+   f: textfile;
+   Header, S, temp: string;
+   i: Integer;
+   Q: TQSO;
+   offsetmin: Integer;
+   dbl: double;
+
+   function AdifField(F, V: string): string;
+   begin
+      if F = '' then begin
+         Result := '';
+      end
+      else begin
+         Result := '<' + F + ':' + IntToStr(Length(V)) + '>' + V;
+      end;
+   end;
+begin
+   Header := 'ADIF export from zLog for Windows'; // +dmZlogGlobal.Settings._mycall;
+
+   AssignFile(f, filename);
+   Rewrite(f);
+
+   { str := 'zLog for Windows Text File'; }
+   WriteLn(f, Header);
+   WriteLn(f, 'All times in UTC');
+   WriteLn(f, '<eoh>');
+
+   offsetmin := Log.QsoList[0].RSTsent;
+   { if offsetmin = 0 then // default JST for older versions
+     offsetmin := -1*9*60; }
+   if offsetmin = _USEUTC then // already recorded in utc
+      offsetmin := 0;
+   dbl := offsetmin / (24 * 60);
+
+   for i := 1 to Log.TotalQSO do begin
+      Q := Log.QsoList[i];
+
+      S := AdifField('qso_date', FormatDateTime('yyyymmdd', Q.Time + dbl));
+      S := S + AdifField('time_on', FormatDateTime('hhnn', Q.Time + dbl));
+      S := S + AdifField('time_off', FormatDateTime('hhnn', Q.Time + dbl));
+
+      S := S + AdifField('call', Q.Callsign);
+
+      S := S + AdifField('rst_sent', IntToStr(Q.RSTsent));
+
+      if MyContest.SerialType = stNone then begin
+         S := S + AdifField('stx_string', Q.NrSent);
+      end
+      else begin
+         S := S + AdifField('stx', IntToStr(Q.Serial));
+      end;
+
+      S := S + AdifField('rst_rcvd', IntToStr(Q.RSTRcvd));
+
+      if MyContest.SerialType = stNone then begin
+         S := S + AdifField('srx_string', Q.NrRcvd);
+      end
+      else begin
+         S := S + AdifField('srx', Q.NrRcvd);
+      end;
+
+      S := S + AdifField(MyContest.ADIF_ExchangeRX_FieldName, MyContest.ADIF_ExchangeRX(Q));
+
+      temp := MyContest.ADIF_ExtraField(Q);
+      if temp <> '' then begin
+         S := S + AdifField(MyContest.ADIF_ExtraFieldName, temp);
+      end;
+
+      S := S + AdifField('band', ADIFBandString[Q.Band]);
+      S := S + AdifField('mode', ModeString[Q.mode]);
+
+      if Q.Operator <> '' then begin
+         S := S + AdifField('operator', Q.Operator);
+      end;
+
+      if Q.Memo <> '' then begin
+         S := S + AdifField('comment', Q.Memo);
+      end;
+
+      temp := Q.FreqStr2;
+      if temp <> '' then begin
+         S := S + AdifField('freq', temp);
+      end;
+
+      temp := MyContest.AdifContestId;
+      if temp <> '' then begin
+         S := S + AdifField('contest_id', temp);
+      end;
+
+      S := S + '<eor>';
+
+      WriteLn(f, S);
+   end;
+
+   CloseFile(f);
+end;
+
 {$ENDIF}
 
 procedure TLog.RebuildDupeCheckList;
@@ -3133,7 +3809,6 @@ end;
 
 function TLog.ObjectOf(qsoid: Integer): TQSO;
 var
-   i: Integer;
    aQSO: TQSO;
 begin
    if FQsoIdDic.TryGetValue(qsoid, aQSO) = True then begin
@@ -3298,13 +3973,16 @@ begin
    Result := TotalQSO;
 end;
 
-function TLog.LoadFromFilezLogCsv(Filename: string): Integer;
+{$IFNDEF ZSERVER}
+
+function TLog.LoadFromFileAszLogCsv(Filename: string): Integer;
 var
    i: Integer;
    Q: TQSO;
    offsetmin: Integer;
    slFile: TStringList;
    slLine: TStringList;
+   slText: TStringList;
    strMsg: string;
    qsoid: Integer;
    b: TBand;
@@ -3313,6 +3991,8 @@ begin
    slFile.StrictDelimiter := True;
    slLine := TStringList.Create();
    slLine.StrictDelimiter := True;
+   slText := TStringList.Create();
+   slText.StrictDelimiter := True;
    try
       if FileExists(Filename) = False then begin
          Result := 0;
@@ -3330,7 +4010,7 @@ begin
       try
          for i := 1 to slFile.Count - 1 do begin
             slLine.Clear();
-            slLine.CommaText := slFile.Strings[i] + DupeString(',', 32);
+            slLine.CommaText := slFile.Strings[i] + DupeString(',', 34);
 
             Q := TQSO.Create();
 
@@ -3399,7 +4079,10 @@ begin
             Q.Operator := slLine[17];
 
             // 19列目 memo
-            Q.Memo := slLine[18];
+            slText.Text := StringReplace(slLine[18], '\n', #13#10, [rfReplaceAll]);
+            if slText.Count > 0 then begin
+               Q.Memo := slText[0];
+            end;
 
             // 20列目 CQ
             Q.CQ := StrToBoolDef(slLine[19], False);
@@ -3440,6 +4123,11 @@ begin
             // 32列目 Invalid
             Q.Invalid := StrToBoolDef(slLine[31], False);
 
+            // 33列目 Area
+
+            // 34列目 RBN Verified
+            Q.RbnVerified := StrToBoolDef(slLine[33], False);
+
             // QSOIDが無ければ発番する
             if Q.Reserve3 = 0 then begin
                repeat
@@ -3479,6 +4167,235 @@ begin
    finally
       slFile.Free();
       slLine.Free();
+      slText.Free();
+   end;
+end;
+
+//
+// <qso_date:8>20250312<time_on:4>0253<time_off:4>0253<call:6>JR8PPG<rst_sent:3>599<stx_string:4>106H<rst_rcvd:3>599<srx_string:4>106M<band:3>40m<mode:2>CW<contest_id:11>JA_DOMESTIC<eor>
+//
+function TLog.LoadFromFileAsAdif(Filename: string): Integer;
+var
+   i: Integer;
+   Q: TQSO;
+   offsetmin: Integer;
+   qsoid: Integer;
+   b: TBand;
+   S: string;
+   dt: string;
+   tm: string;
+   adif: TAdifFile;
+   yy, mm, dd, hh, nn: Word;
+   m: TMode;
+   defrst: Integer;
+   h: Integer;
+
+   //
+   function GetMode(adifMode: string): TMode;
+   var
+      m: TMode;
+   begin
+      for m := mCW to mOther do begin
+         if ModeString[m] = adifMode then begin
+            Result := m;
+            Exit;
+         end;
+      end;
+      Result := mOther;
+   end;
+
+   //
+   function GetBand(adifBand: string): TBand;
+   var
+      b: TBand;
+   begin
+      for b := b19 to b10g do begin
+         if ADIFBandString[b] = adifBand then begin
+            Result := b;
+            Exit;
+         end;
+      end;
+      Result := bUnknown;
+   end;
+begin
+   adif := TAdifFile.Create();
+   try
+      if FileExists(Filename) = False then begin
+         Result := 0;
+         Exit;
+      end;
+
+      // ADIFのロード＆パース
+      adif.LoadFromFile(Filename);
+      adif.Parse();
+
+      // このコンテストのTimezone
+      offsetmin := Log.QsoList[0].RSTsent;
+      if offsetmin = _USEUTC then begin
+         h := 0;
+      end
+      else begin
+         h := Trunc(Abs(offsetmin / 60));
+      end;
+
+      for i := 0 to adif.Items.Count - 1 do begin
+
+         Q := TQSO.Create();
+
+         // 1列目　交信年月日（yyyymmdd）
+         // 2列目　交信時分（hhnn）
+         dt := adif.Items[i].Values['QSO_DATE'];
+         tm := adif.Items[i].Values['TIME_ON'];
+
+         yy := StrToIntDef(Copy(dt, 1, 4), 0);
+         mm := StrToIntDef(Copy(dt, 5, 2), 0);
+         dd := StrToIntDef(Copy(dt, 7, 8), 0);
+         hh := StrToIntDef(Copy(tm, 1, 2), 0);
+         nn := StrToIntDef(Copy(tm, 3, 2), 0);
+
+         Q.Time := EncodeDateTime(yy, mm, dd, hh, nn, 0, 0);
+
+         // JSTの場合は変換する
+         if h <> 0 then begin
+            Q.Time := IncHour(Q.Time, h);
+         end;
+
+         // モード
+         m := GetMode(adif.Items[i].Values['MODE']);
+
+         if (m = mSSB) or (m = mAM) or (m = mFM) then begin
+            defrst := 59;
+         end
+         else begin
+            defrst := 599;
+         end;
+
+         // コールサイン
+         Q.Callsign := adif.Items[i].Values['CALL'];
+
+         // 相手局へ送ったRST
+         Q.RSTSent := StrToIntDef(adif.Items[i].Values['RST_SENT'], defrst);
+
+         // 相手局へ送ったNumber
+         if MyContest.SerialType = stNone then begin
+            Q.NrSent := adif.Items[i].Values['STX_STRING'];
+         end
+         else begin
+            Q.Serial := StrToIntDef(adif.Items[i].Values['STX'], 0);
+         end;
+
+         // 相手局からもらったレポート
+         Q.RSTRcvd := StrToIntDef(adif.Items[i].Values['RST_RCVD'], defrst);
+
+         // 相手局からもらったNumber
+         S := MyContest.ADIF_ExchangeRX_FieldName;
+         if S = '' then begin
+            if MyContest.SerialType = stNone then begin
+               Q.NrRcvd := adif.Items[i].Values['SRX_STRING'];
+            end
+            else begin
+               Q.NrRcvd := adif.Items[i].Values['SRX'];
+            end;
+         end
+         else begin
+            Q.NrRcvd := adif.Items[i].Values[S];
+         end;
+
+         // Mode
+         Q.Mode := m;
+
+         // Band
+         Q.Band := GetBand(adif.Items[i].Values['BAND']);
+
+         // 12列目 Power 0:P 1:L 2:M 3:H
+         Q.Power := dmZLogGlobal.PowerOfBand[Q.Band];
+
+         // マルチ１
+         Q.Multi1 := '';
+
+         // マルチ２
+         Q.Multi2 := '';
+
+         // Newマルチ１
+         Q.NewMulti1 := False;
+
+         // Newマルチ２
+         Q.NewMulti2 := False;
+
+         // Points
+         Q.Points := 0;
+
+         // Operator
+         Q.Operator := adif.Items[i].Values['OPERATOR'];
+
+         // memo
+         Q.Memo := adif.Items[i].Values['COMMENT'];
+
+         // CQ
+         Q.CQ := False;
+
+         // Dupe
+         Q.Dupe := False;
+
+         // Reserve
+         Q.Reserve := 0;
+
+         // TX
+         Q.TX := dmZlogGlobal.TXNr;
+
+         // Power2
+         Q.Power2 := 0;
+
+         // Reserve2
+         Q.Reserve2 := 0;
+
+         // Reserve3
+         Q.Reserve3 := 0;
+
+         // 27列目 Freq
+         Q.Freq := adif.Items[i].Values['FREQ'];
+
+         // QsyViolation
+         Q.QsyViolation := False;
+
+         // PCName
+         Q.PCName := dmZLogGlobal.Settings._pcname;
+
+         // Forced
+         Q.Forced := False;
+
+         // QslState
+         Q.QslState := qsNone;
+
+         // Invalid
+         Q.Invalid := False;
+
+         // RBN Verified
+         Q.RbnVerified := False;
+
+         // QSOIDが無ければ発番する
+         if Q.Reserve3 = 0 then begin
+            repeat
+               qsoid := dmZLogGlobal.NewQSOID;
+            until CheckQSOID(qsoid) = False;
+            Q.Reserve3 := qsoid;
+         end;
+
+         Add(Q, True);
+      end;
+
+      // DUPEチェック用Indexをソート
+      for b := Low(FDupeCheckList) to High(FDupeCheckList) do begin
+         FDupeCheckList[b].Sort(soDupeCheck, FAcceptDifferentMode, FAllPhone);
+      end;
+
+      if Q <> nil then begin
+         GLOBALSERIAL := (Q.Reserve3 div 10000) mod 10000;
+      end;
+
+      Result := TotalQSO;
+   finally
+      adif.Free();
    end;
 end;
 
@@ -3496,7 +4413,8 @@ begin
       Q.Callsign := strCallsign;
       Q.Band := band;
 
-      if FDupeCheckList[band].DupeCheck(Q, FAcceptDifferentMode, FAllPhone) <> nil then begin
+      // BandScopeでは正しいモードがわからないためモード無しでのDupeCheckを行う
+      if FDupeCheckList[band].DupeCheck(Q, False {FAcceptDifferentMode}, FAllPhone) <> nil then begin
          Result := True;
       end
       else begin
@@ -3511,7 +4429,6 @@ begin
    end;
 end;
 
-{$IFNDEF ZSERVER}
 function TLog.IsOtherBandWorked(strCallsign: string; exclude_band: TBand; var workdmulti: string): Boolean;
 var
    Q: TQSO;
@@ -3532,7 +4449,7 @@ begin
          Q.Callsign := strCallsign;
          Q.Band := b;
 
-         R := FDupeCheckList[b].DupeCheck(Q, FAcceptDifferentMode, FAllPhone);
+         R := FDupeCheckList[b].DupeCheck(Q, False {FAcceptDifferentMode}, FAllPhone);
          if R <> nil then begin
             workdmulti := R.NrRcvd;
             Result := True;
@@ -3586,54 +4503,80 @@ var
    aQSO: TQSO;
    bQSO: TQSO;
    i: Integer;
-   Diff: Integer;
    basetime: TDateTime;
-
-   function FindThisTxQso(nStartIndex: Integer): Integer;
-   var
-      i: Integer;
-      aQSO: TQSO;
-   begin
-      for i := nStartIndex downto 1 do begin
-         aQSO := FQsoList[i];
-         if aQSO.TX = dmZLogGlobal.TXNr then begin
-            Result := i;
-            Exit;
-         end;
-      end;
-      Result := -1;
-   end;
+   dd, hh: Word;
+   dd2, hh2: Word;
+   fFound: Boolean;
+   offsetmin: Integer;
+   offsethour: Integer;
 begin
    if dmZlogGlobal.Settings._qsycount = False then begin
       Result := 0;
       Exit;
    end;
 
+   offsetmin := FQsoList[0].RSTsent;
+   if offsetmin = _USEUTC then begin
+      offsethour := 0;
+   end
+   else begin
+      offsethour := offsetmin div 60;
+   end;
+
    nQsyCount := 0;
 
-   // このzLogと同じQSOを探す
-   i := FindThisTxQso(nStartIndex);
-   if i = -1 then begin
-      Result := 0;
+   basetime := CurrentQSO.Time;
+   dd := DayOf(basetime);
+   hh := HourOf(basetime);
+
+   // その時間帯の最初のQSOを探す
+   fFound := False;
+   for i := nStartIndex downto 1 do begin
+      bQSO := FQsoList[i];
+
+      if offsetmin = _USEUTC then begin
+         bQSO.Time := IncHour(bQSO.Time, offsethour);
+      end;
+
+      dd2 := DayOf(bQSO.Time);
+      hh2 := HourOf(bQSO.Time);
+
+      if (dmZLogGlobal.TXNr = bQSO.TX) then begin
+         if (dd = dd2) and (hh = hh2) then begin
+            nStartIndex := i;
+            fFound := True;
+         end;
+
+         if ((dd <> dd2) or (hh <> hh2)) then begin
+            nStartIndex := i;
+            Break;
+         end;
+      end;
+   end;
+
+   // 同じ時間帯のQSOを発見できなかったらQSYなし
+   if fFound = False then begin
+      Result := nQsyCount;
       Exit;
    end;
 
-   nStartIndex := i;
-
+   // その時間帯最初のQSOの一つ前
    aQSO := FQsoList[nStartIndex];
-   basetime := aQSO.Time;
 
-   for i := nStartIndex - 1 downto 1 do begin
+   for i := nStartIndex + 1 to FQsoList.Count - 1 do begin
       bQSO := FQsoList[i];
-
-      // 時間差が1hourあるか
-      Diff := SecondsBetween(basetime, bQSO.Time);
-      if (Diff / 60) > 60 then begin
-         Break;
-      end;
 
       // TXが同じでバンドが違えばカウント
       if (dmZLogGlobal.TXNr = bQSO.TX) then begin
+         dd2 := DayOf(bQSO.Time);
+         hh2 := HourOf(bQSO.Time);
+
+         // 日又は時が変わったら終わり
+         if ((dd <> dd2) or (hh <> hh2)) then begin
+            Break;
+         end;
+
+         // 一つ前のQSOとバンドが違えばQSYとする
          if (aQSO.Band <> bQSO.Band) then begin
             Inc(nQsyCount);
          end;
@@ -3714,7 +4657,7 @@ end;
 function TLog.IsOutOfPeriod(Q: TQSO): Boolean;
 begin
    {$IFNDEF ZSERVER}
-   if dmZLogGlobal.Settings._use_contest_period = False then begin
+   if MyContest.UseContestPeriod = False then begin
       Result := False;
       Exit;
    end;
@@ -3738,6 +4681,21 @@ begin
    end;
 end;
 
+procedure TLog.Renumber();
+var
+   i: Integer;
+   Q: TQSO;
+   qsoid: Integer;
+begin
+   for i := 1 to FQsoList.Count - 1 do begin
+      Q := FQsoList[i];
+
+      repeat
+         qsoid := dmZLogGlobal.NewQSOID;
+      until CheckQSOID(qsoid) = False;
+      Q.Reserve3 := qsoid;
+   end;
+end;
 
 { TQSOCallsignComparer }
 

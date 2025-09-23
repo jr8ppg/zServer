@@ -217,6 +217,8 @@
             <Form>formOptions</Form>
             <FormType>dfm</FormType>
         </DCCReference>
+        <DCCReference Include="HelperLib.pas"/>
+        <DCCReference Include="UzLogAdif.pas"/>
         <None Include="resource\ACAG.DAT"/>
         <None Include="resource\ARDX.DAT"/>
         <None Include="resource\ARRL10.DAT"/>
