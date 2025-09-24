@@ -502,7 +502,7 @@ begin
 
          from := StrToIntDef(TrimRight(copy(S, 1, 3)), -1) - 1;
          if from < 0 then begin
-            Exit;
+            Continue;
          end;
 
          Delete(S, 1, 4);
@@ -516,12 +516,12 @@ begin
 
          if Pos('GETCONSOLE', UpperCase(temp)) = 1 then begin
             Process_GetConsole();
-            Exit;
+            Continue;
          end;
 
          if Pos('SENDRENEW', temp) = 1 then begin
             Process_SendRenew();
-            Exit;
+            Continue;
          end;
 
          {
@@ -533,31 +533,31 @@ begin
 
          if Pos('WHO', UpperCase(temp)) = 1 then begin
             Process_Who();
-            Exit;
+            Continue;
          end;
 
          if Pos('OPERATOR', temp) = 1 then begin
             Process_Operator(temp, from);
-            Exit;
+            Continue;
          end;
 
          if Pos('BAND ', temp) = 1 then begin
             Process_Band(temp, from);
-            Exit;
+            Continue;
          end;
 
          if Pos('PCNAME', temp) = 1 then begin
             Process_PcName(temp, from);
-            Exit;
+            Continue;
          end;
 
          if Pos('RESET', temp) = 1 then begin
-            Exit;
+            Continue;
          end;
 
          if Pos('ENDLOG', temp) = 1 then // received when zLog finishes uploading
          begin
-            Exit;
+            Continue;
          end;
 
          if Pos('PUTMESSAGE', temp) = 1 then begin
@@ -570,23 +570,23 @@ begin
          if Pos('SENDLOG', temp) = 1 then // will send all qsos in server's log and renew command
          begin
             Process_SendLog();
-            Exit;
+            Continue;
          end;
 
          if Pos('GETQSOIDS', temp) = 1 then // will send all qso ids in server's log
          begin
             Process_GetQsoIDs();
-            Exit;
+            Continue;
          end;
 
          if Pos('GETLOGQSOID', temp) = 1 then // will send all qso ids in server's log
          begin
             Process_GetLogQsoID(temp);
-            Exit;
+            Continue;
          end;
 
          if Pos('SENDCURRENT', temp) = 1 then begin
-            Exit;
+            Continue;
          end;
 
          if Pos('PUTQSO', temp) = 1 then begin
@@ -606,7 +606,7 @@ begin
          end;
 
          if Pos('EDITQSOFROM', temp) = 1 then begin
-            Exit;
+            Continue;
          end;
 
          if Pos('EDITQSOTO ', temp) = 1 then begin
@@ -614,7 +614,7 @@ begin
          end;
 
          if Pos('INSQSOAT ', temp) = 1 then begin
-            Exit;
+            Continue;
          end;
 
          if Pos('RENEW', temp) = 1 then begin
@@ -631,7 +631,7 @@ begin
                if i >= 3000 then begin       // 30sec待つ
                   S := ZLinkHeader + ' BEGINMERGE-NG';
                   SendStr(S + LBCODE);
-                  Exit;
+                  Continue;
                end;
 
                if (i mod 50) = 0 then begin  // 0.5secに１度メッセージ出力
@@ -647,14 +647,14 @@ begin
 
             S := ZLinkHeader + ' BEGINMERGE-OK';
             SendStr(S + LBCODE);
-            Exit;
+            Continue;
          end;
 
          if Pos('ENDMERGE', temp) = 1 then begin
             FClientForm.AddConsole('*** マージ処理を終了しました ***');
             FInMergeProc := False;
             MasterLogLock.Release();
-            Exit;
+            Continue;
          end;
 
          if Pos('GETFILE', temp) = 1 then begin
