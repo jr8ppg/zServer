@@ -35,6 +35,7 @@ object ServerForm: TServerForm
     ImeName = 'MS-IME97 '#26085#26412#35486#20837#21147#65404#65405#65411#65425
     ItemHeight = 12
     ParentFont = False
+    PopupMenu = PopupMenu1
     TabOrder = 0
   end
   object Panel1: TPanel
@@ -69,14 +70,14 @@ object ServerForm: TServerForm
       TabOrder = 0
       OnClick = Button2Click
     end
-    object CheckBox2: TCheckBox
+    object checkMonitorChatOnly: TCheckBox
       Left = 6
       Top = 7
       Width = 113
       Height = 17
       Caption = 'Monitor chat only'
       TabOrder = 1
-      OnClick = CheckBox2Click
+      OnClick = checkMonitorChatOnlyClick
     end
   end
   object Panel2: TPanel
@@ -310,5 +311,15 @@ object ServerForm: TServerForm
     Left = 32
     Top = 64
     Banner = ''
+  end
+  object PopupMenu1: TPopupMenu
+    AutoHotkeys = maManual
+    AutoLineReduction = maManual
+    Left = 184
+    Top = 144
+    object menuSaveToFile: TMenuItem
+      Caption = #12486#12461#12473#12488#12501#12449#12452#12523#12395#20445#23384
+      OnClick = menuSaveToFileClick
+    end
   end
 end

@@ -9,7 +9,7 @@ uses
   Generics.Collections, Generics.Defaults, System.NetEncoding,
   OverbyteIcsWndControl, OverbyteIcsWSocket, OverbyteIcsTypes, OverbyteIcsWSocketS,
   OverbyteIcsSslBase, OverbyteIcsSslSessionCache,
-  UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages;
+  UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages, HelperLib, Vcl.Menus;
 
 const
   LBCODE = #13#10;
@@ -25,6 +25,9 @@ type
     Panel2: TPanel;
     DisconnectButton: TButton;
     ListBox: TListBox;
+    Timer1: TTimer;
+    PopupMenu1: TPopupMenu;
+    menuSaveToFile: TMenuItem;
     procedure CreateParams(var Params: TCreateParams); override;
     procedure FormCreate(Sender: TObject);
     procedure FormShow(Sender: TObject);
@@ -33,6 +36,8 @@ type
     procedure SendButtonClick(Sender: TObject);
     procedure DisconnectButtonClick(Sender: TObject);
     procedure ClientThreadTerminate(Sender: TObject);
+    procedure Timer1Timer(Sender: TObject);
+    procedure menuSaveToFileClick(Sender: TObject);
   private
     FInitialized : Boolean;
     FClientSocket: TWSocketClient;
@@ -206,6 +211,14 @@ begin
    FClientThread.Close();
 end;
 
+procedure TCliForm.menuSaveToFileClick(Sender: TObject);
+var
+   fname: string;
+begin
+   fname := ChangeFileExt(Application.ExeName, '') + '_cf' + IntToStr(FClientNumber) +'.txt';
+   ListBox.Items.SaveToFile(fname);
+end;
+
 procedure TCliForm.ClientThreadTerminate(Sender: TObject);
 begin
    //
@@ -214,17 +227,11 @@ end;
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
 procedure TCliForm.AddConsole(S: string);
-var
-   _VisRows: Integer;
-   _TopRow: Integer;
 begin
+   ListBox.Items.BeginUpdate();
    ListBox.Items.Add(S);
-   _VisRows := ListBox.ClientHeight div ListBox.ItemHeight;
-   _TopRow := ListBox.Items.Count - _VisRows + 1;
-   if _TopRow > 0 then
-      ListBox.TopIndex := _TopRow
-   else
-      ListBox.TopIndex := 0;
+   ListBox.Items.EndUpdate();
+   ListBox.ShowLast();
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -315,6 +322,21 @@ procedure TCliForm.SetTakeLog(v: Boolean);
 begin
    FTakeLog := v;
    FClientThread.TakeLog := v;
+end;
+
+procedure TCliForm.Timer1Timer(Sender: TObject);
+begin
+   Timer1.Enabled := False;
+   try
+      ListBox.Items.BeginUpdate();
+      while ListBox.Items.Count > LISTMAXLINES do begin
+         ListBox.Items.Delete(0);
+      end;
+      ListBox.Items.EndUpdate();
+      ListBox.ShowLast();
+   finally
+      Timer1.Enabled := True;
+   end;
 end;
 
 procedure TCliForm.SendStr(S: string);

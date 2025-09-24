@@ -21,16 +21,20 @@ unit UServerForm;
 interface
 
 uses
-  Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms,
-  Dialogs, StdCtrls, IniFiles, Menus, ExtCtrls, System.UITypes,
-  OverbyteIcsWndControl, OverbyteIcsWSocket, OverbyteIcsUtils, System.SyncObjs,
+  WinApi.Windows, WinApi.Messages, System.SysUtils, System.Classes,
+  Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Buttons,
+  Vcl.Dialogs, Vcl.StdCtrls, System.IniFiles, Vcl.Menus, Vcl.ExtCtrls,
+  System.UITypes, System.SyncObjs,
   System.Generics.Collections, System.Generics.Defaults,
+  JclFileUtils,
+  OverbyteIcsWndControl, OverbyteIcsWSocket, OverbyteIcsUtils,
+  OverbyteIcsTypes, OverbyteIcsSslBase, OverbyteIcsWSocketS,
   UBasicStats, UBasicMultiForm, UCliForm, UFreqList, UConnections, UOptions,
-  UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages, JclFileUtils, Vcl.Buttons,
-  OverbyteIcsTypes, OverbyteIcsSslBase, OverbyteIcsWSocketS;
+  UzLogGlobal, UzLogConst, UzLogQSO, UzLogMessages, HelperLib;
 
 const
   IniFileName = 'ZServer.ini';
+  LISTMAXLINES = 1000;
 
 type
   TServerForm = class(TForm)
@@ -50,7 +54,7 @@ type
     Windows1: TMenuItem;
     ScoreandStatistics1: TMenuItem;
     Multipliers1: TMenuItem;
-    CheckBox2: TCheckBox;
+    checkMonitorChatOnly: TCheckBox;
     SendEdit: TEdit;
     SaveDialog: TSaveDialog;
     Save1: TMenuItem;
@@ -72,6 +76,8 @@ type
     SrvSocket: TSslWSocketServer;
     N4: TMenuItem;
     menuOptions: TMenuItem;
+    PopupMenu1: TPopupMenu;
+    menuSaveToFile: TMenuItem;
     //procedure CreateParams(var Params: TCreateParams); override;
     procedure FormShow(Sender: TObject);
     procedure SrvSocketClientConnect(Sender: TObject; Client: TWSocketClient; Error: Word);
@@ -83,7 +89,7 @@ type
     procedure Timer1Timer(Sender: TObject);
     procedure ScoreandStatistics1Click(Sender: TObject);
     procedure Multipliers1Click(Sender: TObject);
-    procedure CheckBox2Click(Sender: TObject);
+    procedure checkMonitorChatOnlyClick(Sender: TObject);
     procedure SendEditKeyPress(Sender: TObject; var Key: Char);
     procedure Save1Click(Sender: TObject);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
@@ -104,6 +110,7 @@ type
     procedure buttonMergeLockClick(Sender: TObject);
     procedure File1Click(Sender: TObject);
     procedure menuOptionsClick(Sender: TObject);
+    procedure menuSaveToFileClick(Sender: TObject);
   private
     { Declarations privates }
     FInitialized  : Boolean;
@@ -216,10 +223,6 @@ begin
    SrvSslContext.SslPrivKeyLines := SL;
    SL.Free();
 
-//   SrvSslContext.SslCertFile := 'server.crt';
-//   SrvSslContext.SslPrivKeyFile := 'server.key';
-
-   ChatOnly := True;
    FClientNumber := 0;
    FCurrentFileName := '';
    FLastPath := '';
@@ -230,7 +233,7 @@ begin
    FConnections := TConnections.Create(Self);
 
    RestoreWindowsPos();
-   CheckBox2.Checked := ChatOnly;
+   checkMonitorChatOnly.Checked := ChatOnly;
 
    Application.OnIdle := IdleEvent;
 
@@ -373,26 +376,23 @@ begin
 end;
 
 procedure TServerForm.AddConsole(S: string);
-var
-   _VisRows: Integer;
-   _TopRow: Integer;
 begin
+   ClientListBox.Items.BeginUpdate();
    ClientListBox.Items.Add(S);
-   _VisRows := ClientListBox.ClientHeight div ClientListBox.ItemHeight;
-   _TopRow := ClientListBox.Items.Count - _VisRows + 1;
-   if _TopRow > 0 then
-      ClientListBox.TopIndex := _TopRow
-   else
-      ClientListBox.TopIndex := 0;
+   ClientListBox.Items.EndUpdate();
+   ClientListBox.ShowLast();
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
 procedure TServerForm.IdleEvent(Sender: TObject; var Done: Boolean);
 begin
-   while ClientListBox.Items.Count > 400 do begin
+   ClientListBox.Items.BeginUpdate();
+   while ClientListBox.Items.Count > LISTMAXLINES do begin
       ClientListBox.Items.Delete(0);
    end;
+   ClientListBox.Items.EndUpdate();
+   ClientListBox.ShowLast();
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -429,7 +429,7 @@ var
    S: string;
    t: string;
 begin
-   t := FormatDateTime('hh:nn', SysUtils.Now);
+   t := FormatDateTime('hh:nn', Now);
    S := t + ' SrvSocketError';
    AddToChatLog(S);
 end;
@@ -439,7 +439,7 @@ var
    S: string;
    t: string;
 begin
-   t := FormatDateTime('hh:nn', SysUtils.Now);
+   t := FormatDateTime('hh:nn', Now);
    S := t + ' [' + SocExcept.IPStr + '] ' + IntToStr(SocExcept.ErrorCode) + ':' + SocExcept.ErrorMessage;
    AddToChatLog(S);
 end;
@@ -466,7 +466,7 @@ var
    S: string;
    t: string;
 begin
-   t := FormatDateTime('hh:nn', SysUtils.Now);
+   t := FormatDateTime('hh:nn', Now);
    S := t + IntToStr(Error) + ':' + Msg;
    AddToChatLog(S);
 end;
@@ -527,7 +527,7 @@ var
    aQSO: TQSO;
    t: string;
 begin
-   t := FormatDateTime('hh:nn', SysUtils.Now);
+   t := FormatDateTime('hh:nn', Now);
    from := msg.WParam;
    aQSO := TQSO(msg.LParam);
 
@@ -550,7 +550,7 @@ var
    aQSO: TQSO;
    t: string;
 begin
-   t := FormatDateTime('hh:nn', SysUtils.Now);
+   t := FormatDateTime('hh:nn', Now);
    from := msg.WParam;
    aQSO := TQSO(msg.LParam);
 
@@ -817,7 +817,7 @@ procedure TServerForm.SendButtonClick(Sender: TObject);
 var
    t, S: string;
 begin
-   t := FormatDateTime('hh:nn', SysUtils.Now);
+   t := FormatDateTime('hh:nn', Now);
    S := t + '  ZServer> ' + SendEdit.Text;
 
    // SendALL(ZLinkHeader + ' PUTMESSAGE '+'ZServer> '+SendEdit.Text + LBCODE);
@@ -850,9 +850,12 @@ procedure TServerForm.Timer1Timer(Sender: TObject);
 begin
    Timer1.Enabled := False;
    try
-      while ClientListBox.Items.Count > 400 do begin
+      ClientListBox.Items.BeginUpdate();
+      while ClientListBox.Items.Count > LISTMAXLINES do begin
          ClientListBox.Items.Delete(0);
       end;
+      ClientListBox.Items.EndUpdate();
+      ClientListBox.ShowLast();
    finally
       Timer1.Enabled := True;
    end;
@@ -875,9 +878,9 @@ begin
    end;
 end;
 
-procedure TServerForm.CheckBox2Click(Sender: TObject);
+procedure TServerForm.checkMonitorChatOnlyClick(Sender: TObject);
 begin
-   ChatOnly := CheckBox2.Checked;
+   ChatOnly := checkMonitorChatOnly.Checked;
 end;
 
 procedure TServerForm.SendEditKeyPress(Sender: TObject; var Key: Char);
@@ -1015,6 +1018,14 @@ begin
       StartServer();
       f.Release();
    end;
+end;
+
+procedure TServerForm.menuSaveToFileClick(Sender: TObject);
+var
+   fname: string;
+begin
+   fname := ChangeFileExt(Application.ExeName, '') + '_sf.txt';
+   ClientListBox.Items.SaveToFile(fname);
 end;
 
 procedure TServerForm.ApplyTakeCommandLog();

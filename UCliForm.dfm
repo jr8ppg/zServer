@@ -83,6 +83,22 @@ object CliForm: TCliForm
     ImeName = 'MS-IME97 '#26085#26412#35486#20837#21147#65404#65405#65411#65425
     ItemHeight = 12
     ParentFont = False
+    PopupMenu = PopupMenu1
     TabOrder = 2
+  end
+  object Timer1: TTimer
+    OnTimer = Timer1Timer
+    Left = 224
+    Top = 80
+  end
+  object PopupMenu1: TPopupMenu
+    AutoHotkeys = maManual
+    AutoLineReduction = maManual
+    Left = 168
+    Top = 62
+    object menuSaveToFile: TMenuItem
+      Caption = #12486#12461#12473#12488#12501#12449#12452#12523#12395#20445#23384
+      OnClick = menuSaveToFileClick
+    end
   end
 end
