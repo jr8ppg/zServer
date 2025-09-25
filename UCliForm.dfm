@@ -13,6 +13,7 @@ object CliForm: TCliForm
   Font.Name = #65325#65331' '#65328#12468#12471#12483#12463
   Font.Style = []
   OnClose = FormClose
+  OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
   OnShow = FormShow
   TextHeight = 12
@@ -24,8 +25,6 @@ object CliForm: TCliForm
     Align = alBottom
     BevelOuter = bvNone
     TabOrder = 0
-    ExplicitTop = 131
-    ExplicitWidth = 344
     DesignSize = (
       348
       30)
@@ -39,7 +38,6 @@ object CliForm: TCliForm
       ImeName = 'MS-IME97 '#26085#26412#35486#20837#21147#65404#65405#65411#65425
       TabOrder = 0
       Text = 'SendEdit'
-      ExplicitWidth = 264
     end
     object SendButton: TButton
       Left = 279
@@ -51,7 +49,6 @@ object CliForm: TCliForm
       Default = True
       TabOrder = 1
       OnClick = SendButtonClick
-      ExplicitLeft = 275
     end
   end
   object Panel2: TPanel
@@ -62,7 +59,6 @@ object CliForm: TCliForm
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 1
-    ExplicitWidth = 344
     object DisconnectButton: TButton
       Left = 6
       Top = 4
@@ -87,6 +83,22 @@ object CliForm: TCliForm
     ImeName = 'MS-IME97 '#26085#26412#35486#20837#21147#65404#65405#65411#65425
     ItemHeight = 12
     ParentFont = False
+    PopupMenu = PopupMenu1
     TabOrder = 2
+  end
+  object Timer1: TTimer
+    OnTimer = Timer1Timer
+    Left = 224
+    Top = 80
+  end
+  object PopupMenu1: TPopupMenu
+    AutoHotkeys = maManual
+    AutoLineReduction = maManual
+    Left = 168
+    Top = 62
+    object menuSaveToFile: TMenuItem
+      Caption = #12486#12461#12473#12488#12501#12449#12452#12523#12395#20445#23384
+      OnClick = menuSaveToFileClick
+    end
   end
 end

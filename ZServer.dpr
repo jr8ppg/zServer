@@ -30,7 +30,10 @@ uses
   UMultipliers in 'UMultipliers.pas',
   UALLJAStats in 'UALLJAStats.pas' {AllJAStats},
   UzLogExtension in 'UzLogExtension.pas',
-  UzLogMessages in 'UzLogMessages.pas';
+  UzLogMessages in 'UzLogMessages.pas',
+  UOptions in 'UOptions.pas' {formOptions},
+  HelperLib in 'HelperLib.pas',
+  UzLogAdif in 'UzLogAdif.pas';
 
 {$R *.RES}
 
