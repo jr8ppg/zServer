@@ -457,6 +457,7 @@ begin
    Form.Secure := FSecure;
    Form.LoginUser := FLoginUser;
    Form.LoginPass := FLoginPass;
+   Form.TakeLog := FTakeCommandLog;
    Form.Show;
    FClientList.Add(Form);
 end;

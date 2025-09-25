@@ -240,7 +240,9 @@ procedure TCliForm.SetCaption;
 var
    S: string;
 begin
-   S := BandString[FCurrentBand];
+   S := '[' + IntToStr(FClientNumber) + '] ';
+
+   S := S + BandString[FCurrentBand];
 
    if FCurrentOperator <> '' then begin
       S := S + ' by ' + FCurrentOperator;
@@ -321,7 +323,9 @@ end;
 procedure TCliForm.SetTakeLog(v: Boolean);
 begin
    FTakeLog := v;
-   FClientThread.TakeLog := v;
+   if FClientThread <> nil then begin
+      FClientThread.TakeLog := v;
+   end;
 end;
 
 procedure TCliForm.Timer1Timer(Sender: TObject);
@@ -388,7 +392,8 @@ end;
 
 procedure TClientThread.Execute();
 begin
-   FCommandLogFileName := StringReplace(Application.ExeName, '.exe', '_#' + IntToHex(Integer(Self), 8) + '_' + FormatDateTime('yyyymmdd', Now) + '.txt', [rfReplaceAll]);
+//   FCommandLogFileName := StringReplace(Application.ExeName, '.exe', '_#' + IntToHex(Integer(Self), 8) + '_' + FormatDateTime('yyyymmdd', Now) + '.txt', [rfReplaceAll]);
+   FCommandLogFileName := StringReplace(Application.ExeName, '.exe', '_cf' + IntToStr(FClientNumber) + '_' + FormatDateTime('yyyymmdd', Now) + '.txt', [rfReplaceAll]);
 
    FClientSocket.LineEnd         := #13#10;
    FClientSocket.OnDataAvailable := ServerWSocketDataAvailable;
