@@ -1073,7 +1073,7 @@ begin
       FLastPath := IncludeTrailingPathDelimiter(FLastPath);
 
       FPortNumber := IniFile.ReadString('Server', 'Port', 'telnet');
-      FSecure := IniFile.ReadBool('Server', 'Secure', True);
+      FSecure := IniFile.ReadBool('Server', 'Secure', False);
       FLoginUser := IniFile.ReadString('Login', 'User', 'zloguser');
       FLoginPass := IniFile.ReadString('Login', 'Password', '');
       FTakeChatLog := IniFile.ReadBool('Options', 'TakeChatLog', True);
