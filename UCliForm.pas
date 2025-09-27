@@ -94,6 +94,7 @@ type
     FSecure: Boolean;
     FLoginUser: string;
     FLoginPass: string;
+    procedure SendConnectedMessage();
     procedure ServerWSocketDataAvailable(Sender: TObject; Error: Word);
     procedure ServerWSocketSessionClosed(Sender: TObject; Error: Word);
     procedure CliSocketError(Sender: TObject);
@@ -414,6 +415,7 @@ begin
    end
    else begin
       FLoginStep := lsLogined;
+      SendConnectedMessage();
    end;
 
    { Message loop to handle TWSocket messages                              }
@@ -428,17 +430,39 @@ begin
    end;
 end;
 
+procedure TClientThread.SendConnectedMessage();
+var
+   S: string;
+   param_atom: ATOM;
+   t: string;
+   addr: string;
+begin
+   addr := FClientSocket.GetPeerAddr();
+
+   t := FormatDateTime('hh:nn', Now);
+   S := t + ' ' + FillRight(IntToStr(FClientNumber), 3) + ' New client(' + addr + ') connected to network.';
+
+   param_atom := AddAtom(PChar(S));
+   SendMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, FClientNumber, MAKELPARAM(param_atom,0));
+
+   param_atom := AddAtom(PChar(S + LBCODE));
+   SendMessage(ServerForm.Handle, WM_ZCMD_SENDALL, FClientNumber, MAKELPARAM(param_atom,0));
+end;
+
 procedure TClientThread.ServerWSocketSessionClosed(Sender: TObject; Error: Word);
 var
    S: string;
    param_atom: ATOM;
    t: string;
+   addr: string;
 begin
    FInputLoginUser := '';
    FLoginStep := lsNone;
 
+   addr := FClientSocket.GetPeerAddr();
+
    t := FormatDateTime('hh:nn', Now);
-   S := t + ' ' + FillRight(IntToStr(FClientNumber), 3) + ' ' + MHzString[FCurrentBand] + ' client disconnected from network.';
+   S := t + ' ' + FillRight(IntToStr(FClientNumber), 3) + ' ' + BandString[FCurrentBand] + ' client(' + addr + ') disconnected from network.';
 
    param_atom := AddAtom(PChar(S));
    SendMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, FClientNumber, MAKELPARAM(param_atom,0));
@@ -476,6 +500,7 @@ begin
             FClientForm.AddConsole('***ÉçÉOÉCÉìOK***');
             FClientSocket.SendStr('OK' + #13#10);
             FLoginStep := lsLogined;
+            SendConnectedMessage();
          end
          else begin
             FClientSocket.SendStr('Password:');
@@ -786,6 +811,7 @@ begin
 
    B := TBand(i);
 
+   FCurrentBand := B;
    FClientForm.CurrentBand := B;
 
    PostMessage(ServerForm.Handle, WM_ZCMD_UPDATE_DISPLAY, from, 0);
