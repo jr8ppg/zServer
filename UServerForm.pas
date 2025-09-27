@@ -162,6 +162,7 @@ type
     procedure SendAll(str : string);
     procedure ApplyTakeCommandLog();
     procedure SetCaption();
+    procedure UpdateClientNumber();
   public
     ChatOnly : boolean;
 
@@ -447,6 +448,7 @@ end;
 procedure TServerForm.SrvSocketClientConnect(Sender: TObject; Client: TWSocketClient; Error: Word);
 var
    Form: TCliForm;
+   i: Integer;
 begin
    FClientNumber := FClientList.Count + 1;
 
@@ -460,6 +462,9 @@ begin
    Form.TakeLog := FTakeCommandLog;
    Form.Show;
    FClientList.Add(Form);
+
+   // リナンバー
+   UpdateClientNumber();
 end;
 
 procedure TServerForm.SrvSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
@@ -491,9 +496,7 @@ begin
    end;
 
    // リナンバー
-   for i := 0 to FClientList.Count - 1 do begin
-      FClientList[i].ClientNumber := i + 1;
-   end;
+   UpdateClientNumber();
 
    // コネクションリストを更新
    FConnections.UpdateDisplay();
@@ -1231,6 +1234,16 @@ begin
    end;
 
    Caption := S;
+end;
+
+procedure TServerForm.UpdateClientNumber();
+var
+   i: Integer;
+begin
+   // リナンバー
+   for i := 0 to FClientList.Count - 1 do begin
+      FClientList[i].ClientNumber := i + 1;
+   end;
 end;
 
 initialization

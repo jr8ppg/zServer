@@ -318,6 +318,7 @@ begin
    if FClientThread <> nil then begin
       FCLientThread.ClientNumber := v;
    end;
+   SetCaption();
 end;
 
 procedure TCliForm.SetTakeLog(v: Boolean);
