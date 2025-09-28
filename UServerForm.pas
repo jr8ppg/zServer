@@ -213,6 +213,10 @@ var
 begin
    FClientList := TList<TCliForm>.Create();
 
+   FClientNumber := 0;
+   FCurrentFileName := '';
+   FLastPath := '';
+
    LoadSettings();
 
    // SSLコンテキストパラメータセット
@@ -223,10 +227,6 @@ begin
    SL := LoadFromResourceName(SysInit.HInstance, 'SERVER_KEY');
    SrvSslContext.SslPrivKeyLines := SL;
    SL.Free();
-
-   FClientNumber := 0;
-   FCurrentFileName := '';
-   FLastPath := '';
 
    SetCaption();
 
