@@ -1174,12 +1174,14 @@ begin
    if FClientSocket.State <> wsConnected then begin
       Exit;
    end;
+   if FLoginStep <> lsLogined then begin
+      Exit;
+   end;
 
    FClientSocket.SendStr(str);
 
    AddToCommandLog('S', str);
 end;
-
 
 procedure TClientThread.AddServerConsole(S: string);
 var
