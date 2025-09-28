@@ -388,12 +388,14 @@ end;
 
 procedure TServerForm.IdleEvent(Sender: TObject; var Done: Boolean);
 begin
-   ClientListBox.Items.BeginUpdate();
-   while ClientListBox.Items.Count > LISTMAXLINES do begin
-      ClientListBox.Items.Delete(0);
+   if ClientListBox.Items.Count > LISTMAXLINES then begin
+      ClientListBox.Items.BeginUpdate();
+      while ClientListBox.Items.Count > LISTMAXLINES do begin
+         ClientListBox.Items.Delete(0);
+      end;
+      ClientListBox.Items.EndUpdate();
+      ClientListBox.ShowLast();
    end;
-   ClientListBox.Items.EndUpdate();
-   ClientListBox.ShowLast();
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -854,12 +856,14 @@ procedure TServerForm.Timer1Timer(Sender: TObject);
 begin
    Timer1.Enabled := False;
    try
-      ClientListBox.Items.BeginUpdate();
-      while ClientListBox.Items.Count > LISTMAXLINES do begin
-         ClientListBox.Items.Delete(0);
+      if ClientListBox.Items.Count > LISTMAXLINES then begin
+         ClientListBox.Items.BeginUpdate();
+         while ClientListBox.Items.Count > LISTMAXLINES do begin
+            ClientListBox.Items.Delete(0);
+         end;
+         ClientListBox.Items.EndUpdate();
+         ClientListBox.ShowLast();
       end;
-      ClientListBox.Items.EndUpdate();
-      ClientListBox.ShowLast();
    finally
       Timer1.Enabled := True;
    end;

@@ -94,7 +94,9 @@ type
     FSecure: Boolean;
     FLoginUser: string;
     FLoginPass: string;
+    procedure BroadcastMessage(S: string);
     procedure SendConnectedMessage();
+    procedure SendSetBandMessage(new_band: TBand);
     procedure ServerWSocketDataAvailable(Sender: TObject; Error: Word);
     procedure ServerWSocketSessionClosed(Sender: TObject; Error: Word);
     procedure CliSocketError(Sender: TObject);
@@ -334,12 +336,14 @@ procedure TCliForm.Timer1Timer(Sender: TObject);
 begin
    Timer1.Enabled := False;
    try
-      ListBox.Items.BeginUpdate();
-      while ListBox.Items.Count > LISTMAXLINES do begin
-         ListBox.Items.Delete(0);
+      if ListBox.Items.Count > LISTMAXLINES then begin
+         ListBox.Items.BeginUpdate();
+         while ListBox.Items.Count > LISTMAXLINES do begin
+            ListBox.Items.Delete(0);
+         end;
+         ListBox.Items.EndUpdate();
+         ListBox.ShowLast();
       end;
-      ListBox.Items.EndUpdate();
-      ListBox.ShowLast();
    finally
       Timer1.Enabled := True;
    end;
@@ -430,17 +434,13 @@ begin
    end;
 end;
 
-procedure TClientThread.SendConnectedMessage();
+procedure TClientThread.BroadcastMessage(S: string);
 var
-   S: string;
-   param_atom: ATOM;
    t: string;
-   addr: string;
+   param_atom: ATOM;
 begin
-   addr := FClientSocket.GetPeerAddr();
-
    t := FormatDateTime('hh:nn', Now);
-   S := t + ' ' + FillRight(IntToStr(FClientNumber), 3) + ' New client(' + addr + ') connected to network.';
+   S := t + ' ' + FillRight(IntToStr(FClientNumber), 3) + ' ' + S;
 
    param_atom := AddAtom(PChar(S));
    SendMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, FClientNumber, MAKELPARAM(param_atom,0));
@@ -449,26 +449,37 @@ begin
    SendMessage(ServerForm.Handle, WM_ZCMD_SENDALL, FClientNumber, MAKELPARAM(param_atom,0));
 end;
 
+procedure TClientThread.SendConnectedMessage();
+var
+   S: string;
+   addr: string;
+begin
+   addr := FClientSocket.GetPeerAddr();
+   S := 'New client #' + IntToStr(FClientNumber) + '(' + addr + ') connected to network.';
+   BroadcastMessage(S);
+end;
+
+procedure TClientThread.SendSetBandMessage(new_band: TBand);
+var
+   S: string;
+   addr: string;
+begin
+   addr := FClientSocket.GetPeerAddr();
+   S := 'client #' + IntToStr(FClientNumber) + '(' + addr + ') set to ' + BandString[new_band] + '.';
+   BroadcastMessage(S);
+end;
+
 procedure TClientThread.ServerWSocketSessionClosed(Sender: TObject; Error: Word);
 var
    S: string;
-   param_atom: ATOM;
-   t: string;
    addr: string;
 begin
    FInputLoginUser := '';
    FLoginStep := lsNone;
 
    addr := FClientSocket.GetPeerAddr();
-
-   t := FormatDateTime('hh:nn', Now);
-   S := t + ' ' + FillRight(IntToStr(FClientNumber), 3) + ' ' + BandString[FCurrentBand] + ' client(' + addr + ') disconnected from network.';
-
-   param_atom := AddAtom(PChar(S));
-   SendMessage(ServerForm.Handle, WM_ZCMD_ADDCONSOLE, FClientNumber, MAKELPARAM(param_atom,0));
-
-   param_atom := AddAtom(PChar(S + LBCODE));
-   SendMessage(ServerForm.Handle, WM_ZCMD_SENDALL, FClientNumber, MAKELPARAM(param_atom,0));
+   S := BandString[FCurrentBand] + ' client #' + IntToStr(FClientNumber) + '(' + addr + ') disconnected from network.';
+   BroadcastMessage(S);
 
    PostMessage(FClientForm.Handle, WM_CLOSE, 0, 0);
 end;
@@ -811,7 +822,6 @@ begin
 
    B := TBand(i);
 
-   FCurrentBand := B;
    FClientForm.CurrentBand := B;
 
    PostMessage(ServerForm.Handle, WM_ZCMD_UPDATE_DISPLAY, from, 0);
@@ -820,6 +830,13 @@ begin
       S := ZLinkHeader + ' PUTMESSAGE ' + 'Band already in use!';
       SendStr(S + LBCODE);
    end;
+
+   // BANDÇ™ñ¢ê›íËÇæÇ¡ÇΩèÍçáÇÕçLïÒÇ∑ÇÈ
+   if FCurrentBand = bUnknown then begin
+      SendSetBandMessage(B);
+   end;
+
+   FCurrentBand := B;
 end;
 
 procedure TClientThread.Process_PcName(S: string; from: Integer);
