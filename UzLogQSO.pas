@@ -2002,6 +2002,11 @@ begin
             RebuildDupeCheckList;
             zyloLogUpdated(evUpdateQSO, beforeQSO, afterQSO);
             afterQSO.Free();
+
+            if FQsoIdDic.ContainsKey(beforeQSO.QsoId) = True then begin
+               FQsoIdDic.Remove(beforeQSO.QsoId);
+            end;
+            FQsoIdDic.Add(wQSO.QsoId, wQSO);
             Exit;
          end;
       end;
