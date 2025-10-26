@@ -4,7 +4,7 @@ interface
 
 uses
   Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
-  Buttons, ExtCtrls,
+  Buttons, ExtCtrls, System.StrUtils,
   UzLogGlobal, UzLogConst;
 
 type
@@ -22,7 +22,7 @@ type
 implementation
 
 uses
-  UServerForm;
+  UServerForm, UCliForm;
 
 {$R *.DFM}
 
@@ -34,27 +34,33 @@ end;
 
 procedure TConnections.UpdateDisplay;
 var
-   B: TBand;
-   i: integer;
    str: string;
+   F: TCliForm;
+   i: Integer;
 begin
    ListBox.Items.Clear;
-   for B := b19 to bUnknown do begin
-      for i := 0 to ServerForm.ClientList.Count - 1 do begin
-         if ServerForm.ClientList[i].CurrentBand = B then begin
-            str := FillRight(BandString[ServerForm.ClientList[i].CurrentBand], 9) + ServerForm.ClientList[i].CurrentOperator;
-            ListBox.Items.AddObject(str, TObject(i));
-         end;
+
+   // 1234 123456789012345 12345678 123456789 1234567890
+   // [1]  127.000.000.100 HH:MM:SS 1.9MHz    JR8PPG
+   for i := Low(ServerForm.ClientList) to High(ServerForm.ClientList) do begin
+      if ServerForm.ClientList[i].FUse = False then begin
+         Continue;
       end;
+      F := ServerForm.ClientList[i].FForm;
+      str := FillRight('[' + IntToStr(i) + ']', 4) + ' ';
+      str := str + FillRight(ServerForm.ClientList[i].FIPAddress, 15) + ' ';
+      str := str + FormatDateTime('hh:nn:ss', ServerForm.ClientList[i].FConnectTime) + ' ';
+      str := str + FillRight(BandString[F.CurrentBand], 9) + F.CurrentOperator;
+      ListBox.Items.AddObject(str, F);
    end;
 end;
 
 procedure TConnections.ListBoxDblClick(Sender: TObject);
 var
-   i: Integer;
+   F: TCliForm;
 begin
-   i := Integer(ListBox.Items.Objects[ListBox.ItemIndex]);
-   ServerForm.ClientList[i].Show;
+   F := TCliForm(ListBox.Items.Objects[ListBox.ItemIndex]);
+   F.Show;
 end;
 
 end.

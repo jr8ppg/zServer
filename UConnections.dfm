@@ -10,9 +10,7 @@ object Connections: TConnections
   Font.Height = -11
   Font.Name = 'MS Sans Serif'
   Font.Style = []
-  OldCreateOrder = True
   Position = poScreenCenter
-  PixelsPerInch = 96
   TextHeight = 11
   object ListBox: TListBox
     Left = 0

@@ -37,6 +37,21 @@ const
   LISTMAXLINES = 1000;
 
 type
+  TClientData = record
+    FUse: Boolean;
+    FForm: TCliForm;
+    FIPAddress: string;
+    FPort: string;
+    FConnectTime: TDateTime;
+    FDisconnectTime: TDateTime;
+    FX: Integer;
+    FY: Integer;
+    FWidth: Integer;
+    FHeight: Integer;
+  end;
+
+  TClientList = array[1..32] of TClientData;
+
   TServerForm = class(TForm)
     ClientListBox: TListBox;
     Panel1: TPanel;
@@ -114,7 +129,6 @@ type
   private
     { Declarations privates }
     FInitialized  : Boolean;
-    FClientNumber : Integer;
     FTakeChatLog : Boolean;
     FTakeCommandLog : Boolean;
     FChatLogFileName: string;
@@ -122,7 +136,8 @@ type
     FFreqList: TFreqList;
     FConnections: TConnections;
 
-    FClientList: TList<TCliForm>;
+    // 接続中のクライアントリスト（最大３２台）
+    FClientList: TClientList;
 
     FStats: TBasicStats;
     FMultiForm: TBasicMultiForm;
@@ -162,9 +177,14 @@ type
     procedure SendAll(str : string);
     procedure ApplyTakeCommandLog();
     procedure SetCaption();
-    procedure UpdateClientNumber();
+    function GetClientSlot(ip: string): Integer;
+    procedure SetClientList(no: Integer; form: TCliForm; ip: string; port: string);
+    procedure UnsetClientList(no: Integer);
   public
     ChatOnly : boolean;
+    procedure SaveCliFormPos(no: Integer; x, y, w, h: Integer);
+    procedure RestoreCliFormPos(no: Integer; Form: TCliForm);
+    function GetClientFormByBand(B: TBand): TCliForm;
 
     procedure AddConsole(S : string); // adds string to clientlistbox
     function GetConsole(): TStringList;
@@ -179,7 +199,7 @@ type
     property LoginUser: string read FLoginUser;
     property LoginPass: string read FLoginPass;
 
-    property ClientList: TList<TCliForm> read FClientList;
+    property ClientList: TClientList read FClientList;
     property MasterLog: TLog read GetMasterLog;
   end;
 
@@ -210,10 +230,21 @@ uses
 procedure TServerForm.FormCreate(Sender: TObject);
 var
    SL: TSTringList;
+   i: Integer;
 begin
-   FClientList := TList<TCliForm>.Create();
+   for i := Low(FClientList) to High(FClientList) do begin
+      FClientList[i].FUse := False;
+      FClientList[i].FForm := nil;
+      FClientList[i].FIPAddress := '';
+      FClientList[i].FPort := '';
+      FClientList[i].FConnectTime := 0;
+      FClientList[i].FDisconnectTime := 0;
+      FClientList[i].FX := -1;
+      FClientList[i].FY := -1;
+      FClientList[i].FWidth := 0;
+      FClientList[i].FHeight := 0;
+   end;
 
-   FClientNumber := 0;
    FCurrentFileName := '';
    FLastPath := '';
 
@@ -360,10 +391,9 @@ begin
    FFreqList.Release();
    FConnections.Release();
 
-   for i := 0 to FClientList.Count - 1 do begin
-      FClientList[i].Release();
+   for i := Low(FClientList) to High(FClientList) do begin
+      UnsetClientList(i);
    end;
-   FClientList.Free();
 end;
 
 {* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *}
@@ -451,22 +481,33 @@ procedure TServerForm.SrvSocketClientConnect(Sender: TObject; Client: TWSocketCl
 var
    Form: TCliForm;
    i: Integer;
+   no: Integer;
+   ip: string;
+   port: string;
 begin
-   FClientNumber := FClientList.Count + 1;
+   ip := Client.PeerAddr;
+   port := Client.PeerPort;
+   no := GetClientSlot(ip);
+   if no = 0 then begin
+      AddConsole('接続数MAXなので受け入れできません。');
+      Client.Close();
+      Exit;
+   end;
 
    Form := TCliForm.Create(Self);
-   Form.Caption := 'Client ' + IntToStr(FClientNumber);
-   Form.ClientNumber := FClientNumber;
+   Form.Caption := 'Client ' + IntToStr(no);
+   Form.ClientNumber := no;
    Form.Socket := Client;
    Form.Secure := FSecure;
    Form.LoginUser := FLoginUser;
    Form.LoginPass := FLoginPass;
    Form.TakeLog := FTakeCommandLog;
-   Form.Show;
-   FClientList.Add(Form);
 
-   // リナンバー
-   UpdateClientNumber();
+   RestoreCliFormPos(no, Form);
+
+   Form.Show;
+
+   SetClientList(no, Form, ip, port);
 end;
 
 procedure TServerForm.SrvSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
@@ -489,16 +530,12 @@ begin
    Form := TCliForm(msg.lParam);
 
    // クライアントリストから消去
-   for i := 0 to FClientList.Count - 1 do begin
-      if LongInt(FClientList[i]) = LongInt(Form) then begin
-         FClientList[i].Release();
-         FClientList.Delete(i);
+   for i := Low(FClientList) to High(FClientList) do begin
+      if LongInt(FClientList[i].FForm) = LongInt(Form) then begin
+         UnsetClientList(i);
          Break;
       end;
    end;
-
-   // リナンバー
-   UpdateClientNumber();
 
    // コネクションリストを更新
    FConnections.UpdateDisplay();
@@ -707,7 +744,9 @@ end;
 
 procedure TServerForm.OnUpdateDisplay(var msg: TMessage);
 begin
-   FConnections.UpdateDisplay;
+   if Assigned(FConnections) then begin
+      FConnections.UpdateDisplay;
+   end;
 end;
 
 // ****************************************************************************
@@ -734,20 +773,19 @@ end;
 
 function TServerForm.GetWhoList(): TStringList;
 var
-   i: Integer;
    SL: TStringList;
    S: string;
    B: TBand;
+   F: TCliForm;
 begin
    SL := TStringList.Create();
    try
       for B := b19 to HiBand do begin
-         for i := 0 to FClientList.Count - 1 do begin
-            if FClientList[i].CurrentBand = B then begin
-               S := ZLinkHeader + ' PUTMESSAGE ';
-               S := S + FillRight(BandString[FClientList[i].CurrentBand], 9) + FClientList[i].CurrentOperator;
-               SL.Add(S);
-            end;
+         F := GetClientFormByBand(B);
+         if F <> nil then begin
+            S := ZLinkHeader + ' PUTMESSAGE ';
+            S := S + FillRight(BandString[F.CurrentBand], 9) + F.CurrentOperator;
+            SL.Add(S);
          end;
       end;
    finally
@@ -761,8 +799,10 @@ procedure TServerForm.SendAll(str: string);
 var
    i: Integer;
 begin
-   for i := 0 to FClientList.Count - 1 do begin
-      FClientList[i].SendStr(str);
+   for i := Low(FClientList) to High(FClientList) do begin
+      if FClientList[i].FUse = True then begin
+         FClientList[i].FForm.SendStr(str);
+      end;
    end;
 end;
 
@@ -770,11 +810,13 @@ procedure TServerForm.SendAllButFrom(str: string; NotThisCli: Integer);
 var
    i: Integer;
 begin
-   for i := 0 to FClientList.Count - 1 do begin
-      if FClientList[i].ClientNumber = NotThisCli then begin
-         Continue;
+   for i := Low(FClientList) to High(FClientList) do begin
+      if FClientList[i].FUse = True then begin
+         if FClientList[i].FForm.ClientNumber = NotThisCli then begin
+            Continue;
+         end;
+         FClientList[i].FForm.SendStr(str);
       end;
-      FClientList[i].SendStr(str);
    end;
 end;
 
@@ -1046,8 +1088,10 @@ procedure TServerForm.ApplyTakeCommandLog();
 var
    i: Integer;
 begin
-   for i := 0 to FClientList.Count - 1 do begin
-      FClientList[i].TakeLog := FTakeCommandLog;
+   for i := Low(FClientList) to High(FClientList) do begin
+      if FClientList[i].FUse = True then begin
+         FClientList[i].FForm.TakeLog := FTakeCommandLog;
+      end;
    end;
 end;
 
@@ -1067,6 +1111,8 @@ procedure TServerForm.LoadSettings();
 var
    IniFile: TIniFile;
    FileName: string;
+   i: Integer;
+   section: string;
 begin
    FileName := ChangeFileExt(Application.ExeName, '.ini');
    IniFile := TIniFile.Create(FileName);
@@ -1090,6 +1136,14 @@ begin
       FTakeCommandLog := IniFile.ReadBool('Options', 'TakeCommandLog', False);
 
       ApplyTakeCommandLog();
+
+      for i := Low(FClientList) to High(FClientList) do begin
+         section := 'CliForm#' + IntToStr(i);
+         FClientList[i].FY := IniFile.ReadInteger(section, 'Top', -1);
+         FClientList[i].FX := IniFile.ReadInteger(section, 'Left', -1);
+         FClientList[i].FWidth := IniFile.ReadInteger(section, 'Width', 0);
+         FClientList[i].FHeight := IniFile.ReadInteger(section, 'Heigth', 0);
+      end;
    finally
       IniFile.Free;
    end;
@@ -1099,6 +1153,8 @@ procedure TServerForm.SaveSettings();
 var
    IniFile: TIniFile;
    FileName: string;
+   i: Integer;
+   section: string;
 begin
    FileName := ChangeFileExt(Application.ExeName, '.ini');
    IniFile := TIniFile.Create(FileName);
@@ -1116,6 +1172,17 @@ begin
       IniFile.WriteString('Login', 'Password', FLoginPass);
       IniFile.WriteBool('Options', 'TakeChatLog', FTakeChatLog);
       IniFile.WriteBool('Options', 'TakeCommandLog', FTakeCommandLog);
+
+      for i := Low(FClientList) to High(FClientList) do begin
+         if (FClientList[i].FX = -1) and (FClientList[i].FY = -1) then begin
+            Continue;
+         end;
+         section := 'CliForm#' + IntToStr(i);
+         IniFile.WriteInteger(section, 'Top', FClientList[i].FY);
+         IniFile.WriteInteger(section, 'Left', FClientList[i].FX);
+         IniFile.WriteInteger(section, 'Width', FClientList[i].FWidth);
+         IniFile.WriteInteger(section, 'Heigth', FClientList[i].FHeight);
+      end;
    finally
       IniFile.Free;
    end;
@@ -1130,12 +1197,15 @@ function TServerForm.IsBandUsed2(from: Integer; b: TBand): Boolean;
 var
    i: Integer;
 begin
-   for i := 0 to FClientList.Count - 1 do begin
-      if (i <> from) and (FClientList[i].CurrentBand = b) then begin
-         Result := True;
-         Exit;
+   for i := Low(FClientList) to High(FClientList) do begin
+      if FClientList[i].FUse = True then begin
+         if (i <> from) and (FClientList[i].FForm.CurrentBand = b) then begin
+            Result := True;
+            Exit;
+         end;
       end;
    end;
+
    Result := False;
 end;
 
@@ -1212,22 +1282,22 @@ end;
 
 procedure TServerForm.RestoreWindowStates;
 begin
-   dmZlogGlobal.ReadWindowState(FConnections);
-   dmZlogGlobal.ReadWindowState(FStats);
+   dmZLogGlobal.ReadWindowState(FConnections);
+   dmZLogGlobal.ReadWindowState(FStats);
    if Assigned(FMultiForm) then begin
-      dmZlogGlobal.ReadWindowState(FMultiForm);
+      dmZLogGlobal.ReadWindowState(FMultiForm);
    end;
-   dmZlogGlobal.ReadWindowState(FFreqList);
+   dmZLogGlobal.ReadWindowState(FFreqList);
 end;
 
 procedure TServerForm.RecordWindowStates;
 begin
-   dmZlogGlobal.WriteWindowState(FConnections);
-   dmZlogGlobal.WriteWindowState(FStats);
+   dmZLogGlobal.WriteWindowState(FConnections);
+   dmZLogGlobal.WriteWindowState(FStats);
    if Assigned(FMultiForm) then begin
-      dmZlogGlobal.WriteWindowState(FMultiForm);
+      dmZLogGlobal.WriteWindowState(FMultiForm);
    end;
-   dmZlogGlobal.WriteWindowState(FFreqList);
+   dmZLogGlobal.WriteWindowState(FFreqList);
 end;
 
 procedure TServerForm.SetCaption();
@@ -1246,13 +1316,103 @@ begin
    Caption := S;
 end;
 
-procedure TServerForm.UpdateClientNumber();
+function TServerForm.GetClientSlot(ip: string): Integer;
 var
    i: Integer;
 begin
-   // リナンバー
-   for i := 0 to FClientList.Count - 1 do begin
-      FClientList[i].ClientNumber := i + 1;
+   // 同じIPアドレスの空スロットを探す
+   for i := Low(FClientList) to High(FClientList) do begin
+      if (FClientList[i].FUse = False) and (FClientList[i].FIPAddress = ip) then begin
+         Result := i;
+         Exit;
+      end;
+   end;
+
+   // 無ければIPアドレスの記録が無い空スロットを探す
+   for i := Low(FClientList) to High(FClientList) do begin
+      if (FClientList[i].FUse = False) and (FClientList[i].FIPAddress = '') then begin
+         Result := i;
+         Exit;
+      end;
+   end;
+
+   // さらに無ければ空スロットを探す
+   for i := Low(FClientList) to High(FClientList) do begin
+      if (FClientList[i].FUse = False) then begin
+         Result := i;
+         Exit;
+      end;
+   end;
+
+   Result := 0;
+end;
+
+procedure TServerForm.SetClientList(no: Integer; form: TCliForm; ip: string; port: string);
+begin
+   if FClientList[no].FUse = True then begin
+      AddConsole('ClientNo:' + IntToStr(no) + 'は使用中です。');
+      Exit;
+   end;
+
+   FClientList[no].FUse := True;
+   FClientList[no].FForm := form;
+   FClientList[no].FIPAddress := ip;
+   FClientList[no].FPort := port;
+   FClientList[no].FConnectTime := Now;
+end;
+
+procedure TServerForm.UnsetClientList(no: Integer);
+begin
+   if FClientList[no].FUse = True then begin
+      FClientList[no].FUse := False;
+      if FClientList[no].FForm <> nil then begin
+         FClientList[no].FForm.Release();
+      end;
+      FClientList[no].FForm := nil;
+//      FClientList[no].FIPAddress := '';
+      FClientList[no].FPort := '';
+      FClientList[no].FDisconnectTime := Now;
+   end;
+end;
+
+function TServerForm.GetClientFormByBand(B: TBand): TCliForm;
+var
+   i: Integer;
+begin
+   for i := Low(FClientList) to High(FClientList) do begin
+      if FClientList[i].FUse = True then begin
+         if FClientList[i].FForm.CurrentBand = B then begin
+            Result := FClientList[i].FForm;
+            Exit;
+         end;
+      end;
+   end;
+
+   Result := nil;
+end;
+
+procedure TServerForm.SaveCliFormPos(no: Integer; x, y, w, h: Integer);
+begin
+   if (no < Low(FClientList)) or (no > High(FClientList)) then begin
+      Exit;
+   end;
+   FClientList[no].FX := x;
+   FClientList[no].FY := y;
+   FClientList[no].FWidth := w;
+   FClientList[no].FHeight := h;
+end;
+
+procedure TServerForm.RestoreCliFormPos(no: Integer; Form: TCliForm);
+begin
+   if (FClientList[no].FX = -1) and (FClientList[no].FY = -1) then begin
+      Form.Position := poDefaultPosOnly;
+   end
+   else begin
+      Form.Position := poDesigned;
+      Form.Left := FClientList[no].FX;
+      Form.Top := FClientList[no].FY;
+      Form.Width := FClientList[no].FWidth;
+      Form.Height := FClientList[no].FHeight;
    end;
 end;
 

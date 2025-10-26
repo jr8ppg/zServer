@@ -38,6 +38,7 @@ type
     procedure ClientThreadTerminate(Sender: TObject);
     procedure Timer1Timer(Sender: TObject);
     procedure menuSaveToFileClick(Sender: TObject);
+    procedure WMMove(var Msg: TWMMove); message WM_MOVE;
   private
     FInitialized : Boolean;
     FClientSocket: TWSocketClient;
@@ -225,6 +226,13 @@ end;
 procedure TCliForm.ClientThreadTerminate(Sender: TObject);
 begin
    //
+end;
+
+procedure TCliForm.WMMove(var Msg: TWMMove);
+begin
+   if FClientNumber > 0 then begin
+      ServerForm.SaveCliFormPos(FClientNumber, Left, Top, Width, Height);
+   end;
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
