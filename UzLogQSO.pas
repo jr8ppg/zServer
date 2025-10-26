@@ -1870,6 +1870,7 @@ begin
    end;
 
    ClearDupeCheckList;
+   FQsoIdDic.Clear();
    FSaved := False;
 end;
 

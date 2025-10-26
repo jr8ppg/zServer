@@ -915,6 +915,7 @@ begin
       // ファイルに保存
       FStats.SaveLogs(FCurrentFileName);
       FLastPath := ExtractFilePath(FCurrentFileName);
+      AddConsole('ファイル ' + FCurrentFileName + ' に保存しました');
    end;
 end;
 
@@ -925,6 +926,7 @@ begin
       FCurrentFileName := SaveDialog.FileName;
       FStats.SaveLogs(FCurrentFileName);
       FLastPath := ExtractFilePath(FCurrentFileName);
+      AddConsole('新しいファイル ' + FCurrentFileName + ' で保存しました');
    end;
 end;
 
@@ -932,19 +934,23 @@ procedure TServerForm.Open1Click(Sender: TObject);
 begin
    OpenDialog.InitialDir := FLastPath;
    if OpenDialog.Execute then begin
-      if MessageDlg('This will clear all data and reload from new file.', mtWarning, [mbOK, mbCancel], 0) <> mrOK then begin
+      if MessageBox(Handle, PChar('すべてのデータがクリアされ、指定のファイルからロードされます。よろしいですか？'), PChar(Application.Title), MB_YESNO or MB_DEFBUTTON2 or MB_ICONEXCLAMATION) = IDNO then begin
          Exit;
       end;
 
       FCurrentFileName := OpenDialog.FileName;
 
       if FileExists(FCurrentFileName) = False then begin
-         exit;
+         MessageBox(Handle, PChar(FCurrentFileName + 'がありません。'), PChar(Application.Title), MB_OK or MB_ICONEXCLAMATION);
+         Exit;
       end;
 
+      AddConsole(FCurrentFileName + ' を開いています...');
+      FStats.MasterLog.Clear2();
       FStats.MasterLog.LoadFromFile(FCurrentFileName);
       RecalcAll();
       FStats.UpdateStats();
+      AddConsole(FCurrentFileName + ' ロード終了');
 
       FLastPath := ExtractFilePath(FCurrentFileName);
 
