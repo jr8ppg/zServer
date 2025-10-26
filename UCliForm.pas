@@ -95,6 +95,9 @@ type
     FSecure: Boolean;
     FLoginUser: string;
     FLoginPass: string;
+    FCommandTemp: string;
+    FCommandTimer: TTimer;
+    procedure OnCommandTimer(Sender: TObject);
     procedure BroadcastMessage(S: string);
     procedure SendConnectedMessage();
     procedure SendSetBandMessage(new_band: TBand);
@@ -103,6 +106,7 @@ type
     procedure CliSocketError(Sender: TObject);
     procedure CliSocketException(Sender: TObject; SocExcept: ESocketException);
     procedure CliSocketSocksError(Sender: TObject; Error: Integer; Msg: string);
+    function SetCommandBuffer(fFinal: Boolean): Boolean;
     procedure ProcessCommand(S: string);
 
     procedure Process_Freq(S: string; from: Integer);
@@ -377,6 +381,11 @@ begin
    FFileData := TStringList.Create();
    FLoginStep := lsNone;
    FSecure:= False;
+   FCommandTemp := '';
+   FCommandTimer := TTimer.Create(AClientForm);
+   FCommandTimer.Enabled := False;
+   FCommandTimer.Interval := 600;
+   FCommandTimer.OnTimer := OnCommandTimer;
    inherited Create(True);
 end;
 
@@ -387,6 +396,7 @@ begin
       FClientSocket := nil;
    end;
 
+   FCommandTimer.Free();
    FFileData.Free();
    FCommandQue.Free();
    inherited Destroy;
@@ -440,6 +450,12 @@ begin
    if FInMergeProc = True then begin
       MasterLogLock.Release();
    end;
+end;
+
+procedure TClientThread.OnCommandTimer(Sender: TObject);
+begin
+   FCommandTimer.Enabled := False;
+   SetCommandBuffer(True);
 end;
 
 procedure TClientThread.BroadcastMessage(S: string);
@@ -496,9 +512,6 @@ procedure TClientThread.ServerWSocketDataAvailable(Sender: TObject; Error: Word)
 var
    str: string;
    SL: TStringList;
-   i: Integer;
-   st: Integer;
-   line: string;
 begin
    SL := TStringList.Create();
    try
@@ -534,18 +547,11 @@ begin
       end;
 
       if (FLoginStep = lsLogined) then begin
-         st := 1;
-         for i := 1 to Length(str) do begin
-            if str[i] = #10 then begin
-               line := TrimCRLF(Copy(str, st, i - st + 1));
-               FCommandQue.Add(FillRight(IntToStr(FClientNumber), 3) + ' ' + line);
-               st := i + 1;
-            end;
-         end;
+         FCommandTemp := FCommandTemp + str;
 
-         line := TrimCRLF(Copy(str, st));
-         if line <> '' then begin
-            FCommandQue.Add(FillRight(IntToStr(FClientNumber), 3) + ' ' + line);
+         // CRLFで終わっている場合はコマンドとする
+         if SetCommandBuffer(False) = False then begin
+            FCommandTimer.Enabled := True;
          end;
 
          if FInProcessing = False then begin
@@ -556,6 +562,34 @@ begin
    finally
       SL.Free();
    end;
+end;
+
+function TClientThread.SetCommandBuffer(fFinal: Boolean): Boolean;
+var
+   Index: Integer;
+   S: string;
+begin
+   while Length(FCommandTemp) > 0 do begin
+      Index := Pos(#13#10, FCommandTemp);
+      if (Index = 0) and (fFinal = False) then begin
+         Result := False;
+         Exit;
+      end;
+
+      // CRLFの手前まで取り出ししてコマンドバッファに追加
+      if Index = 0 then begin
+         S := FCommandTemp;
+         FCommandTemp := '';
+      end
+      else begin
+         S := Copy(FCommandTemp, 1, Index - 1);
+         // CRLFまで削除
+         FCommandTemp := Copy(FCommandTemp, Index + 2);
+      end;
+      FCommandQue.Add(FillRight(IntToStr(FClientNumber), 3) + ' ' + S);
+   end;
+
+   Result := True;
 end;
 
 // *****************************************************************************
