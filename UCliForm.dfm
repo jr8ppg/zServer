@@ -15,6 +15,7 @@ object CliForm: TCliForm
   OnClose = FormClose
   OnCloseQuery = FormCloseQuery
   OnCreate = FormCreate
+  OnResize = FormResize
   OnShow = FormShow
   TextHeight = 12
   object Panel1: TPanel

@@ -39,6 +39,7 @@ type
     procedure Timer1Timer(Sender: TObject);
     procedure menuSaveToFileClick(Sender: TObject);
     procedure WMMove(var Msg: TWMMove); message WM_MOVE;
+    procedure FormResize(Sender: TObject);
   private
     FInitialized : Boolean;
     FClientSocket: TWSocketClient;
@@ -217,6 +218,13 @@ end;
 procedure TCliForm.FormCloseQuery(Sender: TObject; var CanClose: Boolean);
 begin
    FClientThread.Close();
+end;
+
+procedure TCliForm.FormResize(Sender: TObject);
+begin
+   if FClientNumber > 0 then begin
+      ServerForm.SaveCliFormPos(FClientNumber, Left, Top, Width, Height);
+   end;
 end;
 
 procedure TCliForm.menuSaveToFileClick(Sender: TObject);
