@@ -1293,7 +1293,7 @@ begin
    Result.Memo       := ShortString(MemoStr);
    Result.CQ         := FCQ;
    Result.Dupe       := FDupe;
-   Result.Reserve    := Byte(FReserve);
+   Result.Reserve    := 0;
    Result.TX         := Byte(FTX);
    Result.Power2     := FPower2;
    Result.Reserve2   := FReserve2;
@@ -1388,7 +1388,7 @@ begin
    Result.Memo       := ShortString(FMemo);
    Result.CQ         := FCQ;
    Result.Dupe       := FDupe;
-   Result.Reserve    := Byte(FReserve);
+   Result.Reserve    := 0;
    Result.TX         := Byte(FTX);
    Result.Power2     := FPower2;
    Result.Reserve2   := FReserve2;
@@ -2003,10 +2003,12 @@ begin
             zyloLogUpdated(evUpdateQSO, beforeQSO, afterQSO);
             afterQSO.Free();
 
+   			{$IFDEF ZSERVER}
             if FQsoIdDic.ContainsKey(beforeQSO.QsoId) = True then begin
                FQsoIdDic.Remove(beforeQSO.QsoId);
             end;
             FQsoIdDic.Add(wQSO.QsoId, wQSO);
+            {$ENDIF}
             Exit;
          end;
       end;
