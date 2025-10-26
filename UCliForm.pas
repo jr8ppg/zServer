@@ -614,8 +614,8 @@ begin
          S := FCommandQue.Strings[0];
          FCommandQue.Delete(0);
 
-         from := StrToIntDef(TrimRight(copy(S, 1, 3)), -1) - 1;
-         if from < 0 then begin
+         from := StrToIntDef(TrimRight(copy(S, 1, 3)), 0);
+         if from <= 0 then begin
             Continue;
          end;
 
@@ -806,7 +806,7 @@ var
    temp2: string;
    param_atom: ATOM;
 begin
-   temp2 := copy(S, 6, 255);
+   temp2 := FillRight(IntToStr(from), 3) + Copy(S, 6, 255);
    param_atom := AddAtom(PChar(temp2));
    PostMessage(ServerForm.Handle, WM_ZCMD_FREQDATA, from, param_atom);
 end;

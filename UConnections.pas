@@ -5,13 +5,13 @@ interface
 uses
   Windows, SysUtils, Classes, Graphics, Forms, Controls, StdCtrls,
   Buttons, ExtCtrls, System.StrUtils,
-  UzLogGlobal, UzLogConst;
+  UzLogGlobal, UzLogConst, Vcl.ComCtrls;
 
 type
   TConnections = class(TForm)
-    ListBox: TListBox;
+    ListView1: TListView;
     procedure CreateParams(var Params: TCreateParams); override;
-    procedure ListBoxDblClick(Sender: TObject);
+    procedure ListView1DblClick(Sender: TObject);
   private
     { Private declarations }
   public
@@ -37,8 +37,10 @@ var
    str: string;
    F: TCliForm;
    i: Integer;
+   listitem: TListItem;
 begin
-   ListBox.Items.Clear;
+   ListView1.Items.BeginUpdate();
+   ListView1.Items.Clear;
 
    // 1234 123456789012345 12345678 123456789 1234567890
    // [1]  127.000.000.100 HH:MM:SS 1.9MHz    JR8PPG
@@ -46,20 +48,37 @@ begin
       if ServerForm.ClientList[i].FUse = False then begin
          Continue;
       end;
+
       F := ServerForm.ClientList[i].FForm;
-      str := FillRight('[' + IntToStr(i) + ']', 4) + ' ';
-      str := str + FillRight(ServerForm.ClientList[i].FIPAddress, 15) + ' ';
-      str := str + FormatDateTime('hh:nn:ss', ServerForm.ClientList[i].FConnectTime) + ' ';
-      str := str + FillRight(BandString[F.CurrentBand], 9) + F.CurrentOperator;
-      ListBox.Items.AddObject(str, F);
+
+      listitem := ListView1.Items.Add();
+
+      listitem.Caption := IntToStr(i);
+      listitem.SubItems.Add(ServerForm.ClientList[i].FIPAddress);
+      str := FormatDateTime('hh:nn:ss', ServerForm.ClientList[i].FConnectTime);
+      listitem.SubItems.Add(str);
+
+      str := BandString[F.CurrentBand];
+      listitem.SubItems.Add(str);
+
+      str := F.CurrentOperator;
+      listitem.SubItems.Add(str);
+
+      listitem.Data := F;
    end;
+
+   ListView1.Items.EndUpdate();
 end;
 
-procedure TConnections.ListBoxDblClick(Sender: TObject);
+procedure TConnections.ListView1DblClick(Sender: TObject);
 var
    F: TCliForm;
 begin
-   F := TCliForm(ListBox.Items.Objects[ListBox.ItemIndex]);
+   if ListView1.Selected = nil then begin
+      Exit;
+   end;
+
+   F := TCliForm(ListView1.Selected.Data);
    F.Show;
 end;
 

@@ -2319,26 +2319,23 @@ const
                '"Band","Power","Multi1","Multi2","NewMulti1","NewMulti2","Points","Operator","Memo","CQ",' +
                '"Dupe","Reserve","TX","Power2","Reserve2","Reserve3","Freq","QsyViolation","PCName","Forced","QslState","Invalid","Area","RBN Verified"';
 var
-   F: TextFile;
    i: Integer;
    strText: string;
    Q: TQSO;
    offsetmin: Integer;
    slCsv: TStringList;
+   slFile: TStringList;
 begin
    slCsv := TStringList.Create();
    slCsv.StrictDelimiter := True;
    slCsv.QuoteChar := #0;
+   slFile := TStringList.Create();
+   slFile.StrictDelimiter := True;
    try
-      AssignFile(F, Filename);
-      ReWrite(F);
-
       offsetmin := FQsoList[0].RSTsent;
 
-      // BOM
-      Write(F, #$EF + #$BB + #$BF);
-
-      WriteLn(F, UTF8String(csvheader));
+      // CSVÉwÉbÉ_Å[
+      slFile.Add(csvheader);
 
       for i := 1 to FQSOList.Count - 1 do begin
          Q := FQSOList[i];
@@ -2453,12 +2450,14 @@ begin
          // 34óÒñ⁄ RBN Verified
          slCsv.Add(BoolToStr(Q.RbnVerified, True));
 
-         WriteLn(F, UTF8String(slCsv.DelimitedText));
+         slFile.Add(slCsv.DelimitedText);
       end;
 
-      CloseFile(F);
+      slFile.WriteBOM := True;
+      slFile.SaveToFile(Filename, TEncoding.UTF8);
    finally
       slCsv.Free();
+      slFile.Free();
    end;
 end;
 

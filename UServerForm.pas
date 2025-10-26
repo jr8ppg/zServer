@@ -532,6 +532,7 @@ begin
    // クライアントリストから消去
    for i := Low(FClientList) to High(FClientList) do begin
       if LongInt(FClientList[i].FForm) = LongInt(Form) then begin
+         FFreqList.Clear(FClientList[i].FForm.CurrentBand);
          UnsetClientList(i);
          Break;
       end;
