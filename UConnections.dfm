@@ -27,7 +27,11 @@ object Connections: TConnections
         Width = 80
       end
       item
-        Caption = #25509#32154#26178#38291
+        Caption = #25509#32154#26178#21051
+        Width = 80
+      end
+      item
+        Caption = #20999#26029#26178#21051
         Width = 80
       end
       item
@@ -44,6 +48,5 @@ object Connections: TConnections
     TabOrder = 0
     ViewStyle = vsReport
     OnDblClick = ListView1DblClick
-    ExplicitWidth = 400
   end
 end

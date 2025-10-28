@@ -131,6 +131,7 @@ type
     FInitialized  : Boolean;
     FTakeChatLog : Boolean;
     FTakeCommandLog : Boolean;
+    FLongDateTime: Boolean;
     FChatLogFileName: string;
 
     FFreqList: TFreqList;
@@ -247,6 +248,7 @@ begin
 
    FCurrentFileName := '';
    FLastPath := '';
+   FLongDateTime := False;
 
    LoadSettings();
 
@@ -263,6 +265,7 @@ begin
 
    FFreqList := TFreqList.Create(Self);
    FConnections := TConnections.Create(Self);
+   FConnections.LongDateTime := FLongDateTime;
 
    RestoreWindowsPos();
    checkMonitorChatOnly.Checked := ChatOnly;
@@ -1055,6 +1058,7 @@ begin
       f.LoginPassword := FLoginPass;
       f.TakeChatLog := FTakeChatLog;
       f.TakeCommandLog := FTakeCommandLog;
+      f.LongDateTime := FLongDateTime;
 
       if f.ShowModal() <> mrOK then begin
          Exit;
@@ -1066,8 +1070,10 @@ begin
       FLoginPass := f.LoginPassword;
       FTakeChatLog := f.TakeChatLog;
       FTakeCommandLog := f.TakeCommandLog;
+      FLongDateTime := f.LongDateTime;
 
       ApplyTakeCommandLog();
+      FConnections.LongDateTime := FLongDateTime;
 
       SaveSettings();
       SetCaption();
@@ -1135,6 +1141,7 @@ begin
       FLoginPass := IniFile.ReadString('Login', 'Password', '');
       FTakeChatLog := IniFile.ReadBool('Options', 'TakeChatLog', True);
       FTakeCommandLog := IniFile.ReadBool('Options', 'TakeCommandLog', False);
+      FLongDateTime := IniFile.ReadBool('Options', 'LongDateTime', False);
 
       ApplyTakeCommandLog();
 
@@ -1173,6 +1180,7 @@ begin
       IniFile.WriteString('Login', 'Password', FLoginPass);
       IniFile.WriteBool('Options', 'TakeChatLog', FTakeChatLog);
       IniFile.WriteBool('Options', 'TakeCommandLog', FTakeCommandLog);
+      IniFile.WriteBool('Options', 'LongDateTime', FLongDateTime);
 
       for i := Low(FClientList) to High(FClientList) do begin
          if (FClientList[i].FX = -1) and (FClientList[i].FY = -1) then begin

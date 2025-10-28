@@ -23,6 +23,7 @@ type
     groupOtherOptions: TGroupBox;
     checkTakeChatLog: TCheckBox;
     checkTakeCommandLog: TCheckBox;
+    checkLongDateTime: TCheckBox;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
   private
@@ -39,6 +40,8 @@ type
     procedure SetTakeChatLog(v: Boolean);
     function GetTakeCommandLog(): Boolean;
     procedure SetTakeCommandLog(v: Boolean);
+    function GetLongDateTime(): Boolean;
+    procedure SetLongDateTime(v: Boolean);
   public
     { Public êÈåæ }
     property Port: string read GetPort write SetPort;
@@ -47,6 +50,7 @@ type
     property LoginPassword: string read GetLoginPassword write SetLoginPassword;
     property TakeChatLog: Boolean read GetTakeChatLog write SetTakeChatLog;
     property TakeCommandLog: Boolean read GetTakeCommandLog write SetTakeCommandLog;
+    property LongDateTime: Boolean read GetLongDateTime write SetLongDateTime;
   end;
 
 implementation
@@ -129,6 +133,16 @@ end;
 procedure TformOptions.SetTakeCommandLog(v: Boolean);
 begin
    checkTakeCommandLog.Checked := v;
+end;
+
+function TformOptions.GetLongDateTime(): Boolean;
+begin
+   Result := checkLongDateTime.Checked;
+end;
+
+procedure TformOptions.SetLongDateTime(v: Boolean);
+begin
+   checkLongDateTime.Checked := v;
 end;
 
 end.

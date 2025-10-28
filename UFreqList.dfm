@@ -23,6 +23,7 @@ object FreqList: TFreqList
       end
       item
         Caption = #12496#12531#12489
+        Width = 60
       end
       item
         Caption = #21608#27874#25968
@@ -33,7 +34,8 @@ object FreqList: TFreqList
         Width = 60
       end
       item
-        Caption = 'CALL'
+        Caption = 'CQ/SP'
+        Width = 60
       end
       item
         Caption = #26356#26032#26178#21051
@@ -48,6 +50,5 @@ object FreqList: TFreqList
     RowSelect = True
     TabOrder = 0
     ViewStyle = vsReport
-    ExplicitWidth = 402
   end
 end

@@ -23,8 +23,6 @@ object formOptions: TformOptions
     Align = alBottom
     BevelOuter = bvNone
     TabOrder = 3
-    ExplicitTop = 16
-    ExplicitWidth = 503
     DesignSize = (
       331
       33)
@@ -38,7 +36,6 @@ object formOptions: TformOptions
       Default = True
       ModalResult = 1
       TabOrder = 0
-      ExplicitLeft = 333
     end
     object buttonCancel: TButton
       Left = 241
@@ -50,7 +47,6 @@ object formOptions: TformOptions
       Caption = #12461#12515#12531#12475#12523
       ModalResult = 2
       TabOrder = 1
-      ExplicitLeft = 413
     end
   end
   object groupSecureOptions: TGroupBox
@@ -142,6 +138,14 @@ object formOptions: TformOptions
       Width = 145
       Height = 25
       Caption = #12467#12510#12531#12489#12525#12464#12434#21462#24471#12377#12427
+      TabOrder = 2
+    end
+    object checkLongDateTime: TCheckBox
+      Left = 167
+      Top = 24
+      Width = 130
+      Height = 25
+      Caption = #26085#26178#12399#38263#12356#24418#24335
       TabOrder = 1
     end
   end
