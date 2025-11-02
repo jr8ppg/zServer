@@ -88,6 +88,8 @@ function TextToMode(text: string): TMode;
 function LoadFromResourceName(hinst: THandle; filename: string): TStringList;
 function TrimCRLF(SS : string) : string;
 
+function CreateTempLogFileName(): string;
+
 var
   dmZLogGlobal: TdmZLogGlobal;
 
@@ -931,6 +933,33 @@ begin
    end;
 
    Result := S;
+end;
+
+function CreateTempLogFileName(): string;
+var
+   S: string;
+   fullpath: string;
+   c: Integer;
+begin
+   c := 0;
+   repeat
+      if (c = 50) then begin
+         Result := '';
+         Exit;
+      end;
+
+      S := FormatDateTime('yyyymmdd_hhmmss', Now);
+      if c > 0 then begin
+         S := S + IntToStr(c);
+      end;
+      S := 'ZT_' + S + '.ZLOX';
+
+      fullpath := ExtractFilePath(Application.ExeName) + S;
+
+      Inc(c);
+   until FileExists(fullpath) = False;
+
+   Result := fullpath;
 end;
 
 end.

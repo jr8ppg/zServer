@@ -148,5 +148,13 @@ object formOptions: TformOptions
       Caption = #26085#26178#12399#38263#12356#24418#24335
       TabOrder = 1
     end
+    object checkUseAutoSave: TCheckBox
+      Left = 167
+      Top = 55
+      Width = 130
+      Height = 25
+      Caption = #33258#21205#20445#23384
+      TabOrder = 3
+    end
   end
 end

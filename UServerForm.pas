@@ -145,6 +145,8 @@ type
 
     FCurrentFileName: string;
     FLastPath: string;
+    FLastTickCount: DWORD;
+    FUseAutoSave: Boolean;
 
     FPortNumber: string;
     FSecure: Boolean;
@@ -249,7 +251,7 @@ begin
    FCurrentFileName := '';
    FLastPath := '';
    FLongDateTime := False;
-
+   FLastTickCount := 0;
    LoadSettings();
 
    // SSLコンテキストパラメータセット
@@ -420,6 +422,8 @@ end;
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
 
 procedure TServerForm.IdleEvent(Sender: TObject; var Done: Boolean);
+var
+   dwTick: DWORD;
 begin
    if ClientListBox.Items.Count > LISTMAXLINES then begin
       ClientListBox.Items.BeginUpdate();
@@ -429,6 +433,23 @@ begin
       ClientListBox.Items.EndUpdate();
       ClientListBox.ShowLast();
    end;
+
+   // 前回セーブ時から未セーブありかつ１分以上経過で自動セーブ
+   if (FStats <> nil) and (MasterLog.Saved = False) and (FUseAutoSave = True) then begin
+      dwTick := GetTickCount();
+      if (dwTick - FLastTickCount) > (60 * 1000) then begin
+         if FCurrentFileName = '' then begin
+            FCurrentFileName := CreateTempLogFileName();
+         end;
+
+         FStats.SaveLogs(FCurrentFileName);
+         FLastPath := ExtractFilePath(FCurrentFileName);
+         AddConsole('ファイル ' + ExtractFileName(FCurrentFileName) + ' に自動保存しました');
+
+         FLastTickCount := dwTick;
+      end;
+   end;
+
 end;
 
 { * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * }
@@ -1059,6 +1080,7 @@ begin
       f.TakeChatLog := FTakeChatLog;
       f.TakeCommandLog := FTakeCommandLog;
       f.LongDateTime := FLongDateTime;
+      f.UseAutoSave := FUseAutoSave;
 
       if f.ShowModal() <> mrOK then begin
          Exit;
@@ -1071,6 +1093,7 @@ begin
       FTakeChatLog := f.TakeChatLog;
       FTakeCommandLog := f.TakeCommandLog;
       FLongDateTime := f.LongDateTime;
+      FUseAutoSave := f.UseAutoSave;
 
       ApplyTakeCommandLog();
       FConnections.LongDateTime := FLongDateTime;
@@ -1142,6 +1165,7 @@ begin
       FTakeChatLog := IniFile.ReadBool('Options', 'TakeChatLog', True);
       FTakeCommandLog := IniFile.ReadBool('Options', 'TakeCommandLog', False);
       FLongDateTime := IniFile.ReadBool('Options', 'LongDateTime', False);
+      FUseAutoSave := IniFile.ReadBool('Options', 'UseAutoSave', False);
 
       ApplyTakeCommandLog();
 
@@ -1181,6 +1205,7 @@ begin
       IniFile.WriteBool('Options', 'TakeChatLog', FTakeChatLog);
       IniFile.WriteBool('Options', 'TakeCommandLog', FTakeCommandLog);
       IniFile.WriteBool('Options', 'LongDateTime', FLongDateTime);
+      IniFile.WriteBool('Options', 'UseAutoSave', FUseAutoSave);
 
       for i := Low(FClientList) to High(FClientList) do begin
          if (FClientList[i].FX = -1) and (FClientList[i].FY = -1) then begin
@@ -1320,6 +1345,10 @@ begin
 
    if FSecure = True then begin
       S := S + ' [SECURE]';
+   end;
+
+   if FUseAutoSave = True then begin
+      S := S + ' [自動保存]';
    end;
 
    Caption := S;

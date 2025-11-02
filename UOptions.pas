@@ -24,6 +24,7 @@ type
     checkTakeChatLog: TCheckBox;
     checkTakeCommandLog: TCheckBox;
     checkLongDateTime: TCheckBox;
+    checkUseAutoSave: TCheckBox;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
   private
@@ -42,6 +43,8 @@ type
     procedure SetTakeCommandLog(v: Boolean);
     function GetLongDateTime(): Boolean;
     procedure SetLongDateTime(v: Boolean);
+    function GetUseAutoSave(): Boolean;
+    procedure SetUseAutoSave(v: Boolean);
   public
     { Public êÈåæ }
     property Port: string read GetPort write SetPort;
@@ -51,6 +54,7 @@ type
     property TakeChatLog: Boolean read GetTakeChatLog write SetTakeChatLog;
     property TakeCommandLog: Boolean read GetTakeCommandLog write SetTakeCommandLog;
     property LongDateTime: Boolean read GetLongDateTime write SetLongDateTime;
+    property UseAutoSave: Boolean read GetUseAutoSave write SetUseAutoSave;
   end;
 
 implementation
@@ -143,6 +147,16 @@ end;
 procedure TformOptions.SetLongDateTime(v: Boolean);
 begin
    checkLongDateTime.Checked := v;
+end;
+
+function TformOptions.GetUseAutoSave(): Boolean;
+begin
+   Result := checkUseAutoSave.Checked;
+end;
+
+procedure TformOptions.SetUseAutoSave(v: Boolean);
+begin
+   checkUseAutoSave.Checked := v;
 end;
 
 end.
