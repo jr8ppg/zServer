@@ -15,6 +15,7 @@ type
   private
     { Private declarations }
     FLongDateTime: Boolean;
+    FDateTimeFormat: string;
     procedure SetLongDateTime(v: Boolean);
   public
     { Public declarations }
@@ -41,17 +42,9 @@ var
    F: TCliForm;
    i: Integer;
    listitem: TListItem;
-   fmt: string;
 begin
    ListView1.Items.BeginUpdate();
    ListView1.Items.Clear;
-
-   if FLongDateTime = True then begin
-      fmt := 'yyyy/mm/dd hh:nn:ss';
-   end
-   else begin
-      fmt := 'hh:nn:ss';
-   end;
 
    // 1234 123456789012345 12345678 123456789 1234567890
    // [1]  127.000.000.100 HH:MM:SS 1.9MHz    JR8PPG
@@ -70,14 +63,14 @@ begin
       listitem.SubItems.Add(ServerForm.ClientList[i].FIPAddress);
 
       // ê⁄ë±éûçè
-      str := FormatDateTime(fmt, ServerForm.ClientList[i].FConnectTime);
+      str := FormatDateTime(FDateTimeFormat, ServerForm.ClientList[i].FConnectTime);
       listitem.SubItems.Add(str);
 
       if (ServerForm.ClientList[i].FUse = False) then begin
          F := nil;
 
          // êÿíféûçè
-         str := FormatDateTime(fmt, ServerForm.ClientList[i].FDisconnectTime);
+         str := FormatDateTime(FDateTimeFormat, ServerForm.ClientList[i].FDisconnectTime);
          listitem.SubItems.Add(str);
 
          // ÉoÉìÉh
@@ -124,6 +117,14 @@ end;
 procedure TConnections.SetLongDateTime(v: Boolean);
 begin
    FLongDateTime := v;
+
+   if FLongDateTime = True then begin
+      FDateTimeFormat := 'yyyy/mm/dd hh:nn:ss';
+   end
+   else begin
+      FDateTimeFormat := 'hh:nn:ss';
+   end;
+
    if v = True then begin
       ListView1.Columns[2].Width := 160;
       ListView1.Columns[3].Width := 160;
@@ -132,6 +133,9 @@ begin
       ListView1.Columns[2].Width := 80;
       ListView1.Columns[3].Width := 80;
    end;
+
+   UpdateDisplay();
+
    ListView1.Refresh();
 end;
 

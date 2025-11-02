@@ -42,7 +42,7 @@ object FreqList: TFreqList
         Width = 80
       end
       item
-        Caption = #12507#12473#12488#21517
+        Caption = 'PC'#21517
         Width = 80
       end>
     GridLines = True

@@ -85,7 +85,11 @@ begin
          listitem.SubItems.Add(str);
 
          // XV
+         // HH:MM:SS
          str := Trim(Copy(S, 31, 8));
+         if (Length(str) = 7) then begin
+            str := '0' + str;
+         end;
          listitem.SubItems.Add(str);
 
          // PC–¼
