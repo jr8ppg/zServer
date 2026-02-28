@@ -24,6 +24,7 @@ implementation
 procedure TCQWWStats.FormCreate(Sender: TObject);
 begin
    inherited;
+   MasterLog.QsoList[0].RSTSent := _USEUTC;
    LowBand := b19;
    HighBand := b28;
    //InitGrid(LowBand, HighBand);
