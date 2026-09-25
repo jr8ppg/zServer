@@ -130,6 +130,8 @@ type
     procedure Process_InsQso(S: string; from: Integer);
     procedure Process_GetFile(S: string; from: Integer);
     procedure Process_PutFile(S: string; from: Integer);
+    procedure Process_ExGetQsoIDs(S: string; from: Integer);
+    procedure Process_ExSendLog(S: string; from: Integer);
 
     procedure AddServerConsole(S: string);
     procedure AddToCommandLog(direction: string; str: string);
@@ -785,6 +787,16 @@ begin
             Continue;
          end;
 
+         if Pos('EXGETQSOIDS', temp) = 1 then begin
+            Process_ExGetQsoIDs(temp, from);
+            Continue;
+         end;
+
+         if Pos('EXSENDLOG', temp) = 1 then begin
+            Process_ExSendLog(temp, from);
+            Continue;
+         end;
+
          S := ZLinkHeader + ' ' + temp;
 
          if ServerForm.ChatOnly = False then begin
@@ -1216,6 +1228,131 @@ begin
       mem.Free();
       base64.Free();
       sl.Free();
+   end;
+end;
+
+procedure TClientThread.Process_ExGetQsoIDs(S: string; from: Integer);
+var
+   i: Integer;
+   qsoid: Integer;
+   temp: string;
+   qsoidlist: TDictionary<Integer, Integer>;
+   Index: Integer;
+   C: Integer;
+   val: Integer;
+   SL: TStringList;
+begin
+   temp := S;
+   Delete(temp, 1, 12);
+
+   // QSOIDリストをDictionaryに展開する
+   qsoidlist := TDictionary<Integer, Integer>.Create();
+   SL := TStringList.Create();
+   SL.StrictDelimiter := True;
+   SL.Delimiter := ' ';
+   SL.DelimitedText := temp;
+   for i := 0 to SL.Count - 1 do begin
+      qsoid := StrToInt(SL[i]);
+      qsoidlist.Add(qsoid, qsoid);
+   end;
+
+   // 全てのQSOをリストに照合して無ければ送る
+   Index := 1;
+   while Index <= ServerForm.MasterLog.TotalQSO do begin
+
+      C := 0;
+      S := '';
+      repeat
+         if FClientSocket.State <> wsConnected then begin
+            Exit;
+         end;
+
+         qsoid := ServerForm.MasterLog.QSOList[Index].Reserve3;
+         if qsoidlist.TryGetValue(qsoid, val) = False then begin
+            S := S + IntToStr(qsoid);
+            S := S + ' ';
+            Inc(C);
+         end;
+         Inc(Index);
+      until (C = 20) or (Index > ServerForm.MasterLog.TotalQSO);
+
+      if S <> '' then begin
+         SendStr(ZLinkHeader + ' QSOIDS ' + S + LBCODE);
+         S := '';
+      end;
+   end;
+
+   S := ZLinkHeader + ' ENDQSOIDS';
+   SendStr(S + LBCODE);
+
+   qsoidlist.Free();
+   SL.Free();
+end;
+
+procedure TClientThread.Process_ExSendLog(S: string; from: Integer);
+var
+   i: Integer;
+   qsoid: Integer;
+   temp: string;
+   aQSO: TQSO;
+   qsoidlist: TDictionary<Integer, Integer>;
+   Index: Integer;
+   C: Integer;
+   val: Integer;
+   SL: TStringList;
+begin
+   temp := S;
+   Delete(temp, 1, 10);
+
+   if ServerForm.MasterLog.TotalQSO = 0 then begin
+      S := '*** MasterLog is empty ***';
+      if ServerForm.ChatOnly = False then begin
+         AddServerConsole(S);
+      end;
+      Exit;
+   end;
+
+   if ServerForm.ChatOnly = False then begin
+      S := '*** BEGIN EXSENDLOG ***';
+      AddServerConsole(S);
+   end;
+
+   qsoidlist := TDictionary<Integer, Integer>.Create();
+   SL := TStringList.Create();
+   SL.StrictDelimiter := True;
+   SL.Delimiter := ' ';
+
+   C := 0;
+   try
+      // QSOIDリストをDictionaryに展開する
+      SL.DelimitedText := temp;
+      for i := 0 to SL.Count - 1 do begin
+         qsoid := StrToInt(SL[i]);
+         qsoidlist.Add(qsoid, qsoid);
+      end;
+
+      // 全てのQSOをリストに照合して無ければ送る
+      for Index := 1 to ServerForm.MasterLog.TotalQSO do begin
+         if FClientSocket.State <> wsConnected then begin
+            Exit;
+         end;
+
+         aQSO := ServerForm.MasterLog.QSOList[Index];
+         qsoid := aQSO.Reserve3;
+         if qsoidlist.TryGetValue(qsoid, val) = False then begin
+            S := ZLinkHeader + ' PUTLOGEX ' + aQSO.QSOinText + LBCODE;
+            SendStr(S);
+            Sleep(0);
+            Inc(C);
+         end;
+      end;
+   finally
+      qsoidlist.Free();
+      SL.Free();
+      if ServerForm.ChatOnly = False then begin
+         S := '*** END EXSENDLOG = ' + IntToStr(C) + ' QSOs sent ***';
+         AddServerConsole(S);
+      end;
    end;
 end;
 
