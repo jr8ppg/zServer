@@ -98,6 +98,10 @@ type
     FLoginPass: string;
     FCommandTemp: string;
     FCommandTimer: TTimer;
+
+    FNewMergeProgress: Boolean;
+    FNewMergeQsoList: TDictionary<Integer, Integer>;
+
     procedure OnCommandTimer(Sender: TObject);
     procedure BroadcastMessage(S: string);
     procedure SendConnectedMessage();
@@ -132,6 +136,9 @@ type
     procedure Process_PutFile(S: string; from: Integer);
     procedure Process_ExGetQsoIDs(S: string; from: Integer);
     procedure Process_ExSendLog(S: string; from: Integer);
+    procedure Process_NewBeginMerge(S: string; from: Integer);
+    procedure Process_CheckQsoIDs(S: string; from: Integer);
+    procedure Process_GetUnregQSOs(S: string; from: Integer);
 
     procedure AddServerConsole(S: string);
     procedure AddToCommandLog(direction: string; str: string);
@@ -396,6 +403,8 @@ begin
    FCommandTimer.Enabled := False;
    FCommandTimer.Interval := 600;
    FCommandTimer.OnTimer := OnCommandTimer;
+   FNewMergeProgress := False;
+   FNewMergeQsoList := nil;
    inherited Create(True);
 end;
 
@@ -405,7 +414,9 @@ begin
       FClientSocket.Free();
       FClientSocket := nil;
    end;
-
+   if FNewMergeQsoList <> nil then begin
+      FNewMergeQsoList.Free();
+   end;
    FCommandTimer.Free();
    FFileData.Free();
    FCommandQue.Free();
@@ -797,6 +808,27 @@ begin
             Continue;
          end;
 
+         if Pos('NEWBEGINMERGE', temp) = 1 then begin
+            FClientForm.AddConsole('*** NEWマージ処理を開始します ***');
+            Process_NewBeginMerge(temp, from);
+            Continue;
+         end;
+
+         if Pos('CHECKQSOIDS', temp) = 1 then begin
+            Process_CheckQsoIDs(temp, from);
+            Continue;
+         end;
+
+         if Pos('GETUNREGQSOS', temp) = 1 then begin
+            Process_GetUnregQSOs(temp, from);
+
+            FClientForm.AddConsole('*** NEWマージ処理が終了しました ***');
+            S := ZLinkHeader + ' NEWENDMERGE' + LBCODE;
+            SendStr(S);
+
+            Continue;
+         end;
+
          S := ZLinkHeader + ' ' + temp;
 
          if ServerForm.ChatOnly = False then begin
@@ -1038,6 +1070,12 @@ begin
    Delete(S, 1, 7);
    aQSO.TextToQSO(S); // delete "PUTQSO "
 
+   if FNewMergeProgress = True then begin
+      if FNewMergeQsoList.ContainsKey(aQSO.Reserve3) = False then begin
+         FNewMergeQsoList.Add(aQSO.Reserve3, aQSO.Reserve3);
+      end;
+   end;
+
    PostMessage(ServerForm.Handle, WM_ZCMD_PUTQSO, from, LPARAM(aQSO));
 end;
 
@@ -1048,6 +1086,12 @@ begin
    aQSO := TQSO.Create;
    Delete(S, 1, 7);
    aQSO.TextToQSO(S);
+
+   if FNewMergeProgress = True then begin
+      if FNewMergeQsoList.ContainsKey(aQSO.Reserve3) = False then begin
+         FNewMergeQsoList.Add(aQSO.Reserve3, aQSO.Reserve3);
+      end;
+   end;
 
    PostMessage(ServerForm.Handle, WM_ZCMD_PUTLOG, from, LPARAM(aQSO));
 end;
@@ -1239,7 +1283,6 @@ var
    qsoidlist: TDictionary<Integer, Integer>;
    Index: Integer;
    C: Integer;
-   val: Integer;
    SL: TStringList;
 begin
    temp := S;
@@ -1268,7 +1311,7 @@ begin
          end;
 
          qsoid := ServerForm.MasterLog.QSOList[Index].Reserve3;
-         if qsoidlist.TryGetValue(qsoid, val) = False then begin
+         if qsoidlist.ContainsKey(qsoid) = False then begin
             S := S + IntToStr(qsoid);
             S := S + ' ';
             Inc(C);
@@ -1351,6 +1394,116 @@ begin
       SL.Free();
       if ServerForm.ChatOnly = False then begin
          S := '*** END EXSENDLOG = ' + IntToStr(C) + ' QSOs sent ***';
+         AddServerConsole(S);
+      end;
+   end;
+end;
+
+procedure TClientThread.Process_NewBeginMerge(S: string; from: Integer);
+begin
+   FNewMergeProgress := True;
+   if FNewMergeQsoList = nil then begin
+      FNewMergeQsoList := TDictionary<Integer, Integer>.Create();
+   end
+   else begin
+      FNewMergeQsoList.Clear();
+   end;
+end;
+
+procedure TClientThread.Process_CheckQsoIDs(S: string; from: Integer);
+var
+   i: Integer;
+   qsoid: Integer;
+   temp: string;
+   SL: TStringList;
+   SLOUT: TStringList;
+   aQSO: TQSO;
+begin
+   temp := S;
+   Delete(temp, 1, 12);
+
+   // QSOIDリストをDictionaryに展開する
+   SL := TStringList.Create();
+   SL.StrictDelimiter := True;
+   SL.Delimiter := ' ';
+   SL.DelimitedText := temp;
+
+   SLOUT := TStringList.Create();
+   SLOUT.StrictDelimiter := True;
+   SLOUT.Delimiter := ' ';
+
+   for i := 0 to SL.Count - 1 do begin
+      qsoid := StrToInt(SL[i]);
+
+      aQSO := ServerForm.GetQSObyID(qsoid);
+      if aQSO = nil then begin
+         // 無いQSOIDは返す
+         SLOUT.Add(SL[i]);
+      end
+      else begin
+         // あった場合はリストに登録
+         if FNewMergeQsoList.ContainsKey(qsoid) = False then begin
+            FNewMergeQsoList.Add(qsoid, qsoid);
+         end;
+      end;
+   end;
+
+   S := ZLinkHeader + ' CHECKQSOIDS ' + SLOUT.DelimitedText;
+   SendStr(S + LBCODE);
+
+   SL.Free();
+   SLOUT.Free();
+end;
+
+procedure TClientThread.Process_GetUnregQSOs(S: string; from: Integer);
+var
+   qsoid: Integer;
+   temp: string;
+   aQSO: TQSO;
+   Index: Integer;
+   C: Integer;
+begin
+   temp := S;
+   Delete(temp, 1, 13);
+
+   if ServerForm.MasterLog.TotalQSO = 0 then begin
+      S := '*** MasterLog is empty ***';
+      if ServerForm.ChatOnly = False then begin
+         AddServerConsole(S);
+      end;
+
+      S := ZLinkHeader + ' NEWENDMERGE' + LBCODE;
+      SendStr(S);
+
+      Exit;
+   end;
+
+   if ServerForm.ChatOnly = False then begin
+      S := '*** BEGIN EXSENDLOG ***';
+      AddServerConsole(S);
+   end;
+
+   C := 0;
+   try
+      // 全てのQSOをリストに照合して無ければ送る
+      for Index := 1 to ServerForm.MasterLog.TotalQSO do begin
+         if FClientSocket.State <> wsConnected then begin
+            Exit;
+         end;
+
+         aQSO := ServerForm.MasterLog.QSOList[Index];
+         qsoid := aQSO.Reserve3;
+         if FNewMergeQsoList.ContainsKey(qsoid) = False then begin
+            S := ZLinkHeader + ' PUTLOGEX ' + aQSO.QSOinText + LBCODE;
+            SendStr(S);
+            Sleep(0);
+            Inc(C);
+         end;
+      end;
+   finally
+      FNewMergeProgress := False;
+      if ServerForm.ChatOnly = False then begin
+         S := '*** END GETUNREGQSOS = ' + IntToStr(C) + ' QSOs sent ***';
          AddServerConsole(S);
       end;
    end;
